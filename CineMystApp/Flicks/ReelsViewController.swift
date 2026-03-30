@@ -1,0 +1,432 @@
+
+import UIKit
+import AVFoundation
+
+// MARK: - Reels View Controller
+final class ReelsViewController: UIViewController {
+    
+    private var reels: [Reel] = []
+    private var currentIndex: Int = 0
+    private var isLoadingMore = false
+    
+    private lazy var collectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .vertical
+        layout.minimumLineSpacing = 0
+        layout.minimumInteritemSpacing = 0
+        
+        let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        cv.isPagingEnabled = true
+        cv.showsVerticalScrollIndicator = false
+        cv.translatesAutoresizingMaskIntoConstraints = false
+        cv.backgroundColor = .black
+        cv.delegate = self
+        cv.dataSource = self
+        cv.register(ReelCell.self, forCellWithReuseIdentifier: ReelCell.identifier)
+        return cv
+    }()
+    
+    private let createButton: UIButton = {
+        let btn = UIButton(type: .system)
+        
+        var config = UIButton.Configuration.filled()
+        config.baseBackgroundColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1)
+        config.baseForegroundColor = .white
+        config.cornerStyle = .medium
+        config.image = UIImage(systemName: "plus")
+        config.imagePlacement = .leading
+        config.imagePadding = 6
+        config.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12)
+        
+        let titleAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 14, weight: .semibold)
+        ]
+        config.attributedTitle = AttributedString("Create Flick", attributes: AttributeContainer(titleAttributes))
+        
+        btn.configuration = config
+        btn.layer.shadowColor = UIColor.black.cgColor
+        btn.layer.shadowOpacity = 0.3
+        btn.layer.shadowOffset = CGSize(width: 0, height: 2)
+        btn.layer.shadowRadius = 4
+        btn.translatesAutoresizingMaskIntoConstraints = false
+        return btn
+    }()
+    
+    // MARK: - Lifecycle
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
+        configureAudioSession()
+        setupCollectionView()
+        setupCreateButton()
+        loadInitialReels()
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // Refresh flicks when returning to the screen
+        Task {
+            await fetchReelsFromSupabase()
+        }
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        playCurrentVideo()
+    }
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        pauseCurrentVideo()
+    }
+    
+    // MARK: - Audio Session
+    private func configureAudioSession() {
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("Failed to set audio session category: \(error)")
+        }
+    }
+    
+    // MARK: - Setup
+    private func setupCollectionView() {
+        view.addSubview(collectionView)
+        
+        NSLayoutConstraint.activate([
+            collectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            collectionView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
+        ])
+    }
+    
+    private func setupCreateButton() {
+        view.addSubview(createButton)
+        createButton.addTarget(self, action: #selector(createFlickTapped), for: .touchUpInside)
+        
+        NSLayoutConstraint.activate([
+            createButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            createButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
+            createButton.heightAnchor.constraint(equalToConstant: 36)
+        ])
+    }
+    
+    @objc private func createFlickTapped() {
+        let uploadVC = FlickUploadViewController()
+        uploadVC.modalPresentationStyle = .fullScreen
+        present(uploadVC, animated: true)
+    }
+    
+    // MARK: - Data Loading
+    private func loadInitialReels() {
+        Task {
+            await fetchReelsFromSupabase()
+        }
+    }
+    
+    private func fetchReelsFromSupabase() async {
+        do {
+            let offset = reels.count
+            let flicks = try await FlicksService.shared.fetchFlicks(limit: 10, offset: offset)
+            
+            await MainActor.run {
+                let newReels = flicks.map { flick in
+                    Reel.from(flick: flick, isLiked: false)
+                }
+                
+                if offset == 0 {
+                    self.reels = newReels
+                } else {
+                    self.reels.append(contentsOf: newReels)
+                }
+                
+                self.collectionView.reloadData()
+                
+                // Check likes for loaded reels
+                Task {
+                    await self.checkLikesForReels()
+                }
+            }
+        } catch {
+            print("❌ Failed to fetch flicks: \(error)")
+            await MainActor.run {
+                // Show error or fallback to sample data if needed
+                if self.reels.isEmpty {
+                    self.showEmptyState()
+                }
+            }
+        }
+    }
+    
+    private func checkLikesForReels() async {
+        for (index, reel) in reels.enumerated() {
+            if let isLiked = try? await FlicksService.shared.isFlickLiked(flickId: reel.id) {
+                await MainActor.run {
+                    // Update reel with like status
+                    let updatedReel = Reel(
+                        id: reel.id,
+                        userId: reel.userId,
+                        videoURL: reel.videoURL,
+                        authorName: reel.authorName,
+                        authorUsername: reel.authorUsername,
+                        authorAvatar: reel.authorAvatar,
+                        authorAvatarURL: reel.authorAvatarURL,
+                        likes: reel.likes,
+                        comments: reel.comments,
+                        shares: reel.shares,
+                        audioTitle: reel.audioTitle,
+                        caption: reel.caption,
+                        isLiked: isLiked
+                    )
+                    self.reels[index] = updatedReel
+                    
+                    let indexPath = IndexPath(item: index, section: 0)
+                    if let cell = self.collectionView.cellForItem(at: indexPath) as? ReelCell {
+                        cell.updateLikeStatus(isLiked: isLiked)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func showEmptyState() {
+        let label = UILabel()
+        label.text = "No flicks yet\n\nBe the first to post!"
+        label.textColor = .white
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        label.font = .systemFont(ofSize: 18, weight: .medium)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        
+        view.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+        ])
+    }
+    
+    private func updateShareCount(at index: Int) async {
+        guard index < reels.count else { return }
+        let reel = reels[index]
+        
+        // Fetch updated flick data
+        if let updatedFlick = try? await FlicksService.shared.fetchFlicks(limit: 1, offset: index).first {
+            let updatedReel = Reel.from(flick: updatedFlick, isLiked: reel.isLiked)
+            await MainActor.run {
+                self.reels[index] = updatedReel
+                let indexPath = IndexPath(item: index, section: 0)
+                if let cell = self.collectionView.cellForItem(at: indexPath) as? ReelCell {
+                    cell.configure(with: updatedReel)
+                }
+            }
+        }
+    }
+    
+    private func loadMoreReels() {
+        guard !isLoadingMore else { return }
+        isLoadingMore = true
+        
+        Task {
+            await fetchReelsFromSupabase()
+            await MainActor.run {
+                self.isLoadingMore = false
+            }
+        }
+    }
+    
+    // MARK: - Video Control
+    private func playCurrentVideo() {
+        let indexPath = IndexPath(item: currentIndex, section: 0)
+        if let cell = collectionView.cellForItem(at: indexPath) as? ReelCell {
+            cell.play()
+        }
+    }
+    
+    private func pauseCurrentVideo() {
+        let indexPath = IndexPath(item: currentIndex, section: 0)
+        if let cell = collectionView.cellForItem(at: indexPath) as? ReelCell {
+            cell.pause()
+        }
+    }
+    
+    private func pauseAllExcept(index: Int) {
+        for i in 0..<reels.count where i != index {
+            let indexPath = IndexPath(item: i, section: 0)
+            if let cell = collectionView.cellForItem(at: indexPath) as? ReelCell {
+                cell.pause()
+            }
+        }
+    }
+    
+    // MARK: - Comment Bottom Sheet
+    private func showCommentSheet() {
+        let commentVC = CommentBottomSheetViewController()
+        commentVC.modalPresentationStyle = .pageSheet
+        
+        if let sheet = commentVC.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 20
+        }
+        
+        present(commentVC, animated: true)
+    }
+    
+    // MARK: - Share Bottom Sheet
+    private func showShareSheet() {
+        let shareVC = ShareBottomSheetViewController()
+        shareVC.modalPresentationStyle = .pageSheet
+        
+        if let sheet = shareVC.sheetPresentationController {
+            sheet.detents = [.medium()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 20
+        }
+        
+        present(shareVC, animated: true)
+    }
+}
+
+// MARK: - UICollectionView DataSource
+extension ReelsViewController: UICollectionViewDataSource {
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        return reels.count
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        guard let cell = collectionView.dequeueReusableCell(
+            withReuseIdentifier: ReelCell.identifier,
+            for: indexPath
+        ) as? ReelCell else {
+            return UICollectionViewCell()
+        }
+        
+        let reel = reels[indexPath.item]
+        cell.configure(with: reel)
+        cell.delegate = self
+        
+        return cell
+    }
+}
+
+// MARK: - UICollectionView Delegate
+extension ReelsViewController: UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+        return collectionView.bounds.size
+    }
+    
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        let pageHeight = scrollView.frame.height
+        let newIndex = Int(scrollView.contentOffset.y / pageHeight)
+        
+        if newIndex != currentIndex {
+            pauseAllExcept(index: newIndex)
+            currentIndex = newIndex
+            playCurrentVideo()
+        }
+        
+        if currentIndex >= reels.count - 2 {
+            loadMoreReels()
+        }
+    }
+}
+
+// MARK: - ReelCell Delegate
+extension ReelsViewController: ReelCellDelegate {
+
+    func didTapComment(on cell: ReelCell) {
+        guard let indexPath = collectionView.indexPath(for: cell) else { return }
+        let reel = reels[indexPath.item]
+        
+        let commentVC = CommentBottomSheetViewController()
+        commentVC.flickId = reel.id
+        commentVC.modalPresentationStyle = .pageSheet
+        
+        if let sheet = commentVC.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 20
+        }
+        
+        present(commentVC, animated: true)
+    }
+
+    func didTapShare(on cell: ReelCell) {
+        guard let indexPath = collectionView.indexPath(for: cell) else { return }
+        let reel = reels[indexPath.item]
+        
+        // Create share items
+        let shareText = "Check out this flick by \(reel.authorName)!"
+        let shareURL = URL(string: reel.videoURL)
+        
+        var itemsToShare: [Any] = [shareText]
+        if let url = shareURL {
+            itemsToShare.append(url)
+        }
+        
+        let activityVC = UIActivityViewController(activityItems: itemsToShare, applicationActivities: nil)
+        
+        // iPad support
+        if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = cell
+            popover.sourceRect = CGRect(x: cell.bounds.midX, y: cell.bounds.midY, width: 0, height: 0)
+        }
+        
+        present(activityVC, animated: true) {
+            // Increment share count in backend
+            Task {
+                do {
+                    try await FlicksService.shared.incrementShareCount(flickId: reel.id)
+                    // Update local count
+                    await self.updateShareCount(at: indexPath.item)
+                } catch {
+                    print("Failed to increment share count: \(error)")
+                }
+            }
+        }
+    }
+
+    func didTapMore(on cell: ReelCell, sourceView: UIView) {
+        let sheet = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+
+        sheet.addAction(UIAlertAction(title: "Save", style: .default, handler: { _ in
+            print("Save tapped")
+        }))
+
+        sheet.addAction(UIAlertAction(title: "Interested", style: .default, handler: { _ in
+            print("Interested tapped")
+        }))
+
+        sheet.addAction(UIAlertAction(title: "Not Interested", style: .default, handler: { _ in
+            print("Not Interested tapped")
+        }))
+
+        sheet.addAction(UIAlertAction(title: "Report", style: .destructive, handler: { _ in
+            print("Report tapped")
+        }))
+
+        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+
+        // iPad popover support
+        if let pop = sheet.popoverPresentationController {
+            pop.sourceView = sourceView
+            pop.sourceRect = sourceView.bounds
+        }
+
+        present(sheet, animated: true)
+    }
+    
+    func didTapProfile(on cell: ReelCell, userId: String) {
+        // Navigate to user profile
+        let profileVC = ProfileViewController()
+        profileVC.viewingUserId = userId
+        profileVC.hidesBottomBarWhenPushed = true
+        
+        // Push to current navigation controller
+        navigationController?.pushViewController(profileVC, animated: true)
+    }
+}
+
+  
