@@ -16,26 +16,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		5B9C89052EC2D95200A0F1F1 /* CineMystApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CineMystApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5B9C89052EC2D95200A0F1F1 /* CineMystiOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CineMystiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		5B9C89172EC2D95400A0F1F1 /* Exceptions for "CineMystApp" folder in "CineMystApp" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = 5B9C89042EC2D95200A0F1F1 /* CineMystApp */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		5B9C89072EC2D95200A0F1F1 /* CineMystApp */ = {
+		5B9C89072EC2D95200A0F1F1 /* CineMystiOS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				5B9C89172EC2D95400A0F1F1 /* Exceptions for "CineMystApp" folder in "CineMystApp" target */,
-			);
-			path = CineMystApp;
+			path = CineMystiOS;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -60,7 +47,7 @@
 		5B9C88FC2EC2D95200A0F1F1 = {
 			isa = PBXGroup;
 			children = (
-				5B9C89072EC2D95200A0F1F1 /* CineMystApp */,
+				5B9C89072EC2D95200A0F1F1 /* CineMystiOS */,
 				5B9C89062EC2D95200A0F1F1 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -68,7 +55,7 @@
 		5B9C89062EC2D95200A0F1F1 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				5B9C89052EC2D95200A0F1F1 /* CineMystApp.app */,
+				5B9C89052EC2D95200A0F1F1 /* CineMystiOS.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -76,9 +63,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		5B9C89042EC2D95200A0F1F1 /* CineMystApp */ = {
+		5B9C89042EC2D95200A0F1F1 /* CineMystiOS */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 5B9C89182EC2D95400A0F1F1 /* Build configuration list for PBXNativeTarget "CineMystApp" */;
+			buildConfigurationList = 5B9C89182EC2D95400A0F1F1 /* Build configuration list for PBXNativeTarget "CineMystiOS" */;
 			buildPhases = (
 				5B9C89012EC2D95200A0F1F1 /* Sources */,
 				5B9C89022EC2D95200A0F1F1 /* Frameworks */,
@@ -89,9 +76,9 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				5B9C89072EC2D95200A0F1F1 /* CineMystApp */,
+				5B9C89072EC2D95200A0F1F1 /* CineMystiOS */,
 			);
-			name = CineMystApp;
+			name = CineMystiOS;
 			packageProductDependencies = (
 				5BC9E4842ECDF98B0081F195 /* Auth */,
 				5BC9E4862ECDF98B0081F195 /* Functions */,
@@ -101,7 +88,7 @@
 				5BC9E48E2ECDF98B0081F195 /* Supabase */,
 			);
 			productName = CineMystApp;
-			productReference = 5B9C89052EC2D95200A0F1F1 /* CineMystApp.app */;
+			productReference = 5B9C89052EC2D95200A0F1F1 /* CineMystiOS.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -112,14 +99,14 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1640;
-				LastUpgradeCheck = 1640;
+				LastUpgradeCheck = 2630;
 				TargetAttributes = {
 					5B9C89042EC2D95200A0F1F1 = {
 						CreatedOnToolsVersion = 16.4;
 					};
 				};
 			};
-			buildConfigurationList = 5B9C89002EC2D95200A0F1F1 /* Build configuration list for PBXProject "CineMystApp" */;
+			buildConfigurationList = 5B9C89002EC2D95200A0F1F1 /* Build configuration list for PBXProject "CineMystiOS" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -136,7 +123,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				5B9C89042EC2D95200A0F1F1 /* CineMystApp */,
+				5B9C89042EC2D95200A0F1F1 /* CineMystiOS */,
 			);
 		};
 /* End PBXProject section */
@@ -169,23 +156,14 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = JUNF53WL4F;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = CineMystApp/Info.plist;
-				INFOPLIST_KEY_NSCameraUsageDescription = "CineMyst needs access to your camera to capture stories and flicks.\nCineMyst needs access to your camera to capture stories and flicks.\nCineMyst needs to access your camera";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "CineMyst needs to access your photos to add them to the app";
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
-				INFOPLIST_KEY_UIMainStoryboardFile = Main;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_FILE = Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = name.iDevs.CineMystApp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cinemyst.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -200,23 +178,14 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = JUNF53WL4F;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = CineMystApp/Info.plist;
-				INFOPLIST_KEY_NSCameraUsageDescription = "CineMyst needs access to your camera to capture stories and flicks.\nCineMyst needs access to your camera to capture stories and flicks.\nCineMyst needs to access your camera";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "CineMyst needs to access your photos to add them to the app";
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
-				INFOPLIST_KEY_UIMainStoryboardFile = Main;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_FILE = Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = name.iDevs.CineMystApp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cinemyst.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -226,7 +195,7 @@
 		};
 		5B9C891B2EC2D95400A0F1F1 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReferenceAnchor = 5B9C89072EC2D95200A0F1F1 /* CineMystApp */;
+			baseConfigurationReferenceAnchor = 5B9C89072EC2D95200A0F1F1 /* CineMystiOS */;
 			baseConfigurationReferenceRelativePath = Secrets.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -261,6 +230,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = JUNF53WL4F;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -284,6 +254,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -291,7 +262,7 @@
 		};
 		5B9C891C2EC2D95400A0F1F1 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReferenceAnchor = 5B9C89072EC2D95200A0F1F1 /* CineMystApp */;
+			baseConfigurationReferenceAnchor = 5B9C89072EC2D95200A0F1F1 /* CineMystiOS */;
 			baseConfigurationReferenceRelativePath = Secrets.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -326,6 +297,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = JUNF53WL4F;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -342,6 +314,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -350,7 +323,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		5B9C89002EC2D95200A0F1F1 /* Build configuration list for PBXProject "CineMystApp" */ = {
+		5B9C89002EC2D95200A0F1F1 /* Build configuration list for PBXProject "CineMystiOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				5B9C891B2EC2D95400A0F1F1 /* Debug */,
@@ -359,7 +332,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		5B9C89182EC2D95400A0F1F1 /* Build configuration list for PBXNativeTarget "CineMystApp" */ = {
+		5B9C89182EC2D95400A0F1F1 /* Build configuration list for PBXNativeTarget "CineMystiOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				5B9C89192EC2D95400A0F1F1 /* Debug */,
@@ -376,7 +349,7 @@
 			repositoryURL = "https://github.com/supabase/supabase-swift";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 2.5.1;
+				minimumVersion = 2.37.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

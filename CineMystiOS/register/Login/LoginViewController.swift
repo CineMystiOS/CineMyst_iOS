@@ -175,6 +175,12 @@ class LoginViewController: UIViewController {
                    self.loginTimeoutTimer?.invalidate()
                    self.loginTimeoutTimer = nil
                    
+                   // ✅ VALIDATE SESSION EXISTS AFTER AUTH
+                   let session = try await AuthManager.shared.currentSession()
+                   guard session != nil else {
+                       throw LoginError.sessionValidationFailed
+                   }
+                   
                    let isOnboardingComplete = try await checkUserProfile()
                    
                    await MainActor.run {
@@ -215,7 +221,7 @@ class LoginViewController: UIViewController {
     private func checkUserProfile() async throws -> Bool {
         guard let session = try await AuthManager.shared.currentSession() else {
             print("❌ No session available for profile check")
-            return false
+            throw LoginError.profileCheckFailed("Session not found")
         }
         
         let userId = session.user.id
@@ -224,22 +230,36 @@ class LoginViewController: UIViewController {
         do {
             let response = try await supabase
                 .from("profiles")
-                .select("onboarding_completed")
+                .select("onboarding_completed, id")
                 .eq("id", value: userId.uuidString)
                 .single()
                 .execute()
             
-            if let data = response.data as? [String: Any],
-               let onboardingCompleted = data["onboarding_completed"] as? Bool {
-                print("✅ Profile found - Onboarding complete: \(onboardingCompleted)")
-                return onboardingCompleted
-            } else {
-                print("⚠️ Profile exists but onboarding_completed status unclear")
-                return false
+            guard let data = response.data as? [String: Any] else {
+                print("⚠️ Profile data could not be decoded")
+                throw LoginError.profileCheckFailed("Profile data missing")
             }
+            
+            // ✅ Handle NULL or missing onboarding_completed field - default to false
+            let onboardingCompleted: Bool
+            if let value = data["onboarding_completed"] as? Bool {
+                onboardingCompleted = value
+            } else if let value = data["onboarding_completed"] as? NSNull {
+                // Field is NULL in database - treat as incomplete
+                print("⚠️ onboarding_completed is NULL - defaulting to false")
+                onboardingCompleted = false
+            } else {
+                // Field is missing - also treat as incomplete
+                print("⚠️ onboarding_completed field missing - defaulting to false")
+                onboardingCompleted = false
+            }
+            
+            print("✅ Profile found - Onboarding complete: \(onboardingCompleted)")
+            return onboardingCompleted
+            
         } catch {
-            print("⚠️ Profile check error: \(error)")
-            return false
+            print("❌ Profile check error: \(error)")
+            throw LoginError.profileCheckFailed(error.localizedDescription)
         }
     }
 
@@ -332,13 +352,40 @@ class LoginViewController: UIViewController {
 
     // MARK: - ERROR HANDLING
     private func handleAuthError(_ error: Error) {
+        let title: String
         let message: String
-        if let supabaseError = error as? AuthError {
-            message = supabaseError.localizedDescription
+        
+        // ✅ DETAILED ERROR MESSAGES
+        if let loginError = error as? LoginError {
+            title = "Login Failed"
+            switch loginError {
+            case .userNotFound:
+                message = "User account not found. Please check your credentials or sign up."
+            case .invalidCredentials:
+                message = "Invalid email or password. Please try again."
+            case .sessionValidationFailed:
+                message = "Session validation failed. Please try signing in again."
+            case .profileCheckFailed(let details):
+                message = "Could not load your profile: \(details). Please try signing in again."
+            }
+        } else if let supabaseError = error as? AuthError {
+            title = "Authentication Error"
+            let errorDesc = supabaseError.localizedDescription.lowercased()
+            if errorDesc.contains("invalid login") || errorDesc.contains("invalid credentials") {
+                message = "Invalid email or password. Please check your credentials and try again."
+            } else if errorDesc.contains("not registered") || errorDesc.contains("user not found") {
+                message = "This email is not registered. Please sign up first."
+            } else if errorDesc.contains("network") || errorDesc.contains("connection") {
+                message = "Network error. Please check your internet connection and try again."
+            } else {
+                message = supabaseError.localizedDescription
+            }
         } else {
+            title = "Error"
             message = error.localizedDescription
         }
-        showAlert(message: message)
+        
+        showAlert(title: title, message: message)
     }
 
     // MARK: - HELPERS
@@ -386,6 +433,8 @@ extension LoginViewController: UITextFieldDelegate {
 enum LoginError: Error {
     case userNotFound
     case invalidCredentials
+    case sessionValidationFailed
+    case profileCheckFailed(String)
 }
 
 extension LoginError: LocalizedError {
@@ -395,6 +444,10 @@ extension LoginError: LocalizedError {
             return "User not found"
         case .invalidCredentials:
             return "Invalid credentials"
+        case .sessionValidationFailed:
+            return "Session validation failed"
+        case .profileCheckFailed(let details):
+            return "Profile check failed: \(details)"
         }
     }
 }

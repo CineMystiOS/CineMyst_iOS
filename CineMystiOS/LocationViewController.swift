@@ -291,10 +291,15 @@ class LocationViewController: UIViewController {
                     self.loadingIndicator.stopAnimating()
                     self.handlePincodeSuccess(pincodeData)
                 }
+            } catch let error as PincodeError {
+                await MainActor.run {
+                    self.loadingIndicator.stopAnimating()
+                    self.handlePincodeError(error)
+                }
             } catch {
                 await MainActor.run {
                     self.loadingIndicator.stopAnimating()
-                    self.handlePincodeError()
+                    self.handlePincodeError(.networkError)
                 }
             }
         }
@@ -306,21 +311,51 @@ class LocationViewController: UIViewController {
             throw PincodeError.invalidURL
         }
         
-        let (data, _) = try await URLSession.shared.data(from: url)
-        let response = try JSONDecoder().decode([PincodeAPIResponse].self, from: data)
-        
-        guard let firstResult = response.first,
-              firstResult.status == "Success",
-              let postOffice = firstResult.postOffice?.first else {
-            throw PincodeError.notFound
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            
+            // Check HTTP status
+            if let httpResponse = response as? HTTPURLResponse {
+                print("Pincode API Response Status: \(httpResponse.statusCode)")
+            }
+            
+            // Log raw response
+            if let jsonString = String(data: data, encoding: .utf8) {
+                print("Pincode API Raw Response: \(jsonString)")
+            }
+            
+            let decodedResponse = try JSONDecoder().decode([PincodeAPIResponse].self, from: data)
+            
+            guard let firstResult = decodedResponse.first else {
+                print("ERROR: Empty response from pincode API")
+                throw PincodeError.notFound
+            }
+            
+            print("Pincode Status: \(firstResult.status)")
+            
+            guard firstResult.status == "Success" else {
+                print("ERROR: Pincode API returned status: \(firstResult.status)")
+                throw PincodeError.notFound
+            }
+            
+            guard let postOffice = firstResult.postOffice?.first else {
+                print("ERROR: No post office data in response")
+                throw PincodeError.notFound
+            }
+            
+            return PincodeData(
+                pincode: pincode,
+                district: postOffice.district,
+                state: postOffice.state,
+                postOffice: postOffice.name
+            )
+        } catch let decodingError as DecodingError {
+            print("ERROR: Failed to decode pincode response: \(decodingError)")
+            throw PincodeError.networkError
+        } catch {
+            print("ERROR: Network error checking pincode: \(error.localizedDescription)")
+            throw PincodeError.networkError
         }
-        
-        return PincodeData(
-            pincode: pincode,
-            district: postOffice.district,
-            state: postOffice.state,
-            postOffice: postOffice.name
-        )
     }
     
     private func handlePincodeSuccess(_ data: PincodeData) {
@@ -351,9 +386,20 @@ class LocationViewController: UIViewController {
         }
     }
     
-    private func handlePincodeError() {
+    private func handlePincodeError(_ error: PincodeError? = nil) {
         verifiedPincode = nil
-        districtLabel.text = "✗ Invalid pincode"
+        
+        let errorMessage: String
+        switch error {
+        case .networkError:
+            errorMessage = "✗ Network error - check connection"
+        case .invalidURL, .notFound, .none:
+            errorMessage = "✗ Invalid or not found"
+        default:
+            errorMessage = "✗ Invalid pincode"
+        }
+        
+        districtLabel.text = errorMessage
         districtLabel.textColor = .systemRed
         districtLabel.isHidden = false
         

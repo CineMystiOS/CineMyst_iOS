@@ -300,6 +300,102 @@ final class AuthManager {
             throw error
         }
     }
+    
+    // MARK: - Batch Password Reset for Migrated Users
+    /// Fetches migrated users from profiles table and sends password reset emails
+    /// - Returns: A result containing success count, failed emails, and errors
+    func sendPasswordResetForMigratedUsers() async -> PasswordResetBatchResult {
+        var successCount = 0
+        var failedEmails: [(email: String, error: String)] = []
+        
+        do {
+            print("🔍 Fetching migrated users from profiles table...")
+            
+            // Step 1: Query profiles table for users where is_migrated is true
+            let response = try await client
+                .from("profiles")
+                .select("id, email")
+                .eq("is_migrated", value: true)
+                .execute()
+            
+            guard let profiles = response.data as? [[String: Any]] else {
+                let error = "Failed to decode profiles response"
+                print("❌ \(error)")
+                return PasswordResetBatchResult(
+                    successCount: 0,
+                    failedEmails: [],
+                    errorMessage: error
+                )
+            }
+            
+            print("✅ Found \(profiles.count) migrated users")
+            
+            // Step 2: Extract email addresses
+            let emails = profiles.compactMap { profile -> String? in
+                guard let email = profile["email"] as? String else {
+                    print("⚠️ Profile missing email: \(profile["id"] ?? "unknown")")
+                    return nil
+                }
+                return email
+            }
+            
+            print("📧 Extracted \(emails.count) email addresses")
+            
+            guard !emails.isEmpty else {
+                let warning = "No valid email addresses found in migrated users"
+                print("⚠️ \(warning)")
+                return PasswordResetBatchResult(
+                    successCount: 0,
+                    failedEmails: [],
+                    errorMessage: warning
+                )
+            }
+            
+            // Step 3: Loop through emails and send password reset
+            print("📤 Sending password reset emails...")
+            for (index, email) in emails.enumerated() {
+                do {
+                    print("[\(index + 1)/\(emails.count)] 📧 Sending reset email to: \(email)")
+                    try await resetPassword(email: email)
+                    print("✅ Password reset email sent to: \(email)")
+                    successCount += 1
+                    
+                    // Small delay between requests to avoid rate limiting
+                    try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                    
+                } catch {
+                    let errorMessage = error.localizedDescription
+                    print("❌ Failed to send reset email to \(email): \(errorMessage)")
+                    failedEmails.append((email: email, error: errorMessage))
+                }
+            }
+            
+            print("🎉 Batch complete: \(successCount) succeeded, \(failedEmails.count) failed")
+            
+            return PasswordResetBatchResult(
+                successCount: successCount,
+                failedEmails: failedEmails,
+                errorMessage: nil
+            )
+            
+        } catch let error as DecodingError {
+            let message = "Failed to parse profiles response: \(error.localizedDescription)"
+            print("❌ \(message)")
+            return PasswordResetBatchResult(
+                successCount: 0,
+                failedEmails: [],
+                errorMessage: message
+            )
+        } catch {
+            let message = "Error fetching migrated users: \(error.localizedDescription)"
+            print("❌ \(message)")
+            return PasswordResetBatchResult(
+                successCount: 0,
+                failedEmails: [],
+                errorMessage: message
+            )
+        }
+    }
 }
 
 // MARK: - Database Record Structures for SAVING (Encodable only)
@@ -512,6 +608,27 @@ struct CastingProfileRecord: Codable {
         case castingRadius = "casting_radius"
         case contactPreference = "contact_preference"
         case createdAt = "created_at"
+    }
+}
+
+// MARK: - Batch Password Reset Result
+struct PasswordResetBatchResult {
+    let successCount: Int
+    let failedEmails: [(email: String, error: String)]
+    let errorMessage: String?
+    
+    var isFullSuccess: Bool {
+        errorMessage == nil && failedEmails.isEmpty
+    }
+    
+    var summary: String {
+        if isFullSuccess {
+            return "✅ Successfully sent \(successCount) password reset emails"
+        } else if let error = errorMessage {
+            return "❌ Error: \(error)"
+        } else {
+            return "⚠️ Mixed results: \(successCount) succeeded, \(failedEmails.count) failed"
+        }
     }
 }
 
