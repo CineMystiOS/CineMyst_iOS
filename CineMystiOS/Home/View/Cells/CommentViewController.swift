@@ -14,20 +14,20 @@
 
 import UIKit
 
-struct Comment {
+struct CommentDisplayData {
     let username: String
-    let userImage: String
+    let userImage: String?
     let text: String
+    let timeAgo: String
 }
 
 final class CommentViewController: UIViewController {
     
     // MARK: - Properties
     private let post: Post
-    private var comments: [Comment] = [
-        Comment(username: "Dhruv Garg", userImage: "avatar_dhruv", text: "Wow! Great shot 🔥"),
-        Comment(username: "Shradha", userImage: "avatar_shradha", text: "So proud of your work ❤️")
-    ]
+    private var comments: [PostComment] = []
+    private var isLoadingComments = false
+    private var currentUserProfileUrl: String?
     
     // MARK: - UI Elements
     private let tableView = UITableView()
@@ -35,6 +35,7 @@ final class CommentViewController: UIViewController {
     private let commentField = UITextField()
     private let sendButton = UIButton(type: .system)
     private let profileImageView = UIImageView()
+    private let loadingIndicator = UIActivityIndicatorView(style: .medium)
     
     // MARK: - Init
     init(post: Post) {
@@ -52,6 +53,8 @@ final class CommentViewController: UIViewController {
         setupUI()
         setupConstraints()
         setupKeyboardObservers()
+        fetchComments()
+        loadCurrentUserProfile()
     }
     
     // MARK: - Setup
@@ -76,10 +79,11 @@ final class CommentViewController: UIViewController {
         view.addSubview(inputContainer)
         
         // Profile Image
-        profileImageView.image = UIImage(named: "avatar_rani") // your profile image
+        profileImageView.image = UIImage(named: "avatar_placeholder")
         profileImageView.layer.cornerRadius = 18
         profileImageView.layer.masksToBounds = true
         profileImageView.contentMode = .scaleAspectFill
+        profileImageView.backgroundColor = .systemGray5
         profileImageView.translatesAutoresizingMaskIntoConstraints = false
         inputContainer.addSubview(profileImageView)
         
@@ -96,6 +100,10 @@ final class CommentViewController: UIViewController {
         sendButton.addTarget(self, action: #selector(sendComment), for: .touchUpInside)
         sendButton.translatesAutoresizingMaskIntoConstraints = false
         inputContainer.addSubview(sendButton)
+        
+        // Loading Indicator
+        loadingIndicator.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(loadingIndicator)
     }
     
     private func setupConstraints() {
@@ -123,26 +131,124 @@ final class CommentViewController: UIViewController {
             
             sendButton.leadingAnchor.constraint(equalTo: commentField.trailingAnchor, constant: 8),
             sendButton.trailingAnchor.constraint(equalTo: inputContainer.trailingAnchor, constant: -8),
-            sendButton.centerYAnchor.constraint(equalTo: inputContainer.centerYAnchor)
+            sendButton.centerYAnchor.constraint(equalTo: inputContainer.centerYAnchor),
+            
+            loadingIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
+    }
+    
+    // MARK: - Data Loading
+    private func fetchComments() {
+        guard !isLoadingComments else { return }
+        
+        isLoadingComments = true
+        loadingIndicator.startAnimating()
+        
+        Task {
+            do {
+                let fetchedComments = try await PostManager.shared.fetchComments(postId: post.id)
+                
+                DispatchQueue.main.async {
+                    self.comments = fetchedComments
+                    self.tableView.reloadData()
+                    self.isLoadingComments = false
+                    self.loadingIndicator.stopAnimating()
+                    
+                    print("✅ Loaded \(fetchedComments.count) comments")
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.isLoadingComments = false
+                    self.loadingIndicator.stopAnimating()
+                    
+                    print("❌ Error fetching comments: \(error)")
+                    self.showErrorAlert("Failed to load comments: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    // MARK: - Load Current User Profile
+    private func loadCurrentUserProfile() {
+        Task {
+            do {
+                let profile = try await PostManager.shared.fetchCurrentUserProfile()
+                
+                DispatchQueue.main.async {
+                    if let profileUrl = profile?.profilePictureUrl, !profileUrl.isEmpty {
+                        self.currentUserProfileUrl = profileUrl
+                        self.loadProfileImage(from: profileUrl)
+                    } else {
+                        self.profileImageView.image = UIImage(named: "avatar_placeholder")
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    print("⚠️ Could not load current user profile: \(error)")
+                    self.profileImageView.image = UIImage(named: "avatar_placeholder")
+                }
+            }
+        }
+    }
+    
+    private func loadProfileImage(from urlString: String) {
+        guard let url = URL(string: urlString) else {
+            profileImageView.image = UIImage(named: "avatar_placeholder")
+            return
+        }
+        
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            guard let data = data, error == nil else {
+                DispatchQueue.main.async {
+                    self.profileImageView.image = UIImage(named: "avatar_placeholder")
+                }
+                return
+            }
+            
+            DispatchQueue.main.async {
+                self.profileImageView.image = UIImage(data: data)
+            }
+        }.resume()
     }
     
     // MARK: - Actions
     @objc private func sendComment() {
         guard let text = commentField.text, !text.isEmpty else { return }
         
-        let newComment = Comment(username: "You", userImage: "avatar_rani", text: text)
-        comments.append(newComment)
-        tableView.reloadData()
+        // Disable send button during submission
+        sendButton.isEnabled = false
         
-        // Clear the text field
-        commentField.text = ""
-        
-        // Scroll to bottom
-        DispatchQueue.main.async {
-            let indexPath = IndexPath(row: self.comments.count - 1, section: 0)
-            self.tableView.scrollToRow(at: indexPath, at: .bottom, animated: true)
+        // Save comment to database
+        Task {
+            do {
+                try await PostManager.shared.addComment(postId: post.id, text: text)
+                
+                DispatchQueue.main.async {
+                    self.commentField.text = ""
+                    self.sendButton.isEnabled = true
+                    
+                    // Reload comments to show the new one
+                    self.fetchComments()
+                    
+                    print("✅ Comment sent successfully")
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.sendButton.isEnabled = true
+                    
+                    print("❌ Error sending comment: \(error)")
+                    self.showErrorAlert("Failed to send comment: \(error.localizedDescription)")
+                }
+            }
         }
+    }
+    
+    // MARK: - Error Handling
+    private func showErrorAlert(_ message: String) {
+        let alert = UIAlertController(title: "Error", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
     }
     
     // MARK: - Keyboard Handling

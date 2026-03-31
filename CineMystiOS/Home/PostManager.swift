@@ -404,19 +404,165 @@ final class PostManager {
     
     // MARK: - Like/Unlike Post
     func likePost(postId: String) async throws {
-        // Increment likes count
-        try await client.rpc(
-            "increment_post_likes",
-            params: ["post_id": postId]
-        ).execute()
+        guard let session = try await AuthManager.shared.currentSession() else {
+            throw NSError(domain: "PostManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        }
+        
+        let userId = session.user.id.uuidString
+        
+        // Check if already liked
+        let existingLike = try await client
+            .from("post_likes")
+            .select()
+            .eq("post_id", value: postId)
+            .eq("user_id", value: userId)
+            .execute()
+        
+        let decoder = JSONDecoder()
+        let likes = try decoder.decode([[String: String]].self, from: existingLike.data)
+        
+        if likes.isEmpty {
+            // Insert new like
+            struct Like: Encodable {
+                let post_id: String
+                let user_id: String
+                let created_at: String
+            }
+            
+            let like = Like(
+                post_id: postId,
+                user_id: userId,
+                created_at: ISO8601DateFormatter().string(from: Date())
+            )
+            
+            try await client
+                .from("post_likes")
+                .insert(like)
+                .execute()
+            
+            print("✅ Like saved successfully")
+        }
     }
     
     func unlikePost(postId: String) async throws {
-        // Decrement likes count
-        try await client.rpc(
-            "decrement_post_likes",
-            params: ["post_id": postId]
-        ).execute()
+        guard let session = try await AuthManager.shared.currentSession() else {
+            throw NSError(domain: "PostManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        }
+        
+        let userId = session.user.id.uuidString
+        
+        // Delete the like
+        try await client
+            .from("post_likes")
+            .delete()
+            .eq("post_id", value: postId)
+            .eq("user_id", value: userId)
+            .execute()
+        
+        print("✅ Like removed successfully")
+    }
+    
+    // MARK: - Add Comment
+    func addComment(postId: String, text: String) async throws {
+        guard let session = try await AuthManager.shared.currentSession() else {
+            throw NSError(domain: "PostManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        }
+        
+        let userId = session.user.id.uuidString
+        
+        // Create comment entry
+        struct CommentEntry: Encodable {
+            let post_id: String
+            let user_id: String
+            let content: String
+            let created_at: String
+        }
+        
+        let comment = CommentEntry(
+            post_id: postId,
+            user_id: userId,
+            content: text,
+            created_at: ISO8601DateFormatter().string(from: Date())
+        )
+        
+        try await client
+            .from("post_comments")
+            .insert(comment)
+            .execute()
+        
+        print("✅ Comment saved successfully")
+    }
+    
+    // MARK: - Fetch Comments
+    func fetchComments(postId: String) async throws -> [PostComment] {
+        // Fetch comments from post_comments table
+        let commentsResponse = try await client
+            .from("post_comments")
+            .select("""
+                id,
+                post_id,
+                user_id,
+                content,
+                created_at
+            """)
+            .eq("post_id", value: postId)
+            .order("created_at", ascending: true)
+            .execute()
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        
+        // Decode raw comments
+        struct RawComment: Decodable {
+            let id: String
+            let post_id: String
+            let user_id: String
+            let content: String
+            let created_at: Date
+        }
+        
+        let rawComments = try decoder.decode([RawComment].self, from: commentsResponse.data)
+        
+        if rawComments.isEmpty {
+            return []
+        }
+        
+        // Get unique user IDs
+        let userIds = Array(Set(rawComments.map { $0.user_id }))
+        
+        // Fetch user profiles
+        var profilesMap: [String: CommentUserProfile] = [:]
+        
+        for userId in userIds {
+            do {
+                let profileResponse = try await client
+                    .from("profiles")
+                    .select("id, username, profile_picture_url")
+                    .eq("id", value: userId)
+                    .single()
+                    .execute()
+                
+                let profile = try decoder.decode(CommentUserProfile.self, from: profileResponse.data)
+                profilesMap[userId] = profile
+            } catch {
+                print("⚠️ Could not fetch profile for user \(userId): \(error)")
+                // Continue without profile - UI will show "Unknown"
+            }
+        }
+        
+        // Combine comments with profiles
+        let postComments = rawComments.map { raw in
+            PostComment(
+                id: raw.id,
+                postId: raw.post_id,
+                userId: raw.user_id,
+                content: raw.content,
+                createdAt: raw.created_at,
+                profiles: profilesMap[raw.user_id]
+            )
+        }
+        
+        return postComments
     }
     
     // MARK: - Delete Post
@@ -426,6 +572,52 @@ final class PostManager {
             .delete()
             .eq("id", value: postId)
             .execute()
+    }
+    
+    // MARK: - Fetch Current User Profile
+    func fetchCurrentUserProfile() async throws -> CommentUserProfile? {
+        guard let session = try await AuthManager.shared.currentSession() else {
+            throw NSError(domain: "PostManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        }
+        
+        let userId = session.user.id.uuidString
+        
+        let response = try await client
+            .from("profiles")
+            .select("id, username, profile_picture_url")
+            .eq("id", value: userId)
+            .single()
+            .execute()
+        
+        let decoder = JSONDecoder()
+        do {
+            let profile = try decoder.decode(CommentUserProfile.self, from: response.data)
+            return profile
+        } catch {
+            print("❌ Error decoding current user profile: \(error)")
+            return nil
+        }
+    }
+    
+    // MARK: - Fetch Counts from Database
+    func fetchCommentCount(postId: String) async throws -> Int {
+        let response = try await client
+            .from("post_comments")
+            .select("id", head: true, count: .exact)
+            .eq("post_id", value: postId)
+            .execute()
+        
+        return response.count ?? 0
+    }
+    
+    func fetchLikeCount(postId: String) async throws -> Int {
+        let response = try await client
+            .from("post_likes")
+            .select("id", head: true, count: .exact)
+            .eq("post_id", value: postId)
+            .execute()
+        
+        return response.count ?? 0
     }
 }
 

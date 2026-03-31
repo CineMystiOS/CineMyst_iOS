@@ -118,3 +118,45 @@ struct DraftMedia {
     var isVideo: Bool { type == .video }
 }
 
+// MARK: - Post Comment Model
+struct PostComment: Codable, Identifiable {
+    let id: String
+    let postId: String
+    let userId: String
+    let content: String
+    let createdAt: Date
+    let profiles: CommentUserProfile?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case postId = "post_id"
+        case userId = "user_id"
+        case content
+        case createdAt = "created_at"
+        case profiles
+    }
+    
+    // Convenience properties for display
+    var username: String { profiles?.username ?? "Unknown" }
+    var profilePictureUrl: String? { profiles?.profilePictureUrl }
+    var timeAgo: String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: createdAt, relativeTo: Date())
+    }
+}
+
+// MARK: - Comment User Profile Model (for nested data in comments)
+struct CommentUserProfile: Codable, Identifiable {
+    let id: String
+    let username: String
+    let profilePictureUrl: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case username
+        case profilePictureUrl = "profile_picture_url"
+    }
+}
+
+

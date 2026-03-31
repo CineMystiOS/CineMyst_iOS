@@ -135,7 +135,10 @@ final class SearchViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
-        title = "Find People"
+        navigationItem.title = "Find People"
+        navigationItem.backButtonTitle = ""
+        navigationItem.titleView = nil
+        navigationItem.leftBarButtonItem = nil
         
         setupSearchController()
         setupTableView()
@@ -145,6 +148,18 @@ final class SearchViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationItem.hidesSearchBarWhenScrolling = false
+        navigationItem.leftBarButtonItem = nil
+        
+        // Remove CineMyst logo from navigation bar
+        if let navBar = navigationController?.navigationBar {
+            if let contentView = navBar.subviews.first(where: {
+                String(describing: type(of: $0)).contains("ContentView")
+            }) {
+                if let titleLabel = contentView.viewWithTag(999) {
+                    titleLabel.removeFromSuperview()
+                }
+            }
+        }
     }
     
     private func setupSearchController() {
