@@ -108,10 +108,12 @@ final class FilterViewController: UIViewController {
         backdrop.addGestureRecognizer(tap)
 
         // sheet (rounded top corners only)
-        sheet.backgroundColor = .systemBackground
+        sheet.backgroundColor = MentorshipUI.raisedSurface
         sheet.layer.cornerRadius = 16
         sheet.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner] // top corners
         sheet.layer.masksToBounds = true
+        sheet.layer.borderWidth = 1
+        sheet.layer.borderColor = MentorshipUI.plumStroke.cgColor
         sheet.translatesAutoresizingMaskIntoConstraints = false
 
         // left menu styling
@@ -125,23 +127,22 @@ final class FilterViewController: UIViewController {
 
         // bottom bar
         bottomBar.translatesAutoresizingMaskIntoConstraints = false
-        bottomBar.backgroundColor = UIColor.systemGray6
+        bottomBar.backgroundColor = MentorshipUI.softSurface
 
         // Clear button
         clearButton.setTitle("Clear", for: .normal)
-        clearButton.setTitleColor(.label, for: .normal)
+        clearButton.setTitleColor(MentorshipUI.brandPlum, for: .normal)
         clearButton.layer.cornerRadius = 12
         clearButton.layer.borderWidth = 1
-        clearButton.layer.borderColor = UIColor.systemGray4.cgColor
+        clearButton.layer.borderColor = MentorshipUI.plumStroke.cgColor
         clearButton.backgroundColor = .clear
         clearButton.translatesAutoresizingMaskIntoConstraints = false
         clearButton.addTarget(self, action: #selector(clearTapped), for: .touchUpInside)
 
-        // Show Results button - keep black filled (user asked neutral / not purple)
         var cfg = UIButton.Configuration.filled()
         cfg.cornerStyle = .capsule
         cfg.title = "Show Results"
-        cfg.baseBackgroundColor = .black
+        cfg.baseBackgroundColor = MentorshipUI.deepPlum
         cfg.baseForegroundColor = .white
         showResultsButton.configuration = cfg
         showResultsButton.translatesAutoresizingMaskIntoConstraints = false
@@ -161,7 +162,7 @@ final class FilterViewController: UIViewController {
         // small drag indicator
         let indicator = UIView()
         indicator.translatesAutoresizingMaskIntoConstraints = false
-        indicator.backgroundColor = UIColor.systemGray3
+        indicator.backgroundColor = MentorshipUI.plumStroke
         indicator.layer.cornerRadius = 3
         sheet.addSubview(indicator)
         NSLayoutConstraint.activate([
@@ -240,7 +241,7 @@ final class FilterViewController: UIViewController {
             b.contentHorizontalAlignment = .left
             b.contentEdgeInsets = UIEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
             b.tag = i
-            b.backgroundColor = (t == selectedTab) ? UIColor.systemGray6 : .clear
+            b.backgroundColor = (t == selectedTab) ? MentorshipUI.plumChip : .clear
             b.addTarget(self, action: #selector(leftMenuTapped(_:)), for: .touchUpInside)
             leftMenu.addArrangedSubview(b)
         }
@@ -248,9 +249,8 @@ final class FilterViewController: UIViewController {
 
     private func rebuildLeftMenuSelection() {
         for case let b as UIButton in leftMenu.arrangedSubviews {
-            b.backgroundColor = (b.tag == selectedTab.rawValue) ? UIColor.systemGray6 : .clear
-            // keep font color default (no purple). Selected tab will appear on gray background.
-            b.setTitleColor(.label, for: .normal)
+            b.backgroundColor = (b.tag == selectedTab.rawValue) ? MentorshipUI.plumChip : .clear
+            b.setTitleColor(MentorshipUI.brandPlum, for: .normal)
         }
     }
 

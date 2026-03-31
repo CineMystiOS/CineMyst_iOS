@@ -9,13 +9,21 @@ import UIKit
 
 final class UpcomingViewController: UIViewController {
 
-    private let plum = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1)
+    private let plum = MentorshipUI.brandPlum
 
     // MARK: - Header
     private lazy var backButton: UIButton = {
         let b = UIButton(type: .system)
         b.setImage(UIImage(systemName: "chevron.left"), for: .normal)
-        b.tintColor = .label
+        b.tintColor = MentorshipUI.brandPlum
+        b.backgroundColor = MentorshipUI.softSurface
+        b.layer.cornerRadius = 18
+        b.layer.borderWidth = 1
+        b.layer.borderColor = MentorshipUI.plumStroke.cgColor
+        b.layer.shadowColor = MentorshipUI.shadow.cgColor
+        b.layer.shadowOpacity = 1
+        b.layer.shadowRadius = 10
+        b.layer.shadowOffset = CGSize(width: 0, height: 5)
         b.translatesAutoresizingMaskIntoConstraints = false
         b.addTarget(self, action: #selector(goBack), for: .touchUpInside)
         return b
@@ -33,9 +41,10 @@ final class UpcomingViewController: UIViewController {
         let sc = UISegmentedControl(items: ["Upcoming", "Past", "Canceled"])
         sc.selectedSegmentIndex = 0
         sc.translatesAutoresizingMaskIntoConstraints = false
-        sc.backgroundColor = UIColor.systemGray5
-        sc.selectedSegmentTintColor = .white
+        sc.backgroundColor = MentorshipUI.softSurface
+        sc.selectedSegmentTintColor = MentorshipUI.brandPlum
         sc.setTitleTextAttributes([.font: UIFont.systemFont(ofSize: 14, weight: .semibold)], for: .normal)
+        sc.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
         sc.layer.cornerRadius = 18
         sc.clipsToBounds = true
         sc.addTarget(self, action: #selector(segmentChanged(_:)), for: .valueChanged)
@@ -46,7 +55,7 @@ final class UpcomingViewController: UIViewController {
         let l = UILabel()
         l.text = "Track your upcoming sessions"
         l.font = UIFont.systemFont(ofSize: 14)
-        l.textColor = .secondaryLabel
+        l.textColor = MentorshipUI.mutedText
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
@@ -73,9 +82,10 @@ final class UpcomingViewController: UIViewController {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = MentorshipUI.pageBackground
         navigationItem.hidesBackButton = true
         titleLabel.textColor = plum
+        subtitleLabel.textColor = MentorshipUI.mutedText
 
         setupViews()
         setupConstraints()

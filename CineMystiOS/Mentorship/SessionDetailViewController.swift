@@ -11,7 +11,7 @@ final class SessionDetailViewController: UIViewController {
     var session: SessionM!
 
     // Theme color
-    private let plum = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1)
+    private let plum = MentorshipUI.brandPlum
 
     // MARK: UI elements
     private let scrollView = UIScrollView()
@@ -53,7 +53,7 @@ final class SessionDetailViewController: UIViewController {
 
     private let ratingStack: UIStackView = {
         let star = UIImageView(image: UIImage(systemName: "star.fill"))
-        star.tintColor = .systemBlue
+        star.tintColor = CineMystTheme.pink
         star.translatesAutoresizingMaskIntoConstraints = false
         star.widthAnchor.constraint(equalToConstant: 14).isActive = true
         star.heightAnchor.constraint(equalToConstant: 14).isActive = true
@@ -89,7 +89,7 @@ final class SessionDetailViewController: UIViewController {
         var cfg = UIButton.Configuration.filled()
         cfg.cornerStyle = .capsule
         cfg.title = "Reschedule"
-        cfg.baseBackgroundColor = plum
+        cfg.baseBackgroundColor = MentorshipUI.deepPlum
         cfg.baseForegroundColor = .white
         let b = UIButton(configuration: cfg)
         b.translatesAutoresizingMaskIntoConstraints = false
@@ -101,7 +101,7 @@ final class SessionDetailViewController: UIViewController {
         var cfg = UIButton.Configuration.filled()
         cfg.cornerStyle = .capsule
         cfg.title = "Cancel"
-        cfg.baseBackgroundColor = plum   // same background color as Reschedule
+        cfg.baseBackgroundColor = MentorshipUI.deepPlum
         cfg.baseForegroundColor = .white
         let b = UIButton(configuration: cfg)
         b.translatesAutoresizingMaskIntoConstraints = false
@@ -112,7 +112,7 @@ final class SessionDetailViewController: UIViewController {
     // MARK: lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = MentorshipUI.pageBackground
 
         // Hide default back (the nav controller's back) and provide a single custom left item:
         navigationItem.hidesBackButton = true
@@ -122,6 +122,7 @@ final class SessionDetailViewController: UIViewController {
             target: self,
             action: #selector(didTapBack)
         )
+        navigationItem.leftBarButtonItem?.tintColor = MentorshipUI.brandPlum
 
         setupLayout()
         populate()
@@ -163,6 +164,7 @@ final class SessionDetailViewController: UIViewController {
             titleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
             titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16)
         ])
+        titleLabel.textColor = MentorshipUI.brandPlum
 
         // scroll + content stack
         scrollView.translatesAutoresizingMaskIntoConstraints = false
@@ -198,6 +200,8 @@ final class SessionDetailViewController: UIViewController {
         ])
         imageContainer.layer.cornerRadius = 14
         imageContainer.clipsToBounds = true
+        imageContainer.layer.borderWidth = 1
+        imageContainer.layer.borderColor = MentorshipUI.plumStroke.cgColor
 
         // name / role / rating horizontal
         let metaStack = UIStackView(arrangedSubviews: [nameLabel, UIView(), ratingStack])
@@ -303,7 +307,7 @@ private final class DetailRowView: UIView {
         translatesAutoresizingMaskIntoConstraints = false
 
         iconView.image = UIImage(systemName: iconName)
-        iconView.tintColor = .secondaryLabel
+        iconView.tintColor = MentorshipUI.softText
         iconView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(iconView)
 
@@ -313,7 +317,7 @@ private final class DetailRowView: UIView {
         addSubview(titleLabel)
 
         subtitleLabel.font = UIFont.systemFont(ofSize: 12)
-        subtitleLabel.textColor = .secondaryLabel
+        subtitleLabel.textColor = MentorshipUI.mutedText
         subtitleLabel.text = subtitle
         subtitleLabel.numberOfLines = 0
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -353,8 +357,8 @@ private final class TagView: UIView {
 
         layer.cornerRadius = 14
         layer.borderWidth = 1
-        layer.borderColor = UIColor.systemGray4.cgColor
-        backgroundColor = .clear
+        layer.borderColor = MentorshipUI.plumStroke.cgColor
+        backgroundColor = MentorshipUI.plumChip
 
         NSLayoutConstraint.activate([
             label.topAnchor.constraint(equalTo: topAnchor, constant: 8),
@@ -363,6 +367,7 @@ private final class TagView: UIView {
             label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
             heightAnchor.constraint(equalToConstant: 44)
         ])
+        label.textColor = MentorshipUI.brandPlum
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }

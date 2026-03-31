@@ -24,7 +24,7 @@ final class ScheduleSessionViewController: UIViewController {
     }
 
     // MARK: - Theme
-    private let plum = UIColor(red: 0x43/255.0, green: 0x16/255.0, blue: 0x31/255.0, alpha: 1.0)
+    private let plum = MentorshipUI.brandPlum
     private let accentGray = UIColor(white: 0.4, alpha: 1.0)
 
     // MARK: - State
@@ -69,22 +69,24 @@ final class ScheduleSessionViewController: UIViewController {
     // Info box
     private let infoBox: UIView = {
         let v = UIView()
-        v.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.08)
+        v.backgroundColor = MentorshipUI.plumChip
         v.layer.cornerRadius = 14
+        v.layer.borderWidth = 1
+        v.layer.borderColor = MentorshipUI.plumStroke.cgColor
         return v
     }()
     private let infoTitle: UILabel = {
         let l = UILabel()
         l.text = "Session Information"
         l.font = .systemFont(ofSize: 14, weight: .semibold)
-        l.textColor = .systemBlue
+        l.textColor = MentorshipUI.brandPlum
         return l
     }()
     private let infoBullets: UILabel = {
         let l = UILabel()
         l.numberOfLines = 0
         l.font = .systemFont(ofSize: 13)
-        l.textColor = .systemBlue
+        l.textColor = MentorshipUI.softText
         l.text = """
 • Google Meet link will be sent to your email
 • Cancellation allowed up to 24 hours before
@@ -106,7 +108,7 @@ final class ScheduleSessionViewController: UIViewController {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = MentorshipUI.pageBackground
 
         // Move heading into navigation bar so it lines up with the back arrow
         navigationItem.title = "Schedule Session"
@@ -185,10 +187,10 @@ final class ScheduleSessionViewController: UIViewController {
         b.contentEdgeInsets = .init(top: 13, left: 16, bottom: 13, right: 16)
         b.layer.cornerRadius = 16
         b.layer.borderWidth = 1
-        b.layer.borderColor = UIColor.separator.withAlphaComponent(0.5).cgColor
-        b.backgroundColor = .systemBackground
-        b.layer.shadowColor = UIColor.black.cgColor
-        b.layer.shadowOpacity = 0.03
+        b.layer.borderColor = MentorshipUI.plumStroke.cgColor
+        b.backgroundColor = MentorshipUI.raisedSurface
+        b.layer.shadowColor = MentorshipUI.shadow.cgColor
+        b.layer.shadowOpacity = 1
         b.layer.shadowOffset = CGSize(width: 0, height: 4)
         b.layer.shadowRadius = 10
         b.addTarget(self, action: #selector(chooseMentorship(_:)), for: .touchUpInside)
@@ -214,15 +216,15 @@ final class ScheduleSessionViewController: UIViewController {
 
     private func setChip(_ b: UIButton, selected: Bool) {
         if selected {
-            b.backgroundColor = plum.withAlphaComponent(0.10)
+            b.backgroundColor = MentorshipUI.plumChip
             b.layer.borderColor = plum.cgColor
             b.setTitleColor(plum, for: .normal)
             b.layer.shadowOpacity = 0
         } else {
-            b.backgroundColor = .systemBackground
-            b.layer.borderColor = UIColor.separator.withAlphaComponent(0.5).cgColor
-            b.setTitleColor(.secondaryLabel, for: .normal)
-            b.layer.shadowOpacity = 0.03
+            b.backgroundColor = MentorshipUI.raisedSurface
+            b.layer.borderColor = MentorshipUI.plumStroke.cgColor
+            b.setTitleColor(MentorshipUI.mutedText, for: .normal)
+            b.layer.shadowOpacity = 1
         }
     }
 

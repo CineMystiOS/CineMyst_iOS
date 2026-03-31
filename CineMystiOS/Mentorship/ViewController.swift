@@ -35,7 +35,7 @@ private struct ReviewRecord: Codable {
 }
 
 final class BookViewController: UIViewController {
-    private let plum = UIColor(red: 0x43/255.0, green: 0x16/255.0, blue: 0x31/255.0, alpha: 1.0)
+    private let plum = MentorshipUI.brandPlum
 
     // Public property - set before presenting/pushing
     var mentor: Mentor? {
@@ -78,7 +78,7 @@ final class BookViewController: UIViewController {
         let l = UILabel()
         l.text = ""
         l.font = .systemFont(ofSize: 14, weight: .semibold)
-        l.textColor = UIColor(red: 0x43/255.0, green: 0x16/255.0, blue: 0x31/255.0, alpha: 0.86)
+        l.textColor = MentorshipUI.softText
         l.textAlignment = .center
         return l
     }()
@@ -86,8 +86,8 @@ final class BookViewController: UIViewController {
     private let portfolioButton: UIButton = {
         var config = UIButton.Configuration.tinted()
         config.title = "Portfolio"
-        config.baseForegroundColor = UIColor(red: 0x43/255.0, green: 0x16/255.0, blue: 0x31/255.0, alpha: 1.0)
-        config.baseBackgroundColor = UIColor(red: 0x43/255.0, green: 0x16/255.0, blue: 0x31/255.0, alpha: 0.08)
+        config.baseForegroundColor = MentorshipUI.brandPlum
+        config.baseBackgroundColor = MentorshipUI.plumChip
         config.cornerStyle = .capsule
         config.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14)
         let b = UIButton(configuration: config)
@@ -126,7 +126,7 @@ final class BookViewController: UIViewController {
     private let rolePillView: UIView = {
         let view = UIView()
         view.translatesAutoresizingMaskIntoConstraints = false
-        view.backgroundColor = UIColor(red: 0x43/255.0, green: 0x16/255.0, blue: 0x31/255.0, alpha: 0.10)
+        view.backgroundColor = MentorshipUI.plumChip
         view.layer.cornerRadius = 14
         return view
     }()
@@ -149,8 +149,10 @@ final class BookViewController: UIViewController {
         v.spacing = 4
         v.layoutMargins = .init(top: 8, left: 12, bottom: 8, right: 12)
         v.isLayoutMarginsRelativeArrangement = true
-        v.backgroundColor = .secondarySystemBackground
+        v.backgroundColor = MentorshipUI.softSurface
         v.layer.cornerRadius = 14
+        v.layer.borderWidth = 1
+        v.layer.borderColor = MentorshipUI.plumStroke.cgColor
         return v
     }
 
@@ -170,12 +172,14 @@ final class BookViewController: UIViewController {
             v.spacing = 4
             v.layoutMargins = .init(top: 12, left: 12, bottom: 12, right: 12)
             v.isLayoutMarginsRelativeArrangement = true
-            v.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.9)
+            v.backgroundColor = MentorshipUI.raisedSurface
             v.layer.cornerRadius = 20
-            v.layer.shadowColor = UIColor.black.cgColor
-            v.layer.shadowOpacity = 0.03
+            v.layer.shadowColor = MentorshipUI.shadow.cgColor
+            v.layer.shadowOpacity = 1
             v.layer.shadowOffset = CGSize(width: 0, height: 10)
             v.layer.shadowRadius = 18
+            v.layer.borderWidth = 1
+            v.layer.borderColor = MentorshipUI.plumStroke.cgColor
             return v
         }
 
@@ -220,35 +224,37 @@ final class BookViewController: UIViewController {
         var config = UIButton.Configuration.filled()
         config.title = "Book Session"
         config.cornerStyle = .capsule
-        config.baseBackgroundColor = UIColor(red: 0x43/255.0, green: 0x16/255.0, blue: 0x31/255.0, alpha: 1.0)
+        config.baseBackgroundColor = MentorshipUI.deepPlum
         config.baseForegroundColor = .white
         let b = UIButton(configuration: config)
         b.heightAnchor.constraint(equalToConstant: 48).isActive = true
         b.configurationUpdateHandler = { button in
             button.configuration?.baseBackgroundColor = button.isHighlighted
-                ? UIColor(red: 0x43/255.0, green: 0x16/255.0, blue: 0x31/255.0, alpha: 0.85)
-                : UIColor(red: 0x43/255.0, green: 0x16/255.0, blue: 0x31/255.0, alpha: 1.0)
+                ? MentorshipUI.deepPlum.withAlphaComponent(0.85)
+                : MentorshipUI.deepPlum
         }
         return b
     }()
     private func makeSectionCard(titleLabel: UILabel, bodyView: UIView, iconName: String) -> UIView {
         let card = UIView()
         card.translatesAutoresizingMaskIntoConstraints = false
-        card.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.74)
+        card.backgroundColor = MentorshipUI.raisedSurface
         card.layer.cornerRadius = 24
-        card.layer.shadowColor = UIColor.black.cgColor
-        card.layer.shadowOpacity = 0.04
+        card.layer.shadowColor = MentorshipUI.shadow.cgColor
+        card.layer.shadowOpacity = 1
         card.layer.shadowOffset = CGSize(width: 0, height: 8)
         card.layer.shadowRadius = 20
+        card.layer.borderWidth = 1
+        card.layer.borderColor = MentorshipUI.plumStroke.cgColor
 
         let accentBar = UIView()
         accentBar.translatesAutoresizingMaskIntoConstraints = false
-        accentBar.backgroundColor = plum.withAlphaComponent(0.16)
+        accentBar.backgroundColor = MentorshipUI.deepPlumMid.withAlphaComponent(0.28)
         accentBar.layer.cornerRadius = 2
 
         let iconBadge = UIView()
         iconBadge.translatesAutoresizingMaskIntoConstraints = false
-        iconBadge.backgroundColor = plum.withAlphaComponent(0.09)
+        iconBadge.backgroundColor = MentorshipUI.plumChip
         iconBadge.layer.cornerRadius = 14
 
         let iconView = UIImageView(image: UIImage(systemName: iconName))
@@ -297,7 +303,7 @@ final class BookViewController: UIViewController {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = MentorshipUI.pageBackground
         scrollView.contentInsetAdjustmentBehavior = .never
         navigationController?.navigationBar.isTranslucent = true
 
@@ -399,13 +405,15 @@ final class BookViewController: UIViewController {
 
         // Card container
         let card = UIView()
-        card.backgroundColor = .systemBackground
+        card.backgroundColor = MentorshipUI.softSurface
         card.layer.cornerRadius = 30
         card.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-        card.layer.shadowColor = UIColor.black.cgColor
-        card.layer.shadowOpacity = 0.08
+        card.layer.shadowColor = MentorshipUI.shadow.cgColor
+        card.layer.shadowOpacity = 1
         card.layer.shadowOffset = CGSize(width: 0, height: -8)
         card.layer.shadowRadius = 22
+        card.layer.borderWidth = 1
+        card.layer.borderColor = MentorshipUI.plumStroke.cgColor
         contentView.addSubview(card)
         card.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([

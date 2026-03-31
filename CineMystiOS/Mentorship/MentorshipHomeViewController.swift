@@ -6,21 +6,39 @@
 import UIKit
 import Supabase
 
+enum MentorshipUI {
+    static let brandPlum = CineMystTheme.brandPlum
+    static let deepPlum = CineMystTheme.deepPlum
+    static let deepPlumMid = CineMystTheme.deepPlumMid
+    static let deepPlumDark = CineMystTheme.deepPlumDark
+    static let pageBackground = UIColor(red: 0.975, green: 0.965, blue: 0.975, alpha: 1)
+    static let raisedSurface = UIColor.white.withAlphaComponent(0.88)
+    static let softSurface = UIColor.white.withAlphaComponent(0.74)
+    static let plumField = UIColor(red: 0.333, green: 0.098, blue: 0.204, alpha: 0.06)
+    static let plumChip = UIColor(red: 0.333, green: 0.098, blue: 0.204, alpha: 0.09)
+    static let plumStroke = UIColor(red: 0.333, green: 0.098, blue: 0.204, alpha: 0.10)
+    static let mutedText = UIColor(red: 0.333, green: 0.098, blue: 0.204, alpha: 0.58)
+    static let softText = UIColor(red: 0.333, green: 0.098, blue: 0.204, alpha: 0.78)
+    static let shadow = UIColor(red: 0.176, green: 0.043, blue: 0.118, alpha: 0.14)
+}
+
 // MARK: - MentorCell (unchanged)
 final class MentorCell: UICollectionViewCell {
     static let reuseIdentifier = "MentorCell"
     private static let imageCache = NSCache<NSString, UIImage>()
-    private let plum = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1)
+    private let plum = MentorshipUI.brandPlum
 
     private let cardView: UIView = {
         let v = UIView()
-        v.backgroundColor = .white
+        v.backgroundColor = MentorshipUI.raisedSurface
         v.layer.cornerRadius = 20
         v.layer.masksToBounds = false
-        v.layer.shadowColor = UIColor.black.cgColor
-        v.layer.shadowOpacity = 0.09
+        v.layer.shadowColor = MentorshipUI.shadow.cgColor
+        v.layer.shadowOpacity = 1
         v.layer.shadowOffset = CGSize(width: 0, height: 10)
         v.layer.shadowRadius = 18
+        v.layer.borderWidth = 1
+        v.layer.borderColor = MentorshipUI.plumStroke.cgColor
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
@@ -30,7 +48,7 @@ final class MentorCell: UICollectionViewCell {
         v.translatesAutoresizingMaskIntoConstraints = false
         v.layer.cornerRadius = 16
         v.layer.masksToBounds = true
-        v.backgroundColor = UIColor.systemGray6
+        v.backgroundColor = CineMystTheme.plumMist
         return v
     }()
 
@@ -39,14 +57,14 @@ final class MentorCell: UICollectionViewCell {
         iv.contentMode = .scaleAspectFill
         iv.clipsToBounds = true
         iv.translatesAutoresizingMaskIntoConstraints = false
-        iv.backgroundColor = UIColor.systemGray6
+        iv.backgroundColor = CineMystTheme.plumMist
         return iv
     }()
 
     private let nameLabel: UILabel = {
         let l = UILabel()
         l.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
-        l.textColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1)
+        l.textColor = MentorshipUI.brandPlum
         l.numberOfLines = 2
         l.lineBreakMode = .byWordWrapping
         l.translatesAutoresizingMaskIntoConstraints = false
@@ -56,7 +74,7 @@ final class MentorCell: UICollectionViewCell {
     private let roleLabel: UILabel = {
         let l = UILabel()
         l.font = UIFont.systemFont(ofSize: 12, weight: .medium)
-        l.textColor = .secondaryLabel
+        l.textColor = MentorshipUI.mutedText
         l.numberOfLines = 2
         l.lineBreakMode = .byWordWrapping
         l.translatesAutoresizingMaskIntoConstraints = false
@@ -67,14 +85,14 @@ final class MentorCell: UICollectionViewCell {
         let v = UIView()
         v.translatesAutoresizingMaskIntoConstraints = false
         v.layer.cornerRadius = 10
-        v.backgroundColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 0.08)
+        v.backgroundColor = MentorshipUI.plumChip
         return v
     }()
 
     private let priceLabel: UILabel = {
         let l = UILabel()
         l.font = UIFont.systemFont(ofSize: 11, weight: .bold)
-        l.textColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 0.92)
+        l.textColor = MentorshipUI.brandPlum
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
@@ -82,7 +100,7 @@ final class MentorCell: UICollectionViewCell {
     private let starImageView: UIImageView = {
         let iv = UIImageView(image: UIImage(systemName: "star.fill"))
         iv.translatesAutoresizingMaskIntoConstraints = false
-        iv.tintColor = UIColor.systemBlue
+        iv.tintColor = CineMystTheme.pink
         return iv
     }()
 
@@ -90,7 +108,7 @@ final class MentorCell: UICollectionViewCell {
         let l = UILabel()
         l.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
         l.translatesAutoresizingMaskIntoConstraints = false
-        l.textColor = .label
+        l.textColor = MentorshipUI.softText
         return l
     }()
 
@@ -106,12 +124,14 @@ final class MentorCell: UICollectionViewCell {
     private let ratingBadgeView: UIView = {
         let v = UIView()
         v.translatesAutoresizingMaskIntoConstraints = false
-        v.backgroundColor = UIColor.white.withAlphaComponent(0.94)
+        v.backgroundColor = UIColor.white.withAlphaComponent(0.92)
         v.layer.cornerRadius = 12
-        v.layer.shadowColor = UIColor.black.cgColor
-        v.layer.shadowOpacity = 0.08
+        v.layer.shadowColor = MentorshipUI.shadow.cgColor
+        v.layer.shadowOpacity = 1
         v.layer.shadowOffset = CGSize(width: 0, height: 3)
         v.layer.shadowRadius = 6
+        v.layer.borderWidth = 1
+        v.layer.borderColor = MentorshipUI.plumStroke.cgColor
         return v
     }()
 
@@ -204,7 +224,7 @@ final class MentorCell: UICollectionViewCell {
             photoView.image = UIImage(systemName: "person.crop.rectangle", withConfiguration: placeholderConfig)
             photoView.contentMode = .center
             photoView.tintColor = UIColor.systemGray3
-            photoView.backgroundColor = UIColor.systemGray6
+            photoView.backgroundColor = CineMystTheme.plumMist
 
             // Try several URL creation strategies
             var candidateURLs: [URL] = []
@@ -244,12 +264,11 @@ final class MentorCell: UICollectionViewCell {
             let img = UIImage(systemName: "person.crop.rectangle", withConfiguration: config)
             photoView.image = img
             photoView.contentMode = .center
-            photoView.tintColor = UIColor.systemGray3
-            photoView.backgroundColor = UIColor.systemGray6
+            photoView.tintColor = CineMystTheme.plumHaze
+            photoView.backgroundColor = CineMystTheme.plumMist
         }
 
-        cardView.layer.borderWidth = 1
-        cardView.layer.borderColor = plum.withAlphaComponent(0.05).cgColor
+        cardView.layer.borderColor = MentorshipUI.plumStroke.cgColor
     }
 
     private static func priceHint(for mentor: Mentor) -> String? {
@@ -304,7 +323,7 @@ final class MentorCell: UICollectionViewCell {
 final class BookingCardCell: UITableViewCell {
     static let reuseIdentifier = "BookingCardCell"
     private static let imageCache = NSCache<NSString, UIImage>()
-    private let plum = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1)
+    private let plum = MentorshipUI.brandPlum
     private var currentImageURLString: String?
 
     private let cardView: UIView = {
@@ -312,10 +331,12 @@ final class BookingCardCell: UITableViewCell {
         view.translatesAutoresizingMaskIntoConstraints = false
         view.layer.cornerRadius = 24
         view.layer.masksToBounds = false
-        view.layer.shadowColor = UIColor.black.cgColor
-        view.layer.shadowOpacity = 0.08
+        view.layer.shadowColor = MentorshipUI.shadow.cgColor
+        view.layer.shadowOpacity = 1
         view.layer.shadowOffset = CGSize(width: 0, height: 12)
         view.layer.shadowRadius = 24
+        view.layer.borderWidth = 1
+        view.layer.borderColor = MentorshipUI.plumStroke.cgColor
         return view
     }()
 
@@ -331,7 +352,7 @@ final class BookingCardCell: UITableViewCell {
     private let glassTintView: UIView = {
         let view = UIView()
         view.translatesAutoresizingMaskIntoConstraints = false
-        view.backgroundColor = UIColor.white.withAlphaComponent(0.6)
+        view.backgroundColor = MentorshipUI.softSurface
         return view
     }()
 
@@ -350,7 +371,7 @@ final class BookingCardCell: UITableViewCell {
         view.translatesAutoresizingMaskIntoConstraints = false
         view.layer.cornerRadius = 18
         view.layer.masksToBounds = true
-        view.backgroundColor = UIColor.systemGray6
+        view.backgroundColor = CineMystTheme.plumMist
         return view
     }()
 
@@ -365,7 +386,7 @@ final class BookingCardCell: UITableViewCell {
     private let accentOrbView: UIView = {
         let view = UIView()
         view.translatesAutoresizingMaskIntoConstraints = false
-        view.backgroundColor = UIColor.white.withAlphaComponent(0.9)
+        view.backgroundColor = UIColor.white.withAlphaComponent(0.92)
         view.layer.cornerRadius = 14
         return view
     }()
@@ -373,7 +394,7 @@ final class BookingCardCell: UITableViewCell {
     private let accentOrbInnerView: UIView = {
         let view = UIView()
         view.translatesAutoresizingMaskIntoConstraints = false
-        view.backgroundColor = UIColor.systemPink.withAlphaComponent(0.9)
+        view.backgroundColor = MentorshipUI.brandPlum
         view.layer.cornerRadius = 5
         return view
     }()
@@ -383,7 +404,7 @@ final class BookingCardCell: UITableViewCell {
         label.translatesAutoresizingMaskIntoConstraints = false
         label.text = "Upcoming"
         label.font = UIFont.systemFont(ofSize: 11, weight: .semibold)
-        label.textColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 0.82)
+        label.textColor = MentorshipUI.softText
         return label
     }()
 
@@ -400,7 +421,7 @@ final class BookingCardCell: UITableViewCell {
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
         label.font = UIFont.systemFont(ofSize: 22, weight: .bold)
-        label.textColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1)
+        label.textColor = MentorshipUI.brandPlum
         return label
     }()
 
@@ -563,7 +584,7 @@ final class BookingCardCell: UITableViewCell {
         let imageView = UIImageView(image: UIImage(systemName: systemName))
         imageView.translatesAutoresizingMaskIntoConstraints = false
         imageView.contentMode = .scaleAspectFit
-        imageView.tintColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 0.82)
+        imageView.tintColor = MentorshipUI.softText
         NSLayoutConstraint.activate([
             imageView.widthAnchor.constraint(equalToConstant: 14),
             imageView.heightAnchor.constraint(equalToConstant: 14)
@@ -576,8 +597,8 @@ final class BookingCardCell: UITableViewCell {
         rowBackground.translatesAutoresizingMaskIntoConstraints = false
         rowBackground.layer.cornerRadius = 12
         rowBackground.backgroundColor = tinted
-            ? plum.withAlphaComponent(0.08)
-            : UIColor.secondarySystemBackground.withAlphaComponent(0.7)
+            ? MentorshipUI.plumChip
+            : MentorshipUI.softSurface
 
         let stack = UIStackView(arrangedSubviews: [icon, label])
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -652,7 +673,7 @@ final class BookingCardCell: UITableViewCell {
 // MARK: - MentorshipHomeViewController
 final class MentorshipHomeViewController: UIViewController {
 
-    private let plum = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1)
+    private let plum = MentorshipUI.brandPlum
     var initialSegmentIndex: Int = 0
     private static let mentorCachePrefix = "mentor_profile_exists_"
     private static let mentorIdsCachePrefix = "mentor_profile_ids_"
@@ -672,7 +693,7 @@ final class MentorshipHomeViewController: UIViewController {
         let l = UILabel()
         l.text = "Discover & learn from your mentor"
         l.font = UIFont.systemFont(ofSize: 13, weight: .regular)
-        l.textColor = .secondaryLabel
+        l.textColor = MentorshipUI.mutedText
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
@@ -681,9 +702,10 @@ final class MentorshipHomeViewController: UIViewController {
         let sc = UISegmentedControl(items: ["Mentee", "Mentor"])
         sc.selectedSegmentIndex = 0
         sc.translatesAutoresizingMaskIntoConstraints = false
-        sc.selectedSegmentTintColor = .white
-        sc.backgroundColor = UIColor.systemGray5
+        sc.selectedSegmentTintColor = MentorshipUI.brandPlum
+        sc.backgroundColor = MentorshipUI.softSurface
         sc.setTitleTextAttributes([.font: UIFont.systemFont(ofSize: 14, weight: .semibold)], for: .normal)
+        sc.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
         sc.layer.cornerRadius = 18
         sc.layer.masksToBounds = true
         sc.addTarget(self, action: #selector(segmentChanged(_:)), for: .valueChanged)
@@ -693,7 +715,7 @@ final class MentorshipHomeViewController: UIViewController {
     private let emptyIcon: UIImageView = {
         let iv = UIImageView()
         iv.contentMode = .scaleAspectFit
-        iv.tintColor = UIColor.systemGray3
+        iv.tintColor = CineMystTheme.plumHaze
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
@@ -701,7 +723,7 @@ final class MentorshipHomeViewController: UIViewController {
     private let emptyLabel: UILabel = {
         let l = UILabel()
         l.font = UIFont.systemFont(ofSize: 13)
-        l.textColor = .secondaryLabel
+        l.textColor = MentorshipUI.mutedText
         l.numberOfLines = 2
         l.textAlignment = .center
         l.translatesAutoresizingMaskIntoConstraints = false
@@ -736,8 +758,12 @@ final class MentorshipHomeViewController: UIViewController {
         b.setTitle("Become Mentor", for: .normal)
         b.setTitleColor(.white, for: .normal)
         b.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
-        b.backgroundColor = plum
+        b.backgroundColor = MentorshipUI.deepPlum
         b.layer.cornerRadius = 16
+        b.layer.shadowColor = MentorshipUI.shadow.cgColor
+        b.layer.shadowOpacity = 1
+        b.layer.shadowRadius = 16
+        b.layer.shadowOffset = CGSize(width: 0, height: 10)
         b.translatesAutoresizingMaskIntoConstraints = false
         b.addTarget(self, action: #selector(didTapBecomeMentor), for: .touchUpInside)
         b.alpha = 0.0
@@ -883,8 +909,12 @@ final class MentorshipHomeViewController: UIViewController {
     // lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = MentorshipUI.pageBackground
         titleLabel.textColor = plum
+        subtitleLabel.textColor = MentorshipUI.mutedText
+        mentorsLabel.textColor = MentorshipUI.brandPlum
+        bookingsTitle.textColor = MentorshipUI.brandPlum
+        seeAllButton.setTitleColor(MentorshipUI.brandPlum, for: .normal)
         segmentControl.selectedSegmentIndex = initialSegmentIndex
 
         view.addSubview(titleLabel)

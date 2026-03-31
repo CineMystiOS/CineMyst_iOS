@@ -60,42 +60,34 @@ struct FloatingMenuButton: View {
                 }
             }) {
                 ZStack {
-                    // Glow effect background
+                    Circle()
+                        .fill(Color(red: 0.33, green: 0.10, blue: 0.20).opacity(0.22))
+                        .frame(width: 78, height: 78)
+                        .blur(radius: 12)
+
                     Circle()
                         .fill(
-                            RadialGradient(
-                                gradient: Gradient(colors: [
-                                    Color(red: 0.804, green: 0.447, blue: 0.659).opacity(0.4),
-                                    Color(red: 0.804, green: 0.447, blue: 0.659).opacity(0.1)
-                                ]),
-                                center: .center,
-                                startRadius: 25,
-                                endRadius: 45
-                            )
-                        )
-                        .frame(width: 70, height: 70)
-                        .opacity(isExpanded ? 0 : 1)
-                    
-                    // Main Button
-                    Image(systemName: isExpanded ? "xmark" : "plus")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(.white)
-                        .frame(width: 64, height: 64)
-                        .background(
                             LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color(red: 0.263, green: 0.086, blue: 0.192),
-                                    Color(red: 0.804, green: 0.447, blue: 0.659)
-                                ]),
+                                colors: [
+                                    Color(red: 0.38, green: 0.11, blue: 0.22),
+                                    Color(red: 0.27, green: 0.08, blue: 0.17)
+                                ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .clipShape(Circle())
-                        .shadow(color: Color(red: 0.804, green: 0.447, blue: 0.659).opacity(0.5), radius: 12, x: 0, y: 6)
-                        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.white.opacity(0.22), lineWidth: 1.1)
+                        )
+                        .frame(width: 64, height: 64)
+
+                    Image(systemName: isExpanded ? "xmark" : "plus")
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundColor(.white)
                         .rotationEffect(.degrees(rotationAngle))
                 }
+                .shadow(color: Color(red: 0.25, green: 0.07, blue: 0.15).opacity(0.35), radius: 18, x: 0, y: 12)
             }
             .scaleEffect(buttonScale)
             .padding(24)
@@ -136,30 +128,35 @@ struct MenuActionButton: View {
     
     var body: some View {
         Button(action: {
-            print("✅ Button tapped: \(label)")
             action()
         }) {
             VStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 54, height: 54)
-                    .background(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color(red: 0.263, green: 0.086, blue: 0.192),
-                                Color(red: 0.804, green: 0.447, blue: 0.659)
-                            ]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.39, green: 0.12, blue: 0.23),
+                                    Color(red: 0.29, green: 0.09, blue: 0.18)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                    )
-                    .clipShape(Circle())
-                    .shadow(color: Color(red: 0.804, green: 0.447, blue: 0.659).opacity(0.4), radius: 10, x: 0, y: 5)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.white.opacity(0.22), lineWidth: 1.1)
+                        )
+                        .frame(width: 56, height: 56)
+                    Image(systemName: icon)
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+                .shadow(color: Color(red: 0.25, green: 0.07, blue: 0.15).opacity(0.28), radius: 16, x: 0, y: 10)
                 
                 Text(label)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.primary)
+                    .foregroundColor(Color(red: 0.30, green: 0.12, blue: 0.21))
             }
         }
         .buttonStyle(.plain)

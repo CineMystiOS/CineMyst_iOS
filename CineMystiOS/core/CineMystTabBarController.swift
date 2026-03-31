@@ -15,12 +15,29 @@ class CineMystTabBarController: UITabBarController, UITabBarControllerDelegate {
         delegate = self
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        tabBar.layer.cornerRadius = 28
+        tabBar.layer.masksToBounds = false
+        tabBar.layer.shadowColor = UIColor.black.withAlphaComponent(0.12).cgColor
+        tabBar.layer.shadowOpacity = 1
+        tabBar.layer.shadowRadius = 24
+        tabBar.layer.shadowOffset = CGSize(width: 0, height: 10)
+        tabBar.frame = CGRect(
+            x: 12,
+            y: view.bounds.height - tabBar.frame.height - 10,
+            width: view.bounds.width - 24,
+            height: tabBar.frame.height
+        )
+    }
+
     // MARK: - Tab Bar Setup
     private func setupTabBar() {
         let appearance = UITabBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = .white
-        appearance.shadowColor = UIColor(white: 0, alpha: 0.2)
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundEffect = UIBlurEffect(style: .systemThinMaterialLight)
+        appearance.backgroundColor = UIColor(red: 0.982, green: 0.968, blue: 0.975, alpha: 0.78)
+        appearance.shadowColor = .clear
 
         // Color: #431631 (deepPlum)
         let activeColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1)

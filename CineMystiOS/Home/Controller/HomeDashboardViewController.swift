@@ -13,6 +13,7 @@ import PhotosUI
 
 // MARK: - Design Tokens
 enum CineMystTheme {
+    static let brandPlum     = UIColor(red: 0.333, green: 0.098, blue: 0.204, alpha: 1)
     static let deepPlum      = UIColor(red: 0.263, green: 0.082, blue: 0.188, alpha: 1)
     static let deepPlumMid   = UIColor(red: 0.353, green: 0.118, blue: 0.259, alpha: 1)
     static let deepPlumDark  = UIColor(red: 0.176, green: 0.043, blue: 0.118, alpha: 1)
@@ -21,6 +22,15 @@ enum CineMystTheme {
     static let pinkPale      = UIColor(red: 0.969, green: 0.941, blue: 0.961, alpha: 1)
     static let accent        = UIColor(red: 0.659, green: 0.333, blue: 0.969, alpha: 1)
     static let gold          = UIColor(red: 0.961, green: 0.620, blue: 0.043, alpha: 1)
+    static let butterCream   = UIColor(red: 0.991, green: 0.965, blue: 0.865, alpha: 1)
+    static let warmCream     = UIColor(red: 0.998, green: 0.984, blue: 0.941, alpha: 1)
+    static let softMint      = UIColor(red: 0.760, green: 0.914, blue: 0.902, alpha: 1)
+    static let softLavender  = UIColor(red: 0.855, green: 0.780, blue: 0.945, alpha: 1)
+    static let peach         = UIColor(red: 0.977, green: 0.835, blue: 0.705, alpha: 1)
+    static let ink           = UIColor(red: 0.181, green: 0.165, blue: 0.154, alpha: 1)
+    static let plumMist      = UIColor(red: 0.957, green: 0.937, blue: 0.949, alpha: 1)
+    static let plumHaze      = UIColor(red: 0.831, green: 0.733, blue: 0.784, alpha: 1)
+    static let plumGlass     = UIColor(red: 0.333, green: 0.098, blue: 0.204, alpha: 0.10)
     static let cardRadius: CGFloat   = 22
     static let cardRadiusSm: CGFloat = 14
 }
@@ -28,6 +38,7 @@ enum CineMystTheme {
 // MARK: - Models
 enum FeedItem {
     case promoBanner
+    case communityHeader
     case post(Post)
     case job(Job)
     case ad(AdItem)
@@ -99,11 +110,28 @@ struct AdItem {
     ] }
 }
 
+struct HomeQuickLink {
+    let title: String
+    let tint: UIColor
+    let accent: UIColor
+    let icon: String
+
+    static let all: [HomeQuickLink] = [
+        .init(title: "Casting Calls", tint: UIColor(red: 0.918, green: 0.878, blue: 0.911, alpha: 1), accent: UIColor(red: 0.852, green: 0.780, blue: 0.872, alpha: 1), icon: "theatermasks.fill"),
+        .init(title: "Portfolios", tint: UIColor(red: 0.928, green: 0.868, blue: 0.902, alpha: 1), accent: UIColor(red: 0.858, green: 0.768, blue: 0.828, alpha: 1), icon: "sparkles.tv.fill"),
+        .init(title: "Directors", tint: UIColor(red: 0.894, green: 0.836, blue: 0.914, alpha: 1), accent: UIColor(red: 0.812, green: 0.735, blue: 0.845, alpha: 1), icon: "person.2.fill"),
+        .init(title: "Auditions", tint: UIColor(red: 0.886, green: 0.902, blue: 0.948, alpha: 1), accent: UIColor(red: 0.792, green: 0.816, blue: 0.902, alpha: 1), icon: "music.mic")
+    ]
+}
+
 // MARK: - HomeDashboardViewController
 final class HomeDashboardViewController: UIViewController {
 
     private let tableView      = UITableView(frame: .zero, style: .plain)
     private let refreshControl = UIRefreshControl()
+    private let backgroundGradient = CAGradientLayer()
+    private let ambientGlowTop = UIView()
+    private let ambientGlowBottom = UIView()
     private var feedItems: [FeedItem] = []
     private var posts: [Post] = []
     private var jobs:  [Job]  = []
@@ -112,6 +140,7 @@ final class HomeDashboardViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = CineMystTheme.pinkPale
+        setupBackground()
         setupNavigationBar()
         setupTable()
         setupFloatingMenu()
@@ -123,6 +152,55 @@ final class HomeDashboardViewController: UIViewController {
         super.viewWillAppear(animated)
         setupNavigationBar()
         loadPosts()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        backgroundGradient.frame = view.bounds
+        ambientGlowTop.layer.cornerRadius = ambientGlowTop.bounds.width / 2
+        ambientGlowBottom.layer.cornerRadius = ambientGlowBottom.bounds.width / 2
+        updateTableHeaderLayoutIfNeeded()
+    }
+
+    private func setupBackground() {
+        backgroundGradient.colors = [
+            UIColor(red: 0.988, green: 0.978, blue: 0.984, alpha: 1).cgColor,
+            CineMystTheme.plumMist.cgColor,
+            UIColor(red: 0.936, green: 0.892, blue: 0.917, alpha: 1).cgColor
+        ]
+        backgroundGradient.locations = [0, 0.45, 1]
+        backgroundGradient.startPoint = CGPoint(x: 0.1, y: 0)
+        backgroundGradient.endPoint = CGPoint(x: 0.9, y: 1)
+        view.layer.insertSublayer(backgroundGradient, at: 0)
+
+        ambientGlowTop.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.18)
+        ambientGlowTop.layer.shadowColor = CineMystTheme.brandPlum.cgColor
+        ambientGlowTop.layer.shadowOpacity = 0.24
+        ambientGlowTop.layer.shadowRadius = 80
+        ambientGlowTop.layer.shadowOffset = .zero
+
+        ambientGlowBottom.backgroundColor = CineMystTheme.deepPlumMid.withAlphaComponent(0.12)
+        ambientGlowBottom.layer.shadowColor = CineMystTheme.deepPlumMid.cgColor
+        ambientGlowBottom.layer.shadowOpacity = 0.18
+        ambientGlowBottom.layer.shadowRadius = 90
+        ambientGlowBottom.layer.shadowOffset = .zero
+
+        [ambientGlowTop, ambientGlowBottom].forEach {
+            $0.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview($0)
+        }
+
+        NSLayoutConstraint.activate([
+            ambientGlowTop.widthAnchor.constraint(equalToConstant: 220),
+            ambientGlowTop.heightAnchor.constraint(equalToConstant: 220),
+            ambientGlowTop.topAnchor.constraint(equalTo: view.topAnchor, constant: -40),
+            ambientGlowTop.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: 70),
+
+            ambientGlowBottom.widthAnchor.constraint(equalToConstant: 240),
+            ambientGlowBottom.heightAnchor.constraint(equalToConstant: 240),
+            ambientGlowBottom.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: -80),
+            ambientGlowBottom.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: 40)
+        ])
     }
 
     // MARK: - Navigation Bar
@@ -145,7 +223,7 @@ final class HomeDashboardViewController: UIViewController {
             let titleLabel = UILabel()
             titleLabel.text = "CineMyst"
             titleLabel.font = UIFont(name: "Georgia-Bold", size: 26) ?? .boldSystemFont(ofSize: 26)
-            titleLabel.textColor = .white
+            titleLabel.textColor = CineMystTheme.ink
             titleLabel.translatesAutoresizingMaskIntoConstraints = false
             titleLabel.tag = 999
 
@@ -158,15 +236,7 @@ final class HomeDashboardViewController: UIViewController {
         }
 
         // MARK: - Right Buttons
-        let bellBtn = UIBarButtonItem(
-            image: UIImage(systemName: "bell"),
-            style: .plain,
-            target: self,
-            action: #selector(bellTapped)
-        )
-        bellBtn.tintColor = CineMystTheme.pink
-
-        navigationItem.rightBarButtonItems = [makeAvatarBarButton(), bellBtn]
+        navigationItem.rightBarButtonItems = [makeAvatarBarButton(), makeBellBarButton()]
 
         // MARK: - Search
         let search = UISearchController(searchResultsController: nil)
@@ -174,13 +244,29 @@ final class HomeDashboardViewController: UIViewController {
         search.obscuresBackgroundDuringPresentation = false
         search.searchResultsUpdater = self
         search.searchBar.delegate = self
+        let searchField = search.searchBar.searchTextField
+        searchField.backgroundColor = UIColor.white.withAlphaComponent(0.34)
+        searchField.textColor = CineMystTheme.ink
+        searchField.tintColor = CineMystTheme.brandPlum
+        searchField.layer.cornerRadius = 18
+        searchField.layer.borderWidth = 1
+        searchField.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.18).cgColor
+        searchField.layer.shadowColor = UIColor.black.withAlphaComponent(0.08).cgColor
+        searchField.layer.shadowOpacity = 1
+        searchField.layer.shadowRadius = 18
+        searchField.layer.shadowOffset = CGSize(width: 0, height: 8)
+        searchField.attributedPlaceholder = NSAttributedString(
+            string: "Search posts or jobs",
+            attributes: [.foregroundColor: CineMystTheme.ink.withAlphaComponent(0.4)]
+        )
+        searchField.leftView?.tintColor = CineMystTheme.ink.withAlphaComponent(0.55)
         navigationItem.searchController = search
         definesPresentationContext = true
 
         // MARK: - Appearance
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = CineMystTheme.deepPlum
+        appearance.backgroundColor = UIColor(red: 0.988, green: 0.978, blue: 0.984, alpha: 1)
         appearance.shadowColor = .clear
 
         navigationController?.navigationBar.standardAppearance = appearance
@@ -189,12 +275,12 @@ final class HomeDashboardViewController: UIViewController {
     }
     
     private func makeAvatarBarButton() -> UIBarButtonItem {
-        let v = UIView(frame: CGRect(x: 0, y: 0, width: 34, height: 34))
-        v.layer.cornerRadius = 17; v.clipsToBounds = true
-        v.layer.borderWidth = 2; v.layer.borderColor = CineMystTheme.pinkLight.cgColor
+        let v = UIView(frame: CGRect(x: 0, y: 0, width: 38, height: 38))
+        v.layer.cornerRadius = 19; v.clipsToBounds = true
+        v.layer.borderWidth = 1.5; v.layer.borderColor = UIColor.white.withAlphaComponent(0.9).cgColor
         let g = CAGradientLayer()
         g.frame = v.bounds
-        g.colors = [CineMystTheme.pink.cgColor, CineMystTheme.accent.cgColor]
+        g.colors = [CineMystTheme.brandPlum.cgColor, CineMystTheme.deepPlumMid.cgColor]
         g.startPoint = CGPoint(x: 0, y: 0); g.endPoint = CGPoint(x: 1, y: 1)
         v.layer.addSublayer(g)
         let l = UILabel(frame: v.bounds); l.text = "A"; l.textAlignment = .center
@@ -205,16 +291,35 @@ final class HomeDashboardViewController: UIViewController {
         return UIBarButtonItem(customView: v)
     }
 
+    private func makeBellBarButton() -> UIBarButtonItem {
+        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialLight))
+        blur.frame = CGRect(x: 0, y: 0, width: 38, height: 38)
+        blur.layer.cornerRadius = 19
+        blur.clipsToBounds = true
+        blur.layer.borderWidth = 1
+        blur.layer.borderColor = UIColor.white.withAlphaComponent(0.8).cgColor
+
+        let button = UIButton(type: .system)
+        button.frame = blur.bounds
+        button.setImage(UIImage(systemName: "bell"), for: .normal)
+        button.tintColor = CineMystTheme.ink.withAlphaComponent(0.78)
+        button.addTarget(self, action: #selector(bellTapped), for: .touchUpInside)
+        blur.contentView.addSubview(button)
+        return UIBarButtonItem(customView: blur)
+    }
+
     // MARK: - Table
     private func setupTable() {
         tableView.dataSource  = self; tableView.delegate = self
         tableView.separatorStyle = .none; tableView.showsVerticalScrollIndicator = false
-        tableView.backgroundColor = CineMystTheme.pinkPale
+        tableView.backgroundColor = .clear
         tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 100, right: 0)
+        tableView.tableHeaderView = makeTableHeader()
         refreshControl.tintColor = CineMystTheme.pink
         refreshControl.addTarget(self, action: #selector(handleRefresh), for: .valueChanged)
         tableView.refreshControl = refreshControl
         tableView.register(PromoBannerCell.self,  forCellReuseIdentifier: PromoBannerCell.reuseId)
+        tableView.register(FeedSectionHeaderCell.self, forCellReuseIdentifier: FeedSectionHeaderCell.reuseId)
         tableView.register(CastingFeedCell.self,  forCellReuseIdentifier: CastingFeedCell.reuseId)
         tableView.register(PostFeedCell.self,     forCellReuseIdentifier: PostFeedCell.reuseId)
         tableView.register(AdBannerCell.self,     forCellReuseIdentifier: AdBannerCell.reuseId)
@@ -226,6 +331,24 @@ final class HomeDashboardViewController: UIViewController {
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
+    }
+
+    private func makeTableHeader() -> UIView {
+        let header = HomeEditorialHeaderView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 314))
+        header.translatesAutoresizingMaskIntoConstraints = false
+        header.frame.size.width = view.bounds.width
+        header.layoutIfNeeded()
+        return header
+    }
+
+    private func updateTableHeaderLayoutIfNeeded() {
+        guard let header = tableView.tableHeaderView else { return }
+        var frame = header.frame
+        if abs(frame.width - tableView.bounds.width) > 0.5 {
+            frame.size.width = tableView.bounds.width
+            header.frame = frame
+            tableView.tableHeaderView = header
+        }
     }
 
     private func setupFloatingMenu() {
@@ -264,6 +387,9 @@ final class HomeDashboardViewController: UIViewController {
 
     private func rebuildFeed() {
         feedItems = [.promoBanner]
+        if !posts.isEmpty {
+            feedItems.append(.communityHeader)
+        }
         var adIdx = 0
         for (i, post) in posts.enumerated() {
             feedItems.append(.post(post))
@@ -318,6 +444,237 @@ final class HomeDashboardViewController: UIViewController {
     }
 }
 
+private final class HomeEditorialHeaderView: UIView {
+    private let contentColumn = UIView()
+    private let panelView = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialLight))
+    private let introLabel = UILabel()
+    private let titleLabel = UILabel()
+    private let subtitleLabel = UILabel()
+    private let gridStack = UIStackView()
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setup()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func setup() {
+        backgroundColor = .clear
+
+        panelView.layer.cornerRadius = 28
+        panelView.clipsToBounds = true
+        panelView.layer.borderWidth = 1
+        panelView.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.14).cgColor
+        panelView.layer.shadowColor = UIColor.black.withAlphaComponent(0.08).cgColor
+        panelView.layer.shadowOpacity = 1
+        panelView.layer.shadowRadius = 22
+        panelView.layer.shadowOffset = CGSize(width: 0, height: 12)
+        panelView.contentView.backgroundColor = UIColor(red: 0.333, green: 0.098, blue: 0.204, alpha: 0.05)
+        addSubview(panelView)
+        panelView.translatesAutoresizingMaskIntoConstraints = false
+
+        introLabel.text = "Today on CineMyst"
+        introLabel.font = .systemFont(ofSize: 12, weight: .semibold)
+        introLabel.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.62)
+        introLabel.textAlignment = .center
+
+        titleLabel.text = "Discover your next scene"
+        titleLabel.font = UIFont(name: "Georgia-Bold", size: 23) ?? .boldSystemFont(ofSize: 23)
+        titleLabel.textColor = CineMystTheme.ink
+        titleLabel.numberOfLines = 2
+        titleLabel.textAlignment = .center
+
+        subtitleLabel.text = "Elegant casting opportunities for you"
+        subtitleLabel.font = .systemFont(ofSize: 12.5, weight: .medium)
+        subtitleLabel.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.54)
+        subtitleLabel.numberOfLines = 1
+        subtitleLabel.textAlignment = .center
+
+        panelView.contentView.addSubview(contentColumn)
+        contentColumn.translatesAutoresizingMaskIntoConstraints = false
+
+        gridStack.axis = .vertical
+        gridStack.spacing = 16
+        gridStack.distribution = .fillEqually
+
+        [introLabel, titleLabel, subtitleLabel, gridStack].forEach {
+            contentColumn.addSubview($0)
+            $0.translatesAutoresizingMaskIntoConstraints = false
+        }
+
+        NSLayoutConstraint.activate([
+            panelView.topAnchor.constraint(equalTo: topAnchor, constant: 10),
+            panelView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+            panelView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
+            panelView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4),
+
+            contentColumn.topAnchor.constraint(equalTo: panelView.contentView.topAnchor, constant: 16),
+            contentColumn.leadingAnchor.constraint(equalTo: panelView.contentView.leadingAnchor, constant: 16),
+            contentColumn.trailingAnchor.constraint(equalTo: panelView.contentView.trailingAnchor, constant: -16),
+            contentColumn.bottomAnchor.constraint(equalTo: panelView.contentView.bottomAnchor, constant: -16)
+        ])
+
+        let rows = stride(from: 0, to: HomeQuickLink.all.count, by: 2).map {
+            Array(HomeQuickLink.all[$0..<min($0 + 2, HomeQuickLink.all.count)])
+        }
+
+        for rowItems in rows {
+            let row = UIStackView()
+            row.axis = .horizontal
+            row.spacing = 18
+            row.distribution = .fillEqually
+            rowItems.forEach { row.addArrangedSubview(QuickLinkBubbleView(link: $0)) }
+            gridStack.addArrangedSubview(row)
+        }
+
+        NSLayoutConstraint.activate([
+            introLabel.topAnchor.constraint(equalTo: contentColumn.topAnchor, constant: 0),
+            introLabel.leadingAnchor.constraint(equalTo: contentColumn.leadingAnchor),
+            introLabel.trailingAnchor.constraint(equalTo: contentColumn.trailingAnchor),
+
+            titleLabel.topAnchor.constraint(equalTo: introLabel.bottomAnchor, constant: 4),
+            titleLabel.leadingAnchor.constraint(equalTo: contentColumn.leadingAnchor, constant: 10),
+            titleLabel.trailingAnchor.constraint(equalTo: contentColumn.trailingAnchor, constant: -10),
+
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            subtitleLabel.leadingAnchor.constraint(equalTo: contentColumn.leadingAnchor, constant: 10),
+            subtitleLabel.trailingAnchor.constraint(equalTo: contentColumn.trailingAnchor, constant: -10),
+
+            gridStack.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 18),
+            gridStack.leadingAnchor.constraint(equalTo: contentColumn.leadingAnchor, constant: 12),
+            gridStack.trailingAnchor.constraint(equalTo: contentColumn.trailingAnchor, constant: -12),
+            gridStack.bottomAnchor.constraint(equalTo: contentColumn.bottomAnchor, constant: -6)
+        ])
+    }
+}
+
+private final class QuickLinkBubbleView: UIView {
+    private let iconWrap = UIView()
+
+    init(link: HomeQuickLink) {
+        super.init(frame: .zero)
+        translatesAutoresizingMaskIntoConstraints = false
+        setup(link: link)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func setup(link: HomeQuickLink) {
+        let blob = BlobShapeView(colors: [link.tint, link.accent])
+        addSubview(blob)
+        blob.translatesAutoresizingMaskIntoConstraints = false
+
+        iconWrap.backgroundColor = UIColor.white.withAlphaComponent(0.45)
+        iconWrap.layer.cornerRadius = 21
+        iconWrap.layer.borderWidth = 1
+        iconWrap.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.12).cgColor
+        iconWrap.layer.shadowColor = UIColor.black.withAlphaComponent(0.08).cgColor
+        iconWrap.layer.shadowOpacity = 1
+        iconWrap.layer.shadowRadius = 14
+        iconWrap.layer.shadowOffset = CGSize(width: 0, height: 8)
+        addSubview(iconWrap)
+        iconWrap.translatesAutoresizingMaskIntoConstraints = false
+
+        let iconView = UIImageView(image: UIImage(systemName: link.icon))
+        iconView.tintColor = CineMystTheme.ink.withAlphaComponent(0.82)
+        iconView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+        iconWrap.addSubview(iconView)
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+
+        let label = UILabel()
+        label.text = link.title
+        label.font = UIFont(name: "Georgia", size: 12.5) ?? .systemFont(ofSize: 12.5, weight: .medium)
+        label.textColor = CineMystTheme.ink
+        label.textAlignment = .center
+        label.numberOfLines = 2
+        addSubview(label)
+        label.translatesAutoresizingMaskIntoConstraints = false
+
+        NSLayoutConstraint.activate([
+            heightAnchor.constraint(equalToConstant: 92),
+
+            blob.topAnchor.constraint(equalTo: topAnchor),
+            blob.centerXAnchor.constraint(equalTo: centerXAnchor),
+            blob.widthAnchor.constraint(equalToConstant: 78),
+            blob.heightAnchor.constraint(equalToConstant: 62),
+
+            iconWrap.centerXAnchor.constraint(equalTo: blob.centerXAnchor),
+            iconWrap.centerYAnchor.constraint(equalTo: blob.centerYAnchor, constant: -1),
+            iconWrap.widthAnchor.constraint(equalToConstant: 44),
+            iconWrap.heightAnchor.constraint(equalToConstant: 44),
+
+            iconView.centerXAnchor.constraint(equalTo: iconWrap.centerXAnchor),
+            iconView.centerYAnchor.constraint(equalTo: iconWrap.centerYAnchor),
+
+            label.topAnchor.constraint(equalTo: blob.bottomAnchor, constant: 10),
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 2),
+            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -2)
+        ])
+    }
+}
+
+private final class BlobShapeView: UIView {
+    private let gradient = CAGradientLayer()
+
+    init(colors: [UIColor]) {
+        super.init(frame: .zero)
+        gradient.colors = colors.map(\.cgColor)
+        gradient.startPoint = CGPoint(x: 0, y: 0)
+        gradient.endPoint = CGPoint(x: 1, y: 1)
+        layer.insertSublayer(gradient, at: 0)
+        layer.shadowColor = CineMystTheme.ink.cgColor
+        layer.shadowOpacity = 0.10
+        layer.shadowRadius = 16
+        layer.shadowOffset = CGSize(width: 0, height: 8)
+        backgroundColor = .clear
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        gradient.frame = bounds
+        let path = UIBezierPath()
+        let w = bounds.width
+        let h = bounds.height
+        path.move(to: CGPoint(x: 0.18 * w, y: 0.08 * h))
+        path.addCurve(to: CGPoint(x: 0.82 * w, y: 0.12 * h), controlPoint1: CGPoint(x: 0.35 * w, y: -0.02 * h), controlPoint2: CGPoint(x: 0.67 * w, y: -0.01 * h))
+        path.addCurve(to: CGPoint(x: 0.92 * w, y: 0.52 * h), controlPoint1: CGPoint(x: 1.02 * w, y: 0.18 * h), controlPoint2: CGPoint(x: 1.0 * w, y: 0.4 * h))
+        path.addCurve(to: CGPoint(x: 0.68 * w, y: 0.94 * h), controlPoint1: CGPoint(x: 0.85 * w, y: 0.82 * h), controlPoint2: CGPoint(x: 0.82 * w, y: 1.02 * h))
+        path.addCurve(to: CGPoint(x: 0.2 * w, y: 0.86 * h), controlPoint1: CGPoint(x: 0.5 * w, y: 0.88 * h), controlPoint2: CGPoint(x: 0.3 * w, y: 1.0 * h))
+        path.addCurve(to: CGPoint(x: 0.08 * w, y: 0.34 * h), controlPoint1: CGPoint(x: 0.0 * w, y: 0.72 * h), controlPoint2: CGPoint(x: -0.02 * w, y: 0.48 * h))
+        path.close()
+        let shape = CAShapeLayer()
+        shape.path = path.cgPath
+        layer.mask = shape
+        layer.shadowPath = path.cgPath
+    }
+}
+
+private final class ScallopDividerView: UIView {
+    private let inverted: Bool
+
+    init(inverted: Bool) {
+        self.inverted = inverted
+        super.init(frame: .zero)
+        backgroundColor = .clear
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func draw(_ rect: CGRect) {
+        guard let ctx = UIGraphicsGetCurrentContext() else { return }
+        ctx.setFillColor(CineMystTheme.plumMist.withAlphaComponent(0.8).cgColor)
+        let radius: CGFloat = 18
+        let circleCount = Int(ceil(rect.width / (radius * 2)))
+        for index in 0...circleCount {
+            let x = CGFloat(index) * radius * 2
+            let y = inverted ? 0 : rect.height - radius * 2
+            ctx.fillEllipse(in: CGRect(x: x, y: y, width: radius * 2, height: radius * 2))
+        }
+    }
+}
+
 extension HomeDashboardViewController: UISearchBarDelegate, UISearchResultsUpdating {
     func searchBarShouldBeginEditing(_ searchBar: UISearchBar) -> Bool {
         navigationController?.pushViewController(SearchViewController(), animated: true); return false
@@ -335,6 +692,8 @@ extension HomeDashboardViewController: UITableViewDataSource, UITableViewDelegat
         switch feedItems[indexPath.row] {
         case .promoBanner:
             return tableView.dequeueReusableCell(withIdentifier: PromoBannerCell.reuseId, for: indexPath) as! PromoBannerCell
+        case .communityHeader:
+            return tableView.dequeueReusableCell(withIdentifier: FeedSectionHeaderCell.reuseId, for: indexPath) as! FeedSectionHeaderCell
         case .post(let post):
             let cell = tableView.dequeueReusableCell(withIdentifier: PostFeedCell.reuseId, for: indexPath) as! PostFeedCell
             cell.configure(with: post)
@@ -354,6 +713,7 @@ extension HomeDashboardViewController: UITableViewDataSource, UITableViewDelegat
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         switch feedItems[indexPath.row] {
         case .promoBanner: return 210
+        case .communityHeader: return 72
         case .post:        return UITableView.automaticDimension
         case .job:         return UITableView.automaticDimension
         case .ad:          return 110
@@ -363,6 +723,7 @@ extension HomeDashboardViewController: UITableViewDataSource, UITableViewDelegat
     func tableView(_ tableView: UITableView, estimatedHeightForRowAt indexPath: IndexPath) -> CGFloat {
         switch feedItems[indexPath.row] {
         case .promoBanner: return 210
+        case .communityHeader: return 72
         case .post:        return 380
         case .job:         return 280
         case .ad:          return 110
@@ -378,6 +739,72 @@ extension HomeDashboardViewController: UITableViewDataSource, UITableViewDelegat
             }
             return
         }
+    }
+}
+
+private final class FeedSectionHeaderCell: UITableViewCell {
+    static let reuseId = "FeedSectionHeaderCell"
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        selectionStyle = .none
+        backgroundColor = .clear
+        contentView.backgroundColor = .clear
+        build()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func build() {
+        let capsule = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialLight))
+        capsule.layer.cornerRadius = 18
+        capsule.clipsToBounds = true
+        capsule.layer.borderWidth = 1
+        capsule.layer.borderColor = UIColor.white.withAlphaComponent(0.85).cgColor
+        contentView.addSubview(capsule)
+        capsule.translatesAutoresizingMaskIntoConstraints = false
+
+        let eyebrow = UILabel()
+        eyebrow.text = "Community"
+        eyebrow.font = .systemFont(ofSize: 11, weight: .semibold)
+        eyebrow.textColor = CineMystTheme.deepPlum.withAlphaComponent(0.55)
+
+        let title = UILabel()
+        title.text = "Latest From Creators"
+        title.font = UIFont(name: "Georgia-Bold", size: 18) ?? .boldSystemFont(ofSize: 18)
+        title.textColor = CineMystTheme.ink
+        title.numberOfLines = 1
+
+        let dot = UIView()
+        dot.backgroundColor = CineMystTheme.pink.withAlphaComponent(0.9)
+        dot.layer.cornerRadius = 4
+        dot.translatesAutoresizingMaskIntoConstraints = false
+        dot.widthAnchor.constraint(equalToConstant: 8).isActive = true
+        dot.heightAnchor.constraint(equalToConstant: 8).isActive = true
+
+        let textStack = UIStackView(arrangedSubviews: [eyebrow, title])
+        textStack.axis = .vertical
+        textStack.spacing = 4
+        textStack.alignment = .leading
+
+        let row = UIStackView(arrangedSubviews: [dot, textStack])
+        row.axis = .horizontal
+        row.alignment = .center
+        row.spacing = 10
+        capsule.contentView.addSubview(row)
+        row.translatesAutoresizingMaskIntoConstraints = false
+
+        NSLayoutConstraint.activate([
+            capsule.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
+            capsule.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
+            capsule.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -14),
+            capsule.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -6),
+
+            row.topAnchor.constraint(equalTo: capsule.contentView.topAnchor, constant: 12),
+            row.leadingAnchor.constraint(equalTo: capsule.contentView.leadingAnchor, constant: 14),
+            row.trailingAnchor.constraint(equalTo: capsule.contentView.trailingAnchor, constant: -14),
+            row.bottomAnchor.constraint(equalTo: capsule.contentView.bottomAnchor, constant: -12)
+        ])
     }
 }
 
@@ -412,177 +839,185 @@ extension HomeDashboardViewController: PostComposerDelegate {
 // MARK: ═══════════════════════════════════════════
 // MARK: CELL: PromoBannerCell — swipeable cards
 // MARK: ═══════════════════════════════════════════
-
 final class PromoBannerCell: UITableViewCell, UIScrollViewDelegate {
     static let reuseId = "PromoBannerCell"
 
+    private let shellView = UIView()
     private let scrollView  = UIScrollView()
     private let pageControl = UIPageControl()
+    private let pagePill = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialLight))
+
     private var autoTimer: Timer?
-    private var cardViews: [UIView] = []
+    private var cardViews: [PromoCardView] = []
     private var currentPage = 0
-    private var didBuildCards = false
+    private var previousBounds: CGSize = .zero
+
+    // ✅ MATCH HEADER SPACING
+    private let horizontalInset: CGFloat = 16
+
+    // ✅ KEEP PEEK BUT HANDLE IT CORRECTLY
+    private let cardPeek: CGFloat = 8
+    private let cardGap: CGFloat = 14
+    private let cardHeight: CGFloat = 172
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
-        selectionStyle = .none; backgroundColor = .clear; contentView.backgroundColor = .clear
+        selectionStyle = .none
+        backgroundColor = .clear
+        contentView.backgroundColor = .clear
         setupUI()
     }
+
     required init?(coder: NSCoder) { fatalError() }
     deinit { autoTimer?.invalidate() }
 
     private func setupUI() {
+        contentView.addSubview(shellView)
+        shellView.translatesAutoresizingMaskIntoConstraints = false
+
         scrollView.isPagingEnabled = false
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.delegate = self
         scrollView.clipsToBounds = false
         scrollView.decelerationRate = .fast
-        contentView.addSubview(scrollView)
+
+        // ✅ KEEP PEEK VISUAL ONLY
+        scrollView.contentInset = UIEdgeInsets(top: 0, left: cardPeek, bottom: 0, right: cardPeek)
+
+        shellView.addSubview(scrollView)
         scrollView.translatesAutoresizingMaskIntoConstraints = false
 
         pageControl.numberOfPages = PromoCard.all.count
         pageControl.currentPage   = 0
-        pageControl.currentPageIndicatorTintColor = CineMystTheme.pink
-        pageControl.pageIndicatorTintColor        = CineMystTheme.pink.withAlphaComponent(0.3)
+        pageControl.currentPageIndicatorTintColor = CineMystTheme.brandPlum
+        pageControl.pageIndicatorTintColor        = CineMystTheme.brandPlum.withAlphaComponent(0.18)
         pageControl.transform = CGAffineTransform(scaleX: 0.75, y: 0.75)
-        contentView.addSubview(pageControl)
+
+        pagePill.layer.cornerRadius = 16
+        pagePill.clipsToBounds = true
+        pagePill.layer.borderWidth = 1
+        pagePill.layer.borderColor = UIColor.white.withAlphaComponent(0.85).cgColor
+
+        shellView.addSubview(pagePill)
+        pagePill.contentView.addSubview(pageControl)
+
+        pagePill.translatesAutoresizingMaskIntoConstraints = false
         pageControl.translatesAutoresizingMaskIntoConstraints = false
 
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
-            scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            scrollView.heightAnchor.constraint(equalToConstant: 168),
+            shellView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
+            shellView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            shellView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            shellView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -4),
 
-            pageControl.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 0),
-            pageControl.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            pageControl.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -4)
+            // ✅ 🔥 CRITICAL FIX HERE
+            // subtract peek so visual edges align
+            scrollView.leadingAnchor.constraint(equalTo: shellView.leadingAnchor, constant: horizontalInset - cardPeek),
+            scrollView.trailingAnchor.constraint(equalTo: shellView.trailingAnchor, constant: -(horizontalInset - cardPeek)),
+
+            scrollView.topAnchor.constraint(equalTo: shellView.topAnchor),
+            scrollView.heightAnchor.constraint(equalToConstant: cardHeight),
+
+            pagePill.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 4),
+            pagePill.centerXAnchor.constraint(equalTo: shellView.centerXAnchor),
+            pagePill.bottomAnchor.constraint(equalTo: shellView.bottomAnchor),
+            pagePill.heightAnchor.constraint(equalToConstant: 28),
+
+            pageControl.centerXAnchor.constraint(equalTo: pagePill.contentView.centerXAnchor),
+            pageControl.centerYAnchor.constraint(equalTo: pagePill.contentView.centerYAnchor)
         ])
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        guard !didBuildCards, scrollView.bounds.width > 0 else { return }
-        didBuildCards = true
-        buildCards()
-        startAutoScroll()
-    }
+        guard scrollView.bounds.width > 0 else { return }
 
-    private func buildCards() {
-        let cardW  = scrollView.bounds.width - 40  // 20pt peek on each side
-        let gap: CGFloat = 12
-        let totalWidth = 20 + CGFloat(PromoCard.all.count) * (cardW + gap)
-        scrollView.contentSize = CGSize(width: totalWidth, height: 168)
+        if cardViews.isEmpty { buildCards() }
 
-        for (i, card) in PromoCard.all.enumerated() {
-            let x = 20 + CGFloat(i) * (cardW + gap)
-            let v = makeCard(card, frame: CGRect(x: x, y: 0, width: cardW, height: 168))
-            scrollView.addSubview(v)
-            cardViews.append(v)
-            // Stagger entrance
-            v.alpha = 0; v.transform = CGAffineTransform(translationX: 30, y: 0)
-            UIView.animate(withDuration: 0.5, delay: Double(i) * 0.1,
-                           usingSpringWithDamping: 0.78, initialSpringVelocity: 0.3) {
-                v.alpha = 1; v.transform = .identity
-            }
+        if previousBounds != scrollView.bounds.size {
+            previousBounds = scrollView.bounds.size
+            layoutCards()
         }
     }
 
-    private func makeCard(_ promo: PromoCard, frame: CGRect) -> UIView {
-        let v = UIView(frame: frame)
-        v.layer.cornerRadius = 18; v.clipsToBounds = true
+    private func buildCards() {
+        cardViews.forEach { $0.removeFromSuperview() }
+        cardViews.removeAll()
 
-        let grad = CAGradientLayer()
-        grad.frame = CGRect(origin: .zero, size: frame.size)
-        grad.colors = [promo.gradientStart.cgColor, promo.gradientEnd.cgColor]
-        grad.startPoint = CGPoint(x: 0, y: 0); grad.endPoint = CGPoint(x: 1, y: 1)
-        v.layer.insertSublayer(grad, at: 0)
+        for (i, card) in PromoCard.all.enumerated() {
+            let v = PromoCardView(promo: card)
+            scrollView.addSubview(v)
+            cardViews.append(v)
 
-        // Decorative circles
-        let c1 = UIView(frame: CGRect(x: frame.width - 50, y: -50, width: 130, height: 130))
-        c1.backgroundColor = UIColor.white.withAlphaComponent(0.06); c1.layer.cornerRadius = 65
-        let c2 = UIView(frame: CGRect(x: frame.width - 90, y: -20, width: 170, height: 170))
-        c2.backgroundColor = UIColor.white.withAlphaComponent(0.03); c2.layer.cornerRadius = 85
-        v.addSubview(c2); v.addSubview(c1)
+            v.alpha = 0
+            v.transform = CGAffineTransform(translationX: 30, y: 0)
 
-        // Shimmer line
-        let shimmer = ShimmerLineView(frame: CGRect(x: 0, y: frame.height - 2, width: frame.width, height: 2))
-        v.addSubview(shimmer)
+            UIView.animate(withDuration: 0.5,
+                           delay: Double(i) * 0.1,
+                           usingSpringWithDamping: 0.78,
+                           initialSpringVelocity: 0.3) {
+                v.alpha = 1
+                v.transform = .identity
+            }
+        }
 
-        // Content
-        let emoji = UILabel(); emoji.text = promo.emoji; emoji.font = .systemFont(ofSize: 36)
-        emoji.translatesAutoresizingMaskIntoConstraints = false; v.addSubview(emoji)
+        layoutCards()
+        startAutoScroll()
+    }
 
-        let title = UILabel(); title.text = promo.title
-        title.font = UIFont(name: "Georgia-Bold", size: 16) ?? .boldSystemFont(ofSize: 16)
-        title.textColor = .white; title.numberOfLines = 2
-        title.translatesAutoresizingMaskIntoConstraints = false; v.addSubview(title)
+    private func layoutCards() {
+        let cardWidth = scrollView.bounds.width - (cardPeek * 2)
 
-        let subtitle = UILabel(); subtitle.text = promo.subtitle
-        subtitle.font = .systemFont(ofSize: 12); subtitle.textColor = UIColor.white.withAlphaComponent(0.78)
-        subtitle.numberOfLines = 2; subtitle.translatesAutoresizingMaskIntoConstraints = false; v.addSubview(subtitle)
+        let contentWidth =
+            CGFloat(cardViews.count) * cardWidth +
+            CGFloat(cardViews.count - 1) * cardGap
 
-        let cta = UIButton(type: .system)
-        cta.setTitle(promo.ctaText, for: .normal); cta.setTitleColor(.white, for: .normal)
-        cta.titleLabel?.font = .systemFont(ofSize: 12, weight: .semibold)
-        cta.backgroundColor = UIColor.white.withAlphaComponent(0.2)
-        cta.layer.cornerRadius = 13; cta.layer.borderWidth = 1
-        cta.layer.borderColor = UIColor.white.withAlphaComponent(0.45).cgColor
-        cta.contentEdgeInsets = UIEdgeInsets(top: 6, left: 14, bottom: 6, right: 14)
-        cta.translatesAutoresizingMaskIntoConstraints = false; v.addSubview(cta)
+        scrollView.contentSize = CGSize(width: contentWidth, height: cardHeight)
 
-        NSLayoutConstraint.activate([
-            emoji.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 18),
-            emoji.topAnchor.constraint(equalTo: v.topAnchor, constant: 16),
+        for (i, card) in cardViews.enumerated() {
+            let x = CGFloat(i) * (cardWidth + cardGap)
+            card.frame = CGRect(x: x, y: 0, width: cardWidth, height: cardHeight)
+        }
 
-            title.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 18),
-            title.topAnchor.constraint(equalTo: emoji.bottomAnchor, constant: 4),
-            title.trailingAnchor.constraint(equalTo: v.trailingAnchor, constant: -18),
+        scrollToPage(currentPage, animated: false)
+    }
 
-            subtitle.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 18),
-            subtitle.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 4),
-            subtitle.trailingAnchor.constraint(equalTo: v.trailingAnchor, constant: -18),
+    private func offsetForPage(_ page: Int) -> CGFloat {
+        let cardWidth = scrollView.bounds.width - (cardPeek * 2)
+        return CGFloat(page) * (cardWidth + cardGap) - cardPeek
+    }
 
-            cta.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 18),
-            cta.bottomAnchor.constraint(equalTo: v.bottomAnchor, constant: -16)
-        ])
-        return v
+    private func scrollToPage(_ page: Int, animated: Bool) {
+        scrollView.setContentOffset(
+            CGPoint(x: offsetForPage(page), y: 0),
+            animated: animated
+        )
     }
 
     // MARK: - Auto scroll
+
     private func startAutoScroll() {
         autoTimer?.invalidate()
+
         autoTimer = Timer.scheduledTimer(withTimeInterval: 3.8, repeats: true) { [weak self] _ in
             guard let self else { return }
-            self.currentPage = (self.currentPage + 1) % PromoCard.all.count
+            self.currentPage = (self.currentPage + 1) % self.cardViews.count
             self.scrollToPage(self.currentPage, animated: true)
         }
     }
 
-    private func scrollToPage(_ page: Int, animated: Bool) {
-        guard scrollView.bounds.width > 0 else { return }
-        let cardW = scrollView.bounds.width - 40
-        let gap: CGFloat = 12
-        let x = 20 + CGFloat(page) * (cardW + gap)
-        scrollView.setContentOffset(CGPoint(x: max(x, 0), y: 0), animated: animated)
-    }
-
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        let cardW = scrollView.bounds.width - 40
-        let gap: CGFloat = 12
-        let page = max(0, min(Int((scrollView.contentOffset.x + cardW / 2 - 20) / (cardW + gap)), PromoCard.all.count - 1))
-        if pageControl.currentPage != page {
-            pageControl.currentPage = page; currentPage = page
-            for (i, v) in cardViews.enumerated() {
-                UIView.animate(withDuration: 0.22) {
-                    v.transform = (i == page) ? CGAffineTransform(scaleX: 1.02, y: 1.02) : .identity
-                }
-            }
+        let cardWidth = scrollView.bounds.width - (cardPeek * 2)
+
+        let page = Int(round((scrollView.contentOffset.x + cardPeek) / (cardWidth + cardGap)))
+
+        let safePage = max(0, min(page, cardViews.count - 1))
+
+        if pageControl.currentPage != safePage {
+            pageControl.currentPage = safePage
+            currentPage = safePage
         }
     }
-
-    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) { autoTimer?.invalidate(); autoTimer = nil }
-    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) { startAutoScroll() }
 }
 
 // MARK: - Shimmer accent line
@@ -597,7 +1032,193 @@ private final class ShimmerLineView: UIView {
         a.fromValue = [-1.0, -0.5, 0.0]; a.toValue = [1.0, 1.5, 2.0]
         a.duration = 2.6; a.repeatCount = .infinity; gl.add(a, forKey: "shimmer")
     }
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        gl.frame = bounds
+    }
     required init?(coder: NSCoder) { fatalError() }
+}
+
+private final class PromoCardView: UIView {
+    private let promo: PromoCard
+    private let contentMaskView = UIView()
+    private let gradientLayer = CAGradientLayer()
+    private let glowLayer = CAGradientLayer()
+    private let shimmer = ShimmerLineView(frame: .zero)
+    private let badge = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
+    private let emoji = UILabel()
+    private let titleLabel = UILabel()
+    private let subtitleLabel = UILabel()
+    private let ctaButton = UIButton(type: .system)
+    private let ringA = UIView()
+    private let ringB = UIView()
+
+    init(promo: PromoCard) {
+        self.promo = promo
+        super.init(frame: .zero)
+        setup()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func setup() {
+        layer.cornerRadius = 24
+        layer.masksToBounds = false
+        layer.shadowColor = CineMystTheme.deepPlumDark.cgColor
+        layer.shadowOpacity = 0.18
+        layer.shadowRadius = 28
+        layer.shadowOffset = CGSize(width: 0, height: 18)
+
+        contentMaskView.layer.cornerRadius = 24
+        contentMaskView.clipsToBounds = true
+        contentMaskView.backgroundColor = UIColor.white.withAlphaComponent(0.05)
+        addSubview(contentMaskView)
+        contentMaskView.translatesAutoresizingMaskIntoConstraints = false
+
+        gradientLayer.colors = [promo.gradientStart.cgColor, promo.gradientEnd.cgColor]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 1)
+        contentMaskView.layer.insertSublayer(gradientLayer, at: 0)
+
+        glowLayer.colors = [
+            UIColor.white.withAlphaComponent(0.28).cgColor,
+            UIColor.white.withAlphaComponent(0.0).cgColor
+        ]
+        glowLayer.startPoint = CGPoint(x: 0.15, y: 0)
+        glowLayer.endPoint = CGPoint(x: 1, y: 1)
+        contentMaskView.layer.insertSublayer(glowLayer, above: gradientLayer)
+
+        [ringA, ringB].forEach {
+            $0.backgroundColor = UIColor.white.withAlphaComponent(0.07)
+            contentMaskView.addSubview($0)
+            $0.translatesAutoresizingMaskIntoConstraints = false
+        }
+        ringA.layer.borderWidth = 1
+        ringA.layer.borderColor = UIColor.white.withAlphaComponent(0.1).cgColor
+        ringB.backgroundColor = UIColor.white.withAlphaComponent(0.04)
+
+        badge.layer.cornerRadius = 14
+        badge.clipsToBounds = true
+        badge.contentView.backgroundColor = UIColor.white.withAlphaComponent(0.12)
+        badge.layer.borderWidth = 1
+        badge.layer.borderColor = UIColor.white.withAlphaComponent(0.28).cgColor
+        contentMaskView.addSubview(badge)
+        badge.translatesAutoresizingMaskIntoConstraints = false
+
+        let badgeLabel = UILabel()
+        badgeLabel.text = "Featured"
+        badgeLabel.font = .systemFont(ofSize: 11, weight: .semibold)
+        badgeLabel.textColor = .white.withAlphaComponent(0.94)
+        badge.contentView.addSubview(badgeLabel)
+        badgeLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        emoji.text = promo.emoji
+        emoji.font = .systemFont(ofSize: 30)
+        contentMaskView.addSubview(emoji)
+        emoji.translatesAutoresizingMaskIntoConstraints = false
+
+        titleLabel.text = promo.title
+        titleLabel.font = UIFont(name: "Georgia-Bold", size: 19) ?? .boldSystemFont(ofSize: 19)
+        titleLabel.textColor = .white
+        titleLabel.numberOfLines = 2
+        contentMaskView.addSubview(titleLabel)
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        subtitleLabel.text = promo.subtitle
+        subtitleLabel.font = .systemFont(ofSize: 12.5, weight: .medium)
+        subtitleLabel.textColor = UIColor.white.withAlphaComponent(0.82)
+        subtitleLabel.numberOfLines = 2
+        contentMaskView.addSubview(subtitleLabel)
+        subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        var config = UIButton.Configuration.plain()
+        config.attributedTitle = AttributedString(
+            promo.ctaText,
+            attributes: AttributeContainer([
+                .font: UIFont.systemFont(ofSize: 11.5, weight: .semibold)
+            ])
+        )
+        config.image = UIImage(
+            systemName: "arrow.up.right",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
+        )
+        config.imagePlacement = .trailing
+        config.imagePadding = 4
+        config.contentInsets = NSDirectionalEdgeInsets(top: 7, leading: 12, bottom: 7, trailing: 12)
+        ctaButton.configuration = config
+        ctaButton.tintColor = .white
+        ctaButton.backgroundColor = UIColor.white.withAlphaComponent(0.18)
+        ctaButton.layer.cornerRadius = 14
+        ctaButton.layer.borderWidth = 1
+        ctaButton.layer.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
+        ctaButton.layer.shadowColor = UIColor.black.withAlphaComponent(0.14).cgColor
+        ctaButton.layer.shadowOpacity = 1
+        ctaButton.layer.shadowRadius = 10
+        ctaButton.layer.shadowOffset = CGSize(width: 0, height: 6)
+        contentMaskView.addSubview(ctaButton)
+        ctaButton.translatesAutoresizingMaskIntoConstraints = false
+
+        contentMaskView.addSubview(shimmer)
+        shimmer.translatesAutoresizingMaskIntoConstraints = false
+
+        NSLayoutConstraint.activate([
+            contentMaskView.topAnchor.constraint(equalTo: topAnchor),
+            contentMaskView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            contentMaskView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            contentMaskView.bottomAnchor.constraint(equalTo: bottomAnchor),
+
+            badge.topAnchor.constraint(equalTo: contentMaskView.topAnchor, constant: 14),
+            badge.trailingAnchor.constraint(equalTo: contentMaskView.trailingAnchor, constant: -14),
+            badge.heightAnchor.constraint(equalToConstant: 28),
+
+            badgeLabel.leadingAnchor.constraint(equalTo: badge.contentView.leadingAnchor, constant: 10),
+            badgeLabel.trailingAnchor.constraint(equalTo: badge.contentView.trailingAnchor, constant: -10),
+            badgeLabel.centerYAnchor.constraint(equalTo: badge.contentView.centerYAnchor),
+
+            emoji.leadingAnchor.constraint(equalTo: contentMaskView.leadingAnchor, constant: 18),
+            emoji.topAnchor.constraint(equalTo: contentMaskView.topAnchor, constant: 16),
+
+            titleLabel.leadingAnchor.constraint(equalTo: contentMaskView.leadingAnchor, constant: 18),
+            titleLabel.topAnchor.constraint(equalTo: emoji.bottomAnchor, constant: 10),
+            titleLabel.trailingAnchor.constraint(equalTo: badge.leadingAnchor, constant: -12),
+
+            subtitleLabel.leadingAnchor.constraint(equalTo: contentMaskView.leadingAnchor, constant: 18),
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            subtitleLabel.trailingAnchor.constraint(equalTo: contentMaskView.trailingAnchor, constant: -18),
+
+            ctaButton.leadingAnchor.constraint(equalTo: contentMaskView.leadingAnchor, constant: 18),
+            ctaButton.bottomAnchor.constraint(equalTo: contentMaskView.bottomAnchor, constant: -18),
+            ctaButton.heightAnchor.constraint(equalToConstant: 30),
+
+            shimmer.leadingAnchor.constraint(equalTo: contentMaskView.leadingAnchor),
+            shimmer.trailingAnchor.constraint(equalTo: contentMaskView.trailingAnchor),
+            shimmer.bottomAnchor.constraint(equalTo: contentMaskView.bottomAnchor),
+            shimmer.heightAnchor.constraint(equalToConstant: 2)
+        ])
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        updateLayout()
+        layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: 24).cgPath
+    }
+
+    func updateLayout() {
+        gradientLayer.frame = contentMaskView.bounds
+        glowLayer.frame = contentMaskView.bounds
+        ringA.frame = CGRect(x: bounds.width - 132, y: -34, width: 144, height: 144)
+        ringB.frame = CGRect(x: bounds.width - 92, y: 60, width: 132, height: 132)
+        ringA.layer.cornerRadius = ringA.bounds.width / 2
+        ringB.layer.cornerRadius = ringB.bounds.width / 2
+        shimmer.frame = CGRect(x: 0, y: bounds.height - 2, width: bounds.width, height: 2)
+    }
+
+    func setEmphasis(_ emphasized: Bool) {
+        UIView.animate(withDuration: 0.24, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) {
+            self.transform = emphasized ? CGAffineTransform(scaleX: 1.02, y: 1.02) : .identity
+            self.layer.shadowOpacity = emphasized ? 0.28 : 0.18
+        }
+    }
 }
 
 
@@ -646,13 +1267,14 @@ final class PostFeedCell: UITableViewCell {
 
     private func setupCard() {
         card.backgroundColor    = .white
+        card.backgroundColor    = UIColor(red: 1.0, green: 0.995, blue: 0.985, alpha: 0.96)
         card.layer.cornerRadius  = CineMystTheme.cardRadius
         card.layer.borderWidth   = 0.5
-        card.layer.borderColor   = CineMystTheme.pinkLight.withAlphaComponent(0.6).cgColor
-        card.layer.shadowColor   = CineMystTheme.deepPlum.cgColor
-        card.layer.shadowOpacity = 0.07
-        card.layer.shadowRadius  = 8
-        card.layer.shadowOffset  = CGSize(width: 0, height: 2)
+        card.layer.borderColor   = UIColor(red: 0.92, green: 0.87, blue: 0.78, alpha: 1).cgColor
+        card.layer.shadowColor   = CineMystTheme.ink.cgColor
+        card.layer.shadowOpacity = 0.06
+        card.layer.shadowRadius  = 16
+        card.layer.shadowOffset  = CGSize(width: 0, height: 8)
         card.clipsToBounds = false
         contentView.addSubview(card); card.translatesAutoresizingMaskIntoConstraints = false
 
@@ -685,9 +1307,9 @@ final class PostFeedCell: UITableViewCell {
         ])
 
         // Header
-        nameLabel.font = .systemFont(ofSize: 13, weight: .semibold)
-        nameLabel.textColor = UIColor(red: 0.1, green: 0.04, blue: 0.07, alpha: 1)
-        roleLabel.font = .systemFont(ofSize: 11); roleLabel.textColor = CineMystTheme.pink.withAlphaComponent(0.8)
+        nameLabel.font = .systemFont(ofSize: 14, weight: .semibold)
+        nameLabel.textColor = CineMystTheme.ink
+        roleLabel.font = .systemFont(ofSize: 11, weight: .medium); roleLabel.textColor = CineMystTheme.deepPlum.withAlphaComponent(0.58)
         timeLabel.font = .systemFont(ofSize: 11); timeLabel.textColor = .secondaryLabel
         let dot = UILabel(); dot.text = "·"; dot.font = .systemFont(ofSize: 11); dot.textColor = .secondaryLabel
         let metaRow = UIStackView(arrangedSubviews: [roleLabel, dot, timeLabel])
@@ -703,8 +1325,8 @@ final class PostFeedCell: UITableViewCell {
         card.addSubview(headerRow); headerRow.translatesAutoresizingMaskIntoConstraints = false
 
         // Caption
-        captionLabel.font = UIFont(name: "Georgia", size: 13) ?? .systemFont(ofSize: 13)
-        captionLabel.textColor = UIColor(red: 0.18, green: 0.07, blue: 0.13, alpha: 1)
+        captionLabel.font = UIFont(name: "Georgia", size: 13.5) ?? .systemFont(ofSize: 13.5)
+        captionLabel.textColor = CineMystTheme.ink.withAlphaComponent(0.92)
         captionLabel.numberOfLines = 4
         card.addSubview(captionLabel); captionLabel.translatesAutoresizingMaskIntoConstraints = false
 
@@ -715,7 +1337,7 @@ final class PostFeedCell: UITableViewCell {
         mediaHeightConstraint.isActive = true
 
         // Separator
-        let sep = UIView(); sep.backgroundColor = CineMystTheme.pinkLight.withAlphaComponent(0.5)
+        let sep = UIView(); sep.backgroundColor = UIColor(red: 0.93, green: 0.89, blue: 0.82, alpha: 1)
         card.addSubview(sep); sep.translatesAutoresizingMaskIntoConstraints = false
         sep.heightAnchor.constraint(equalToConstant: 0.5).isActive = true
 
@@ -926,7 +1548,7 @@ final class PostFeedCell: UITableViewCell {
     private func makeImageView() -> UIImageView {
         let iv = UIImageView()
         iv.contentMode = .scaleAspectFill; iv.clipsToBounds = true
-        iv.backgroundColor = CineMystTheme.pinkPale
+        iv.backgroundColor = CineMystTheme.plumMist.withAlphaComponent(0.5)
         return iv
     }
 

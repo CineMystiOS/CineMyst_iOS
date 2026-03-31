@@ -12,7 +12,7 @@ import Supabase
 final class PaymentViewController: UIViewController {
 
     // MARK: Theme
-    private let plum = UIColor(red: 0x43/255.0, green: 0x16/255.0, blue: 0x31/255.0, alpha: 1.0)
+    private let plum = MentorshipUI.brandPlum
     private let accentGray = UIColor(white: 0.4, alpha: 1.0)
 
     // MARK: Data passed from Schedule screen
@@ -187,7 +187,7 @@ final class PaymentViewController: UIViewController {
         tf.placeholder = "Enter  UPI ID"
         tf.borderStyle = .roundedRect
         tf.translatesAutoresizingMaskIntoConstraints = false
-        tf.backgroundColor = UIColor.secondarySystemBackground
+        tf.backgroundColor = MentorshipUI.raisedSurface
         return tf
     }()
     private let scanButton: UIButton = {
@@ -230,7 +230,7 @@ final class PaymentViewController: UIViewController {
     // MARK: Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = MentorshipUI.pageBackground
         navigationItem.backButtonDisplayMode = .minimal
         view.tintColor = accentGray
 
@@ -246,7 +246,7 @@ final class PaymentViewController: UIViewController {
         setupUPI()
         wireActions()
 
-        payButton.configuration?.baseBackgroundColor = plum
+        payButton.configuration?.baseBackgroundColor = MentorshipUI.deepPlum
 
         // show Card by default
         showCard(animated: false)
@@ -556,7 +556,7 @@ final class PaymentViewController: UIViewController {
             payButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -12),
             payButton.heightAnchor.constraint(equalToConstant: 48)
         ])
-        payButton.configuration?.baseBackgroundColor = plum
+        payButton.configuration?.baseBackgroundColor = MentorshipUI.deepPlum
 
         // scroll content
         view.addSubview(scrollView)
@@ -592,12 +592,14 @@ final class PaymentViewController: UIViewController {
         ])
 
         // Card box styling
-        cardView.backgroundColor = plum
+        cardView.backgroundColor = MentorshipUI.deepPlum
         cardView.layer.cornerRadius = 16
-        cardView.layer.shadowColor = UIColor.black.cgColor
-        cardView.layer.shadowOpacity = 0.15
+        cardView.layer.shadowColor = MentorshipUI.shadow.cgColor
+        cardView.layer.shadowOpacity = 1
         cardView.layer.shadowRadius = 6
         cardView.layer.shadowOffset = CGSize(width: 0, height: 3)
+        cardView.layer.borderWidth = 1
+        cardView.layer.borderColor = UIColor.white.withAlphaComponent(0.16).cgColor
         cardView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             cardView.heightAnchor.constraint(equalToConstant: 180)

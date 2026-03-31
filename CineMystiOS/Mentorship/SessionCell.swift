@@ -8,13 +8,15 @@ final class SessionCell: UITableViewCell {
 
     private let cardView: UIView = {
         let v = UIView()
-        v.backgroundColor = UIColor.systemGray6
+        v.backgroundColor = MentorshipUI.raisedSurface
         v.layer.cornerRadius = 14
         v.translatesAutoresizingMaskIntoConstraints = false
-        v.layer.shadowColor = UIColor.black.cgColor
-        v.layer.shadowOpacity = 0.04
+        v.layer.shadowColor = MentorshipUI.shadow.cgColor
+        v.layer.shadowOpacity = 1
         v.layer.shadowOffset = CGSize(width: 0, height: 6)
         v.layer.shadowRadius = 8
+        v.layer.borderWidth = 1
+        v.layer.borderColor = MentorshipUI.plumStroke.cgColor
         return v
     }()
 
@@ -23,7 +25,7 @@ final class SessionCell: UITableViewCell {
         iv.layer.cornerRadius = 28
         iv.clipsToBounds = true
         iv.translatesAutoresizingMaskIntoConstraints = false
-        iv.backgroundColor = .systemGray4
+        iv.backgroundColor = CineMystTheme.plumMist
         iv.contentMode = .scaleAspectFill
         return iv
     }()
@@ -38,7 +40,7 @@ final class SessionCell: UITableViewCell {
     private let roleLabel: UILabel = {
         let l = UILabel()
         l.font = UIFont.systemFont(ofSize: 12)
-        l.textColor = .secondaryLabel
+        l.textColor = MentorshipUI.mutedText
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
@@ -46,14 +48,14 @@ final class SessionCell: UITableViewCell {
     private let dateLabel: UILabel = {
         let l = UILabel()
         l.font = UIFont.systemFont(ofSize: 12)
-        l.textColor = .secondaryLabel
+        l.textColor = MentorshipUI.mutedText
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
 
     private let ratingStack: UIStackView = {
         let star = UIImageView(image: UIImage(systemName: "star.fill"))
-        star.tintColor = .systemBlue
+        star.tintColor = CineMystTheme.pink
         star.translatesAutoresizingMaskIntoConstraints = false
         star.widthAnchor.constraint(equalToConstant: 14).isActive = true
         star.heightAnchor.constraint(equalToConstant: 14).isActive = true

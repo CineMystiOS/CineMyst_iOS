@@ -112,7 +112,7 @@ final class MentorSessionDetailViewController: UIViewController {
     // MARK: lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = MentorshipUI.pageBackground
 
         // Ensure navigation bar is visible and configure large title style.
         navigationController?.setNavigationBarHidden(false, animated: false)
@@ -136,6 +136,7 @@ final class MentorSessionDetailViewController: UIViewController {
             target: self,
             action: #selector(didTapBack)
         )
+        navigationItem.leftBarButtonItem?.tintColor = MentorshipUI.brandPlum
 
         setupLayout()
         populate()
@@ -392,7 +393,7 @@ private final class DetailRowView: UIView {
         translatesAutoresizingMaskIntoConstraints = false
 
         iconView.image = UIImage(systemName: iconName)
-        iconView.tintColor = .secondaryLabel
+        iconView.tintColor = MentorshipUI.softText
         iconView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(iconView)
 
@@ -402,7 +403,7 @@ private final class DetailRowView: UIView {
         addSubview(titleLabel)
 
         subtitleLabel.font = UIFont.systemFont(ofSize: 12)
-        subtitleLabel.textColor = .secondaryLabel
+        subtitleLabel.textColor = MentorshipUI.mutedText
         subtitleLabel.text = subtitle
         subtitleLabel.numberOfLines = 0
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -442,8 +443,8 @@ private final class TagView: UIView {
 
         layer.cornerRadius = 14
         layer.borderWidth = 1
-        layer.borderColor = UIColor.systemGray4.cgColor
-        backgroundColor = .clear
+        layer.borderColor = MentorshipUI.plumStroke.cgColor
+        backgroundColor = MentorshipUI.plumChip
 
         NSLayoutConstraint.activate([
             label.topAnchor.constraint(equalTo: topAnchor, constant: 8),
@@ -452,6 +453,7 @@ private final class TagView: UIView {
             label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
             heightAnchor.constraint(equalToConstant: 44)
         ])
+        label.textColor = MentorshipUI.brandPlum
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }

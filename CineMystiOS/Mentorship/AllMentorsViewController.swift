@@ -13,29 +13,29 @@ import Supabase
 // MARK: - MentorCardCell (tightened layout + aligned rating)
 final class MentorCardCell: UITableViewCell {
     static let reuseIdentifier = "MentorCardCell"
-    private let plum = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1)
-    private let softPlum = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 0.08)
-    private let deepShadow = UIColor.black.withAlphaComponent(0.05)
+    private let plum = MentorshipUI.brandPlum
+    private let softPlum = MentorshipUI.plumChip
+    private let deepShadow = MentorshipUI.shadow
 
     private let cardView: UIView = {
         let v = UIView()
-        v.backgroundColor = .systemBackground
+        v.backgroundColor = MentorshipUI.raisedSurface
         v.layer.cornerRadius = 26
         v.layer.masksToBounds = false
         v.translatesAutoresizingMaskIntoConstraints = false
-        v.layer.shadowColor = UIColor.black.withAlphaComponent(0.08).cgColor
+        v.layer.shadowColor = MentorshipUI.shadow.cgColor
         v.layer.shadowOpacity = 1
         v.layer.shadowRadius = 22
         v.layer.shadowOffset = CGSize(width: 0, height: 12)
         v.layer.borderWidth = 1
-        v.layer.borderColor = UIColor.white.withAlphaComponent(0.82).cgColor
+        v.layer.borderColor = MentorshipUI.plumStroke.cgColor
         return v
     }()
 
     private let cardGlowView: UIView = {
         let view = UIView()
         view.translatesAutoresizingMaskIntoConstraints = false
-        view.backgroundColor = UIColor.white.withAlphaComponent(0.55)
+        view.backgroundColor = MentorshipUI.softSurface
         view.layer.cornerRadius = 26
         view.isUserInteractionEnabled = false
         return view
@@ -45,7 +45,7 @@ final class MentorCardCell: UITableViewCell {
     private let nameLabel: UILabel = {
         let l = UILabel()
         l.font = UIFont.systemFont(ofSize: 20, weight: .bold)
-        l.textColor = .label
+        l.textColor = MentorshipUI.brandPlum
         l.numberOfLines = 2
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
@@ -53,7 +53,7 @@ final class MentorCardCell: UITableViewCell {
     private let roleLabel: UILabel = {
         let l = UILabel()
         l.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
-        l.textColor = UIColor(red: 0.36, green: 0.17, blue: 0.28, alpha: 0.92)
+        l.textColor = MentorshipUI.softText
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
@@ -85,7 +85,7 @@ final class MentorCardCell: UITableViewCell {
     }()
     private let starImageView: UIImageView = {
         let iv = UIImageView(image: UIImage(systemName: "star.fill"))
-        iv.tintColor = UIColor(red: 0.09, green: 0.48, blue: 1, alpha: 1) // blue star
+        iv.tintColor = CineMystTheme.pink
         iv.contentMode = .scaleAspectFit
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
@@ -93,7 +93,7 @@ final class MentorCardCell: UITableViewCell {
     private let ratingLabel: UILabel = {
         let l = UILabel()
         l.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
-        l.textColor = .label
+        l.textColor = MentorshipUI.softText
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
@@ -104,7 +104,7 @@ final class MentorCardCell: UITableViewCell {
         view.layer.cornerRadius = 14
         view.layer.masksToBounds = true
         view.layer.borderWidth = 1
-        view.layer.borderColor = UIColor.white.withAlphaComponent(0.65).cgColor
+        view.layer.borderColor = MentorshipUI.plumStroke.cgColor
         return view
     }()
     private let reviewsLabel: UILabel = {
@@ -117,7 +117,7 @@ final class MentorCardCell: UITableViewCell {
     private let priceLabel: UILabel = {
         let l = UILabel()
         l.font = UIFont.systemFont(ofSize: 12, weight: .bold)
-        l.textColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 0.9)
+        l.textColor = MentorshipUI.brandPlum
         l.textAlignment = .center
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
@@ -126,7 +126,7 @@ final class MentorCardCell: UITableViewCell {
     private let pricePillView: UIView = {
         let view = UIView()
         view.translatesAutoresizingMaskIntoConstraints = false
-        view.backgroundColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 0.09)
+        view.backgroundColor = MentorshipUI.plumChip
         view.layer.cornerRadius = 14
         return view
     }()
@@ -144,7 +144,7 @@ final class MentorCardCell: UITableViewCell {
         let label = UILabel()
         label.font = UIFont.systemFont(ofSize: 11, weight: .semibold)
         label.textColor = .secondaryLabel
-        label.backgroundColor = UIColor.systemGray6
+        label.backgroundColor = MentorshipUI.softSurface
         label.layer.cornerRadius = 10
         label.layer.masksToBounds = true
         label.textAlignment = .center
@@ -158,7 +158,7 @@ final class MentorCardCell: UITableViewCell {
         iv.layer.cornerRadius = 18
         iv.layer.masksToBounds = true
         iv.translatesAutoresizingMaskIntoConstraints = false
-        iv.backgroundColor = UIColor.systemGray5
+        iv.backgroundColor = CineMystTheme.plumMist
         return iv
     }()
 
@@ -167,9 +167,9 @@ final class MentorCardCell: UITableViewCell {
         view.translatesAutoresizingMaskIntoConstraints = false
         view.layer.cornerRadius = 20
         view.layer.masksToBounds = true
-        view.backgroundColor = UIColor.systemGray6
+        view.backgroundColor = CineMystTheme.plumMist
         view.layer.borderWidth = 1
-        view.layer.borderColor = UIColor.white.withAlphaComponent(0.75).cgColor
+        view.layer.borderColor = MentorshipUI.plumStroke.cgColor
         return view
     }()
 
@@ -183,7 +183,7 @@ final class MentorCardCell: UITableViewCell {
     // divider and bottom row
     private let divider: UIView = {
         let v = UIView()
-        v.backgroundColor = UIColor.systemGray5.withAlphaComponent(0.7)
+        v.backgroundColor = MentorshipUI.plumStroke
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
@@ -207,7 +207,7 @@ final class MentorCardCell: UITableViewCell {
         var cfg = UIButton.Configuration.filled()
         cfg.title = "Book"
         cfg.cornerStyle = .capsule
-        cfg.baseBackgroundColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1)
+        cfg.baseBackgroundColor = MentorshipUI.deepPlum
         cfg.baseForegroundColor = .white
         cfg.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 18, bottom: 10, trailing: 18)
         let b = UIButton(configuration: cfg)
@@ -410,7 +410,7 @@ final class MentorCardCell: UITableViewCell {
         let label = PaddingLabel(insets: UIEdgeInsets(top: 6, left: 10, bottom: 6, right: 10))
         label.text = text
         label.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
-        label.textColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1)
+        label.textColor = MentorshipUI.brandPlum
         label.backgroundColor = softPlum
         label.layer.cornerRadius = 12
         label.layer.masksToBounds = true
@@ -447,19 +447,21 @@ private final class PaddingLabel: UILabel {
 final class AllMentorsViewController: UIViewController {
 
     // static plum so it can be referenced from property initializers safely
-    private static let plum = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1)
+    private static let plum = MentorshipUI.brandPlum
 
     // make backButton lazy so we can reference Self.plum inside initializer
     private lazy var backButton: UIButton = {
         let b = UIButton(type: .system)
         b.setImage(UIImage(systemName: "chevron.left"), for: .normal)
         b.tintColor = Self.plum
-        b.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.94)
+        b.backgroundColor = MentorshipUI.softSurface
         b.layer.cornerRadius = 18
-        b.layer.shadowColor = UIColor.black.withAlphaComponent(0.06).cgColor
+        b.layer.shadowColor = MentorshipUI.shadow.cgColor
         b.layer.shadowOpacity = 1
         b.layer.shadowRadius = 10
         b.layer.shadowOffset = CGSize(width: 0, height: 5)
+        b.layer.borderWidth = 1
+        b.layer.borderColor = MentorshipUI.plumStroke.cgColor
         b.translatesAutoresizingMaskIntoConstraints = false
         return b
     }()
@@ -475,13 +477,15 @@ final class AllMentorsViewController: UIViewController {
     private let searchButton: UIButton = {
         let b = UIButton(type: .system)
         b.setImage(UIImage(systemName: "magnifyingglass"), for: .normal)
-        b.tintColor = .label
-        b.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.94)
+        b.tintColor = MentorshipUI.brandPlum
+        b.backgroundColor = MentorshipUI.softSurface
         b.layer.cornerRadius = 18
-        b.layer.shadowColor = UIColor.black.withAlphaComponent(0.05).cgColor
+        b.layer.shadowColor = MentorshipUI.shadow.cgColor
         b.layer.shadowOpacity = 1
         b.layer.shadowRadius = 10
         b.layer.shadowOffset = CGSize(width: 0, height: 4)
+        b.layer.borderWidth = 1
+        b.layer.borderColor = MentorshipUI.plumStroke.cgColor
         b.translatesAutoresizingMaskIntoConstraints = false
         return b
     }()
@@ -489,13 +493,15 @@ final class AllMentorsViewController: UIViewController {
     private let filterButton: UIButton = {
         let b = UIButton(type: .system)
         b.setImage(UIImage(systemName: "line.horizontal.3.decrease"), for: .normal)
-        b.tintColor = .label
-        b.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.94)
+        b.tintColor = MentorshipUI.brandPlum
+        b.backgroundColor = MentorshipUI.softSurface
         b.layer.cornerRadius = 18
-        b.layer.shadowColor = UIColor.black.withAlphaComponent(0.05).cgColor
+        b.layer.shadowColor = MentorshipUI.shadow.cgColor
         b.layer.shadowOpacity = 1
         b.layer.shadowRadius = 10
         b.layer.shadowOffset = CGSize(width: 0, height: 4)
+        b.layer.borderWidth = 1
+        b.layer.borderColor = MentorshipUI.plumStroke.cgColor
         b.translatesAutoresizingMaskIntoConstraints = false
         return b
     }()
@@ -503,9 +509,10 @@ final class AllMentorsViewController: UIViewController {
     private let segmented: UISegmentedControl = {
         let sc = UISegmentedControl(items: ["All", "Actor", "Director"])
         sc.selectedSegmentIndex = 0
-        sc.selectedSegmentTintColor = .white
-        sc.backgroundColor = UIColor.systemGray6
+        sc.selectedSegmentTintColor = MentorshipUI.brandPlum
+        sc.backgroundColor = MentorshipUI.softSurface
         sc.setTitleTextAttributes([.font: UIFont.systemFont(ofSize: 14, weight: .semibold)], for: .normal)
+        sc.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
         sc.layer.cornerRadius = 22
         sc.translatesAutoresizingMaskIntoConstraints = false
         return sc
@@ -515,7 +522,7 @@ final class AllMentorsViewController: UIViewController {
         let l = UILabel()
         l.text = "See all the mentors available"
         l.font = UIFont.systemFont(ofSize: 14)
-        l.textColor = .secondaryLabel
+        l.textColor = MentorshipUI.mutedText
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
@@ -558,12 +565,13 @@ final class AllMentorsViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = MentorshipUI.pageBackground
 
         // Hide the default navigation back button (so only our custom chevron is visible)
         navigationItem.hidesBackButton = true
 
         titleLabel.textColor = Self.plum
+        subtitleLabel.textColor = MentorshipUI.mutedText
 
         setupHierarchy()
         setupConstraints()
