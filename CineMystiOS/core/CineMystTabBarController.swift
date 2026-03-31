@@ -22,16 +22,19 @@ class CineMystTabBarController: UITabBarController, UITabBarControllerDelegate {
         appearance.backgroundColor = .white
         appearance.shadowColor = UIColor(white: 0, alpha: 0.2)
 
-        let activeColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1)
+        // Color: #431631 (deepPlum)
+        let activeColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1)
+        let inactiveColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 0.4)
+        
         appearance.stackedLayoutAppearance.selected.iconColor = activeColor
         appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: activeColor]
-        appearance.stackedLayoutAppearance.normal.iconColor = .systemGray
-        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.systemGray]
+        appearance.stackedLayoutAppearance.normal.iconColor = inactiveColor
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: inactiveColor]
 
         tabBar.standardAppearance = appearance
         tabBar.scrollEdgeAppearance = appearance
         tabBar.tintColor = activeColor
-        tabBar.unselectedItemTintColor = .systemGray
+        tabBar.unselectedItemTintColor = inactiveColor
 
         // MARK: - Tabs
 

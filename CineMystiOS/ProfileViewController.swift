@@ -99,6 +99,20 @@ final class ProfileViewController: UIViewController, UICollectionViewDataSource,
         fetchProfileData()
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // Remove CineMyst logo from navigation bar
+        if let navBar = navigationController?.navigationBar {
+            if let contentView = navBar.subviews.first(where: {
+                String(describing: type(of: $0)).contains("ContentView")
+            }) {
+                if let titleLabel = contentView.viewWithTag(999) {
+                    titleLabel.removeFromSuperview()
+                }
+            }
+        }
+    }
+
     // MARK: - Setup Navigation Bar
     private func setupNavigationBar() {
         navigationItem.title = ""
