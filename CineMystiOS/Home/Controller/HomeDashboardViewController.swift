@@ -237,8 +237,8 @@ final class HomeDashboardViewController: UIViewController {
         addChild(host); view.addSubview(host.view)
         host.view.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            host.view.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            host.view.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -12),
+            host.view.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            host.view.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: 8), // Overlaps or sits just above tab bar
             host.view.widthAnchor.constraint(equalToConstant: 280),
             host.view.heightAnchor.constraint(equalToConstant: 280)
         ])
