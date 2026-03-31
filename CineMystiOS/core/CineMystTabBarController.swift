@@ -61,19 +61,18 @@ class CineMystTabBarController: UITabBarController, UITabBarControllerDelegate {
                                          image: UIImage(systemName: "house.fill"),
                                          tag: 0)
 
+        // Jobs
+        let jobsVC = UINavigationController(rootViewController: jobsViewController())
+        jobsVC.tabBarItem = UITabBarItem(title: "Jobs",
+                                         image: UIImage(systemName: "briefcase.fill"),
+                                         tag: 1)
+
         // Flicks → ReelsViewController
         let reelsVC = ReelsViewController()
         let flicksNav = UINavigationController(rootViewController: reelsVC)
         flicksNav.tabBarItem = UITabBarItem(title: "Flicks",
                                             image: UIImage(systemName: "popcorn.fill"),
-                                            tag: 1)
-
-        // Chat → MessagesViewController
-        let messagesVC = MessagesViewController()
-        let chatNav = UINavigationController(rootViewController: messagesVC)
-        chatNav.tabBarItem = UITabBarItem(title: "Chat",
-                                          image: UIImage(systemName: "bubble.left.and.bubble.right.fill"),
-                                          tag: 2)
+                                            tag: 2)
 
         // Mentorship
         let mentorHome = MentorshipHomeViewController()
@@ -82,13 +81,13 @@ class CineMystTabBarController: UITabBarController, UITabBarControllerDelegate {
                                            image: UIImage(systemName: "person.2.fill"),
                                            tag: 3)
 
-        // Jobs
-        let jobsVC = UINavigationController(rootViewController: jobsViewController())
-        jobsVC.tabBarItem = UITabBarItem(title: "Jobs",
-                                         image: UIImage(systemName: "briefcase.fill"),
-                                         tag: 4)
+        // Profile
+        let profileVC = UINavigationController(rootViewController: ActorProfileViewController())
+        profileVC.tabBarItem = UITabBarItem(title: "Profile",
+                                            image: UIImage(systemName: "person.crop.circle.fill"),
+                                            tag: 4)
 
         // Final Tab Order
-        viewControllers = [homeVC, flicksNav, chatNav, mentorVC, jobsVC]
+        viewControllers = [homeVC, jobsVC, flicksNav, mentorVC, profileVC]
     }
 }

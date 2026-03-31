@@ -50,14 +50,13 @@ class ActorProfileCardView: UIView {
     
     let bannerImageView = UIImageView()
     let profileImageView = UIImageView()
-    let badgeView = UIView()
     let nameLabel = UILabel()
     let roleLabel = UILabel()
     let connectionsLabel = UILabel()
-    let editProfileButton = GradientButton(type: .system)
     let editPortfolioButton = GradientButton(type: .system)
-    let moreButton = UIButton(type: .system)
-    let shareButton = UIButton(type: .system)
+    let avatarEditButton = UIButton(type: .system)
+    private let bannerGradientLayer = CAGradientLayer()
+    private let ringGradientLayer = CAGradientLayer()
     
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -73,46 +72,22 @@ class ActorProfileCardView: UIView {
         layer.shadowOpacity = 0.1
         layer.shadowRadius = 12
         layer.shadowOffset = CGSize(width: 0, height: 4)
+        layer.masksToBounds = false
         translatesAutoresizingMaskIntoConstraints = false
-        
-        // Header Tag
-        let headerTag = UILabel()
-        headerTag.text = "Acting for Life"
-        headerTag.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
-        headerTag.textColor = ActorProfileDS.deepPlum
-        headerTag.backgroundColor = ActorProfileDS.palePink
-        headerTag.textAlignment = .center
-        headerTag.layer.cornerRadius = 12
-        headerTag.clipsToBounds = true
-        headerTag.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(headerTag)
         
         // Banner Image
         bannerImageView.contentMode = .scaleAspectFill
         bannerImageView.clipsToBounds = true
         bannerImageView.backgroundColor = ActorProfileDS.palePink
+        bannerImageView.layer.cornerRadius = 18
         bannerImageView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(bannerImageView)
         
         // Overlay gradient on banner
-        let gradientLayer = CAGradientLayer()
-        gradientLayer.colors = [UIColor.clear.cgColor, ActorProfileDS.deepPlum.withAlphaComponent(0.3).cgColor]
-        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
-        gradientLayer.endPoint = CGPoint(x: 0, y: 1)
-        bannerImageView.layer.addSublayer(gradientLayer)
-        
-        // Top Right Buttons (Share + More)
-        shareButton.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
-        shareButton.tintColor = .white
-        shareButton.frame = CGRect(x: 0, y: 0, width: 40, height: 40)
-        shareButton.translatesAutoresizingMaskIntoConstraints = false
-        bannerImageView.addSubview(shareButton)
-        
-        moreButton.setImage(UIImage(systemName: "ellipsis"), for: .normal)
-        moreButton.tintColor = .white
-        moreButton.frame = CGRect(x: 0, y: 0, width: 40, height: 40)
-        moreButton.translatesAutoresizingMaskIntoConstraints = false
-        bannerImageView.addSubview(moreButton)
+        bannerGradientLayer.colors = [UIColor.clear.cgColor, ActorProfileDS.deepPlum.withAlphaComponent(0.3).cgColor]
+        bannerGradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        bannerGradientLayer.endPoint = CGPoint(x: 0, y: 1)
+        bannerImageView.layer.addSublayer(bannerGradientLayer)
         
         // Profile Image with Gradient Ring
         profileImageView.contentMode = .scaleAspectFill
@@ -127,22 +102,16 @@ class ActorProfileCardView: UIView {
         // Gradient ring background
         let ringView = UIView()
         ringView.layer.cornerRadius = 68
-        let gradLayer = ActorProfileDS.gradient(colors: [ActorProfileDS.deepPlum, ActorProfileDS.rosePink])
-        gradLayer.cornerRadius = 68
-        ringView.layer.addSublayer(gradLayer)
+        ringGradientLayer.colors = [ActorProfileDS.deepPlum.cgColor, ActorProfileDS.rosePink.cgColor]
+        ringGradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        ringGradientLayer.endPoint = CGPoint(x: 1, y: 1)
+        ringGradientLayer.cornerRadius = 68
+        ringView.layer.addSublayer(ringGradientLayer)
         ringView.translatesAutoresizingMaskIntoConstraints = false
         insertSubview(ringView, belowSubview: profileImageView)
         
-        // Blue Badge
-        badgeView.backgroundColor = #colorLiteral(red: 0.2, green: 0.6, blue: 1, alpha: 1)
-        badgeView.layer.cornerRadius = 15
-        badgeView.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(badgeView)
-        
-        let badgeIcon = UIImageView(image: UIImage(systemName: "checkmark.circle.fill"))
-        badgeIcon.tintColor = .white
-        badgeIcon.translatesAutoresizingMaskIntoConstraints = false
-        badgeView.addSubview(badgeIcon)
+        configureEditBadge(avatarEditButton)
+        addSubview(avatarEditButton)
         
         // Name Label
         nameLabel.font = UIFont.systemFont(ofSize: 26, weight: .bold)
@@ -172,26 +141,14 @@ class ActorProfileCardView: UIView {
         connLabel.textAlignment = .center
         connLabel.translatesAutoresizingMaskIntoConstraints = false
         addSubview(connLabel)
-        
-        // Action Buttons Container
+
         let buttonStack = UIStackView()
         buttonStack.axis = .horizontal
-        buttonStack.spacing = 12
-        buttonStack.distribution = .fillEqually
+        buttonStack.spacing = 0
+        buttonStack.distribution = .fill
         buttonStack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(buttonStack)
-        
-        // Edit Profile Button
-        editProfileButton.setTitle("Edit Profile", for: .normal)
-        editProfileButton.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
-        editProfileButton.setTitleColor(.white, for: .normal)
-        editProfileButton.layer.cornerRadius = 10
-        editProfileButton.layer.masksToBounds = true
-        editProfileButton.translatesAutoresizingMaskIntoConstraints = false
-        editProfileButton.setupGradient(colors: [ActorProfileDS.deepPlum, ActorProfileDS.midPlum])
-        buttonStack.addArrangedSubview(editProfileButton)
-        
-        // Edit Portfolio Button
+
         editPortfolioButton.setTitle("Edit Portfolio", for: .normal)
         editPortfolioButton.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
         editPortfolioButton.setTitleColor(.white, for: .normal)
@@ -199,29 +156,17 @@ class ActorProfileCardView: UIView {
         editPortfolioButton.layer.masksToBounds = true
         editPortfolioButton.translatesAutoresizingMaskIntoConstraints = false
         editPortfolioButton.setupGradient(colors: [ActorProfileDS.rosePink, ActorProfileDS.deepPlum])
+        editPortfolioButton.widthAnchor.constraint(equalToConstant: 132).isActive = true
+        buttonStack.addArrangedSubview(UIView())
         buttonStack.addArrangedSubview(editPortfolioButton)
+        buttonStack.addArrangedSubview(UIView())
         
         // Layout with NSLayoutConstraint
         NSLayoutConstraint.activate([
-            headerTag.topAnchor.constraint(equalTo: topAnchor, constant: 12),
-            headerTag.centerXAnchor.constraint(equalTo: centerXAnchor),
-            headerTag.heightAnchor.constraint(equalToConstant: 24),
-            headerTag.widthAnchor.constraint(equalToConstant: 120),
-            
-            bannerImageView.topAnchor.constraint(equalTo: topAnchor),
-            bannerImageView.leftAnchor.constraint(equalTo: leftAnchor),
-            bannerImageView.rightAnchor.constraint(equalTo: rightAnchor),
+            bannerImageView.topAnchor.constraint(equalTo: topAnchor, constant: 12),
+            bannerImageView.leftAnchor.constraint(equalTo: leftAnchor, constant: 12),
+            bannerImageView.rightAnchor.constraint(equalTo: rightAnchor, constant: -12),
             bannerImageView.heightAnchor.constraint(equalToConstant: 140),
-            
-            shareButton.topAnchor.constraint(equalTo: bannerImageView.topAnchor, constant: 12),
-            shareButton.rightAnchor.constraint(equalTo: bannerImageView.rightAnchor, constant: -12),
-            shareButton.widthAnchor.constraint(equalToConstant: 40),
-            shareButton.heightAnchor.constraint(equalToConstant: 40),
-            
-            moreButton.topAnchor.constraint(equalTo: bannerImageView.topAnchor, constant: 12),
-            moreButton.rightAnchor.constraint(equalTo: shareButton.leftAnchor, constant: -8),
-            moreButton.widthAnchor.constraint(equalToConstant: 40),
-            moreButton.heightAnchor.constraint(equalToConstant: 40),
             
             profileImageView.topAnchor.constraint(equalTo: bannerImageView.bottomAnchor, constant: -40),
             profileImageView.centerXAnchor.constraint(equalTo: centerXAnchor),
@@ -233,13 +178,10 @@ class ActorProfileCardView: UIView {
             ringView.widthAnchor.constraint(equalToConstant: 136),
             ringView.heightAnchor.constraint(equalToConstant: 136),
             
-            badgeView.bottomAnchor.constraint(equalTo: profileImageView.bottomAnchor, constant: 4),
-            badgeView.rightAnchor.constraint(equalTo: profileImageView.rightAnchor, constant: 4),
-            badgeView.widthAnchor.constraint(equalToConstant: 30),
-            badgeView.heightAnchor.constraint(equalToConstant: 30),
-            
-            badgeIcon.centerXAnchor.constraint(equalTo: badgeView.centerXAnchor),
-            badgeIcon.centerYAnchor.constraint(equalTo: badgeView.centerYAnchor),
+            avatarEditButton.bottomAnchor.constraint(equalTo: profileImageView.bottomAnchor, constant: 4),
+            avatarEditButton.rightAnchor.constraint(equalTo: profileImageView.rightAnchor, constant: 4),
+            avatarEditButton.widthAnchor.constraint(equalToConstant: 34),
+            avatarEditButton.heightAnchor.constraint(equalToConstant: 34),
             
             nameLabel.topAnchor.constraint(equalTo: profileImageView.bottomAnchor, constant: 18),
             nameLabel.leftAnchor.constraint(equalTo: leftAnchor, constant: 16),
@@ -264,6 +206,27 @@ class ActorProfileCardView: UIView {
             buttonStack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16)
         ])
     }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        bannerGradientLayer.frame = bannerImageView.bounds
+        ringGradientLayer.frame = CGRect(origin: .zero, size: CGSize(width: 136, height: 136))
+    }
+
+    private func configureEditBadge(_ button: UIButton) {
+        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 14, weight: .bold)
+        button.setImage(UIImage(systemName: "pencil", withConfiguration: symbolConfig), for: .normal)
+        button.tintColor = .white
+        button.backgroundColor = ActorProfileDS.deepPlum.withAlphaComponent(0.92)
+        button.layer.cornerRadius = 17
+        button.layer.borderWidth = 1.5
+        button.layer.borderColor = UIColor.white.withAlphaComponent(0.9).cgColor
+        button.layer.shadowColor = UIColor.black.withAlphaComponent(0.18).cgColor
+        button.layer.shadowOpacity = 1
+        button.layer.shadowRadius = 10
+        button.layer.shadowOffset = CGSize(width: 0, height: 4)
+        button.translatesAutoresizingMaskIntoConstraints = false
+    }
 }
 
 // MARK: - Professional Stats View
@@ -281,11 +244,15 @@ class ProfessionalStatsView: UIView {
         backgroundColor = .white
         layer.cornerRadius = 16
         translatesAutoresizingMaskIntoConstraints = false
+        layer.shadowColor = UIColor.black.withAlphaComponent(0.05).cgColor
+        layer.shadowOpacity = 1
+        layer.shadowRadius = 10
+        layer.shadowOffset = CGSize(width: 0, height: 4)
         
         let mainStack = UIStackView()
         mainStack.axis = .horizontal
-        mainStack.distribution = .equalSpacing
-        mainStack.alignment = .center
+        mainStack.distribution = .fillEqually
+        mainStack.alignment = .top
         mainStack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(mainStack)
         
@@ -301,9 +268,10 @@ class ProfessionalStatsView: UIView {
         
         let projectsLabel = UILabel()
         projectsLabel.text = "Projects"
-        projectsLabel.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        projectsLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
         projectsLabel.textColor = .gray
         projectsLabel.textAlignment = .center
+        projectsLabel.numberOfLines = 2
         
         let projectsValue = UILabel()
         projectsValue.text = "0"
@@ -314,7 +282,7 @@ class ProfessionalStatsView: UIView {
         
         let projectsVStack = UIStackView(arrangedSubviews: [projectsIcon, projectsValue, projectsLabel])
         projectsVStack.axis = .vertical
-        projectsVStack.spacing = 6
+        projectsVStack.spacing = 8
         projectsVStack.alignment = .center
         
         // Rating
@@ -329,9 +297,10 @@ class ProfessionalStatsView: UIView {
         
         let ratingLabel = UILabel()
         ratingLabel.text = "Rating"
-        ratingLabel.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        ratingLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
         ratingLabel.textColor = .gray
         ratingLabel.textAlignment = .center
+        ratingLabel.numberOfLines = 2
         
         let ratingValue = UILabel()
         ratingValue.text = "4.9"
@@ -341,7 +310,7 @@ class ProfessionalStatsView: UIView {
         
         let ratingVStack = UIStackView(arrangedSubviews: [ratingIcon, ratingValue, ratingLabel])
         ratingVStack.axis = .vertical
-        ratingVStack.spacing = 6
+        ratingVStack.spacing = 8
         ratingVStack.alignment = .center
         
         // Experience
@@ -356,9 +325,10 @@ class ProfessionalStatsView: UIView {
         
         let expLabel = UILabel()
         expLabel.text = "Experience"
-        expLabel.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        expLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
         expLabel.textColor = .gray
         expLabel.textAlignment = .center
+        expLabel.numberOfLines = 2
         
         let expValue = UILabel()
         expValue.text = "—"
@@ -369,7 +339,7 @@ class ProfessionalStatsView: UIView {
         
         let expVStack = UIStackView(arrangedSubviews: [expIcon, expValue, expLabel])
         expVStack.axis = .vertical
-        expVStack.spacing = 6
+        expVStack.spacing = 8
         expVStack.alignment = .center
         
         mainStack.addArrangedSubview(projectsVStack)
@@ -377,8 +347,8 @@ class ProfessionalStatsView: UIView {
         mainStack.addArrangedSubview(expVStack)
         
         NSLayoutConstraint.activate([
-            mainStack.topAnchor.constraint(equalTo: topAnchor, constant: 16),
-            mainStack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
+            mainStack.topAnchor.constraint(equalTo: topAnchor, constant: 18),
+            mainStack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -18),
             mainStack.leftAnchor.constraint(equalTo: leftAnchor, constant: 16),
             mainStack.rightAnchor.constraint(equalTo: rightAnchor, constant: -16)
         ])
@@ -590,6 +560,98 @@ class GalleryHeaderView: UIView {
     }
 }
 
+final class ProfileSettingsViewController: UIViewController {
+    var onEditProfile: (() -> Void)?
+    var onLogout: (() -> Void)?
+
+    private let titleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "Settings"
+        label.font = UIFont.systemFont(ofSize: 30, weight: .bold)
+        label.textColor = ActorProfileDS.deepPlum
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
+    private let stackView: UIStackView = {
+        let stack = UIStackView()
+        stack.axis = .vertical
+        stack.spacing = 16
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        return stack
+    }()
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = ActorProfileDS.bgLight
+        title = ""
+
+        let back = UIBarButtonItem(image: UIImage(systemName: "chevron.left"),
+                                   style: .plain,
+                                   target: self,
+                                   action: #selector(backTapped))
+        back.tintColor = ActorProfileDS.deepPlum
+        navigationItem.leftBarButtonItem = back
+
+        view.addSubview(titleLabel)
+        view.addSubview(stackView)
+
+        let editButton = makeRowButton(title: "Edit Profile", subtitle: "Update your profile details and information")
+        editButton.addTarget(self, action: #selector(editProfileTapped), for: .touchUpInside)
+
+        let logoutButton = makeRowButton(title: "Logout", subtitle: "Sign out of your account")
+        logoutButton.addTarget(self, action: #selector(logoutTapped), for: .touchUpInside)
+
+        stackView.addArrangedSubview(editButton)
+        stackView.addArrangedSubview(logoutButton)
+
+        NSLayoutConstraint.activate([
+            titleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
+            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+
+            stackView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 24),
+            stackView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            stackView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16)
+        ])
+    }
+
+    private func makeRowButton(title: String, subtitle: String) -> UIButton {
+        var config = UIButton.Configuration.plain()
+        config.title = title
+        config.subtitle = subtitle
+        config.titleAlignment = .leading
+        config.image = UIImage(systemName: "chevron.right")
+        config.imagePlacement = .trailing
+        config.imagePadding = 8
+        config.baseForegroundColor = ActorProfileDS.deepPlum
+        config.contentInsets = NSDirectionalEdgeInsets(top: 20, leading: 18, bottom: 20, trailing: 18)
+
+        let button = UIButton(configuration: config)
+        button.contentHorizontalAlignment = .fill
+        button.backgroundColor = .white
+        button.layer.cornerRadius = 18
+        button.layer.shadowColor = UIColor.black.withAlphaComponent(0.05).cgColor
+        button.layer.shadowOpacity = 1
+        button.layer.shadowRadius = 10
+        button.layer.shadowOffset = CGSize(width: 0, height: 4)
+        return button
+    }
+
+    @objc private func backTapped() {
+        navigationController?.popViewController(animated: true)
+    }
+
+    @objc private func editProfileTapped() {
+        navigationController?.popViewController(animated: false)
+        onEditProfile?()
+    }
+
+    @objc private func logoutTapped() {
+        navigationController?.popViewController(animated: false)
+        onLogout?()
+    }
+}
+
 // MARK: - Gallery Collection View Data Source
 
 class GalleryCollectionViewDataSource: NSObject, UICollectionViewDataSource, UICollectionViewDelegate {
@@ -614,7 +676,7 @@ class GalleryCollectionViewDataSource: NSObject, UICollectionViewDataSource, UIC
 
 // MARK: - Main Actor Profile ViewController
 
-final class ActorProfileViewController: UIViewController, EditProfileDelegate {
+final class ActorProfileViewController: UIViewController, EditProfileDelegate, PHPickerViewControllerDelegate {
 
     private let scrollView = UIScrollView()
     private let contentStackView = UIStackView()
@@ -625,8 +687,13 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate {
 
     private var profileData: UserProfileData?
     private var posts: [PostData] = []
-        private let userId: UUID?
-        private var hasPortfolio: Bool = false
+    private let userId: UUID?
+    private var hasPortfolio: Bool = false
+    private enum ImageEditTarget {
+        case banner
+        case avatar
+    }
+    private var pendingImageEditTarget: ImageEditTarget?
     
     init(userId: UUID? = nil) {
         self.userId = userId
@@ -654,6 +721,11 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate {
             name: .portfolioCreated,
             object: nil
         )
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        removeHomeInjectedTitleIfNeeded()
     }
 
     deinit {
@@ -731,15 +803,10 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate {
                     profileCard.bannerImageView.image = image
                 }
             }
-            profileCard.badgeView.isHidden = !data.profile.isVerified
-
-            // Wire edit buttons (remove stale targets first)
-            profileCard.editProfileButton.removeTarget(nil, action: nil, for: .allEvents)
+            profileCard.avatarEditButton.removeTarget(nil, action: nil, for: .allEvents)
+            profileCard.avatarEditButton.addTarget(self, action: #selector(editProfileImageTapped), for: .touchUpInside)
             profileCard.editPortfolioButton.removeTarget(nil, action: nil, for: .allEvents)
-            profileCard.editProfileButton.addTarget(self, action: #selector(editProfileTapped), for: .touchUpInside)
             profileCard.editPortfolioButton.addTarget(self, action: #selector(editPortfolioTapped), for: .touchUpInside)
-
-            // Set portfolio button title based on whether portfolio exists
             profileCard.editPortfolioButton.setTitle(hasPortfolio ? "Edit Portfolio" : "Create Portfolio", for: .normal)
         }
 
@@ -844,6 +911,125 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate {
             present(nav, animated: true)
         }
     }
+
+    @objc private func editProfileImageTapped() {
+        let sheet = UIAlertController(title: "Update Images", message: "What do you want to change?", preferredStyle: .actionSheet)
+        sheet.addAction(UIAlertAction(title: "Profile Image", style: .default) { [weak self] _ in
+            self?.presentImagePicker(for: .avatar)
+        })
+        sheet.addAction(UIAlertAction(title: "Banner Image", style: .default) { [weak self] _ in
+            self?.presentImagePicker(for: .banner)
+        })
+        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+
+        if let popover = sheet.popoverPresentationController,
+           let profileCard = contentStackView.arrangedSubviews.first as? ActorProfileCardView {
+            popover.sourceView = profileCard.avatarEditButton
+            popover.sourceRect = profileCard.avatarEditButton.bounds
+        }
+
+        present(sheet, animated: true)
+    }
+
+    private func presentImagePicker(for target: ImageEditTarget) {
+        var config = PHPickerConfiguration(photoLibrary: .shared())
+        config.filter = .images
+        config.selectionLimit = 1
+        let picker = PHPickerViewController(configuration: config)
+        picker.delegate = self
+        pendingImageEditTarget = target
+        present(picker, animated: true)
+    }
+
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        picker.dismiss(animated: true)
+        guard let result = results.first,
+              result.itemProvider.canLoadObject(ofClass: UIImage.self),
+              let target = pendingImageEditTarget else { return }
+
+        result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] object, _ in
+            guard let self, let image = object as? UIImage else { return }
+            DispatchQueue.main.async {
+                guard let profileCard = self.contentStackView.arrangedSubviews.first as? ActorProfileCardView else { return }
+                switch target {
+                case .banner:
+                    profileCard.bannerImageView.image = image
+                case .avatar:
+                    profileCard.profileImageView.image = image
+                }
+                self.persistImageChange(image, target: target)
+            }
+        }
+    }
+
+    private func persistImageChange(_ image: UIImage, target: ImageEditTarget) {
+        guard let userUUID = profileData?.profile.id ?? userId else { return }
+        loadingView.startAnimating()
+
+        Task {
+            do {
+                guard let imageData = image.jpegData(compressionQuality: 0.82) else {
+                    throw NSError(domain: "ActorProfileViewController", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to prepare image for upload."])
+                }
+
+                let fileName: String
+                switch target {
+                case .banner:
+                    fileName = "\(userUUID.uuidString)/banner_\(UUID().uuidString).jpg"
+                case .avatar:
+                    fileName = "\(userUUID.uuidString)/profile_\(UUID().uuidString).jpg"
+                }
+
+                try await supabase.storage
+                    .from("profile-pictures")
+                    .upload(
+                        path: fileName,
+                        file: imageData,
+                        options: FileOptions(
+                            cacheControl: "3600",
+                            contentType: "image/jpeg",
+                            upsert: true
+                        )
+                    )
+
+                let publicURL = try supabase.storage
+                    .from("profile-pictures")
+                    .getPublicURL(path: fileName)
+                    .absoluteString
+
+                let updatePayload: [String: String]
+                switch target {
+                case .banner:
+                    updatePayload = [
+                        "banner_url": publicURL,
+                        "updated_at": ISO8601DateFormatter().string(from: Date())
+                    ]
+                case .avatar:
+                    updatePayload = [
+                        "profile_picture_url": publicURL,
+                        "avatar_url": publicURL,
+                        "updated_at": ISO8601DateFormatter().string(from: Date())
+                    ]
+                }
+
+                _ = try await supabase
+                    .from("profiles")
+                    .update(updatePayload)
+                    .eq("id", value: userUUID.uuidString)
+                    .execute()
+
+                await MainActor.run {
+                    self.loadingView.stopAnimating()
+                    self.loadProfileData()
+                }
+            } catch {
+                await MainActor.run {
+                    self.loadingView.stopAnimating()
+                    self.showErrorMessage("Failed to update image: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
     
     private func updateStatsView(_ statsView: ProfessionalStatsView, with data: UserProfileData) {
         // Use viewWithTag to find labels (tag assigned in ProfessionalStatsView)
@@ -930,13 +1116,92 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate {
     }
     
     private func setupNavigationBar() {
-        navigationItem.leftBarButtonItem = UIBarButtonItem(
-            image: UIImage(systemName: "chevron.left"),
-            style: .plain,
-            target: self,
-            action: #selector(backTapped)
-        )
-        navigationItem.leftBarButtonItem?.tintColor = ActorProfileDS.deepPlum
+        navigationItem.title = ""
+        navigationItem.hidesBackButton = true
+        navigationItem.leftItemsSupplementBackButton = false
+        navigationController?.navigationBar.topItem?.title = ""
+        navigationController?.navigationBar.prefersLargeTitles = false
+        if #available(iOS 14.0, *) {
+            navigationItem.backButtonDisplayMode = .minimal
+        }
+
+        let titleLabel = UILabel()
+        titleLabel.text = "CineMyst"
+        titleLabel.font = UIFont(name: "Georgia-Bold", size: 20) ?? UIFont.systemFont(ofSize: 20, weight: .bold)
+        titleLabel.textColor = ActorProfileDS.deepPlum
+        titleLabel.sizeToFit()
+        navigationItem.titleView = titleLabel
+
+        let settingsButton = UIButton(type: .system)
+        let settingsConfig = UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold)
+        settingsButton.setImage(UIImage(systemName: "gearshape.fill", withConfiguration: settingsConfig), for: .normal)
+        settingsButton.tintColor = ActorProfileDS.deepPlum
+        settingsButton.backgroundColor = UIColor.white.withAlphaComponent(0.96)
+        settingsButton.layer.cornerRadius = 18
+        settingsButton.layer.shadowColor = UIColor.black.withAlphaComponent(0.08).cgColor
+        settingsButton.layer.shadowOpacity = 1
+        settingsButton.layer.shadowRadius = 10
+        settingsButton.layer.shadowOffset = CGSize(width: 0, height: 4)
+        settingsButton.frame = CGRect(x: 0, y: 0, width: 36, height: 36)
+        settingsButton.addTarget(self, action: #selector(settingsTapped), for: .touchUpInside)
+        navigationItem.rightBarButtonItem = UIBarButtonItem(customView: settingsButton)
+
+        let isRootProfileTab = navigationController?.viewControllers.first === self
+        if isRootProfileTab {
+            navigationItem.leftBarButtonItem = nil
+        } else {
+            let backButton = UIButton(type: .system)
+            let symbolConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+            backButton.setImage(UIImage(systemName: "chevron.left", withConfiguration: symbolConfig), for: .normal)
+            backButton.tintColor = ActorProfileDS.deepPlum
+            backButton.backgroundColor = UIColor.white.withAlphaComponent(0.96)
+            backButton.layer.cornerRadius = 18
+            backButton.layer.shadowColor = UIColor.black.withAlphaComponent(0.08).cgColor
+            backButton.layer.shadowOpacity = 1
+            backButton.layer.shadowRadius = 10
+            backButton.layer.shadowOffset = CGSize(width: 0, height: 4)
+            backButton.frame = CGRect(x: 0, y: 0, width: 36, height: 36)
+            backButton.addTarget(self, action: #selector(backTapped), for: .touchUpInside)
+            navigationItem.leftBarButtonItem = UIBarButtonItem(customView: backButton)
+        }
+    }
+
+    @objc private func settingsTapped() {
+        let vc = ProfileSettingsViewController()
+        vc.onEditProfile = { [weak self] in
+            self?.editProfileTapped()
+        }
+        vc.onLogout = { [weak self] in
+            self?.logoutTapped()
+        }
+        navigationController?.pushViewController(vc, animated: true)
+    }
+
+    private func logoutTapped() {
+        Task {
+            do {
+                try await AuthManager.shared.signOut()
+                await MainActor.run {
+                    let loginVC = LoginViewController()
+                    let nav = UINavigationController(rootViewController: loginVC)
+                    nav.modalPresentationStyle = .fullScreen
+                    self.present(nav, animated: true)
+                }
+            } catch {
+                await MainActor.run {
+                    self.showErrorMessage("Failed to logout: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    private func removeHomeInjectedTitleIfNeeded() {
+        guard let navBar = navigationController?.navigationBar,
+              let contentView = navBar.subviews.first(where: {
+                  String(describing: type(of: $0)).contains("ContentView")
+              }) else { return }
+
+        contentView.viewWithTag(999)?.removeFromSuperview()
     }
     
     @objc private func backTapped() {
@@ -958,12 +1223,12 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate {
         
         // Profile Card
         let profileCard = ActorProfileCardView()
-        profileCard.heightAnchor.constraint(equalToConstant: 420).isActive = true
+        profileCard.heightAnchor.constraint(equalToConstant: 430).isActive = true
         contentStackView.addArrangedSubview(profileCard)
         
         // Professional Stats
         let statsView = ProfessionalStatsView()
-        statsView.heightAnchor.constraint(equalToConstant: 120).isActive = true
+        statsView.heightAnchor.constraint(equalToConstant: 146).isActive = true
         contentStackView.addArrangedSubview(statsView)
         
         // About

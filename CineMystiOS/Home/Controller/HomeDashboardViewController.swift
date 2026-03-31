@@ -236,7 +236,7 @@ final class HomeDashboardViewController: UIViewController {
         }
 
         // MARK: - Right Buttons
-        navigationItem.rightBarButtonItems = [makeAvatarBarButton(), makeBellBarButton()]
+        navigationItem.rightBarButtonItems = [makeChatBarButton(), makeBellBarButton()]
 
         // MARK: - Search
         let search = UISearchController(searchResultsController: nil)
@@ -273,22 +273,37 @@ final class HomeDashboardViewController: UIViewController {
         navigationController?.navigationBar.scrollEdgeAppearance = appearance
         navigationController?.navigationBar.compactAppearance = appearance
     }
+
+    private func removeInjectedHomeTitleIfNeeded() {
+        guard let navBar = navigationController?.navigationBar,
+              let contentView = navBar.subviews.first(where: {
+                  String(describing: type(of: $0)).contains("ContentView")
+              }) else { return }
+
+        contentView.viewWithTag(999)?.removeFromSuperview()
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        removeInjectedHomeTitleIfNeeded()
+    }
     
-    private func makeAvatarBarButton() -> UIBarButtonItem {
-        let v = UIView(frame: CGRect(x: 0, y: 0, width: 38, height: 38))
-        v.layer.cornerRadius = 19; v.clipsToBounds = true
-        v.layer.borderWidth = 1.5; v.layer.borderColor = UIColor.white.withAlphaComponent(0.9).cgColor
-        let g = CAGradientLayer()
-        g.frame = v.bounds
-        g.colors = [CineMystTheme.brandPlum.cgColor, CineMystTheme.deepPlumMid.cgColor]
-        g.startPoint = CGPoint(x: 0, y: 0); g.endPoint = CGPoint(x: 1, y: 1)
-        v.layer.addSublayer(g)
-        let l = UILabel(frame: v.bounds); l.text = "A"; l.textAlignment = .center
-        l.font = .boldSystemFont(ofSize: 14); l.textColor = .white
-        v.addSubview(l)
-        v.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(profileTapped)))
-        v.isUserInteractionEnabled = true
-        return UIBarButtonItem(customView: v)
+    private func makeChatBarButton() -> UIBarButtonItem {
+        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialLight))
+        blur.frame = CGRect(x: 0, y: 0, width: 38, height: 38)
+        blur.layer.cornerRadius = 19
+        blur.clipsToBounds = true
+        blur.layer.borderWidth = 1
+        blur.layer.borderColor = UIColor.white.withAlphaComponent(0.8).cgColor
+
+        let button = UIButton(type: .system)
+        button.frame = blur.bounds
+        let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+        button.setImage(UIImage(systemName: "bubble.left.and.bubble.right", withConfiguration: config), for: .normal)
+        button.tintColor = CineMystTheme.ink.withAlphaComponent(0.78)
+        button.addTarget(self, action: #selector(chatTapped), for: .touchUpInside)
+        blur.contentView.addSubview(button)
+        return UIBarButtonItem(customView: blur)
     }
 
     private func makeBellBarButton() -> UIBarButtonItem {
@@ -418,7 +433,11 @@ final class HomeDashboardViewController: UIViewController {
         rebuildFeed(); tableView.reloadData()
     }
 
-    @objc private func profileTapped() { navigationController?.pushViewController(ActorProfileViewController(), animated: true) }
+    @objc private func chatTapped() {
+        let vc = MessagesViewController()
+        vc.hidesBottomBarWhenPushed = true
+        navigationController?.pushViewController(vc, animated: true)
+    }
     @objc private func bellTapped() {
         let vc = NotificationsViewController(); vc.hidesBottomBarWhenPushed = true
         navigationController?.pushViewController(vc, animated: true)
