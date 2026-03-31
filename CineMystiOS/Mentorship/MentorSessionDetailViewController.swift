@@ -216,7 +216,10 @@ final class MentorSessionDetailViewController: UIViewController {
             mentorRole: c.mentorRole,
             date: c.date,
             createdAt: Date(),
-            mentorImageName: c.avatarName
+            mentorImageName: c.avatarName,
+            mentorImageURL: nil,
+            mentorshipArea: c.services.joined(separator: ", "),
+            scheduledTimeText: nil
         )
     }
 
@@ -314,7 +317,10 @@ final class MentorSessionDetailViewController: UIViewController {
                     mentorRole: s.mentorRole,
                     date: newDate,
                     createdAt: s.createdAt,
-                    mentorImageName: s.mentorImageName
+                    mentorImageName: s.mentorImageName,
+                    mentorImageURL: s.mentorImageURL,
+                    mentorshipArea: s.mentorshipArea,
+                    scheduledTimeText: s.scheduledTimeText
                 )
                 SessionStore.shared.remove(id: s.id)
                 SessionStore.shared.add(updated)
@@ -336,7 +342,10 @@ final class MentorSessionDetailViewController: UIViewController {
                     mentorRole: s.mentorRole,
                     date: newDate,
                     createdAt: s.createdAt,
-                    mentorImageName: s.mentorImageName
+                    mentorImageName: s.mentorImageName,
+                    mentorImageURL: s.mentorImageURL,
+                    mentorshipArea: s.mentorshipArea,
+                    scheduledTimeText: s.scheduledTimeText
                 )
                 // add to SessionStore as new session
                 SessionStore.shared.add(updated)

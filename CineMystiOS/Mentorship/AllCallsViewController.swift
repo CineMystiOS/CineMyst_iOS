@@ -6,6 +6,7 @@
 import UIKit
 
 // MARK: - Model
+
 struct CallItem {
     let id: String
     let mentorName: String

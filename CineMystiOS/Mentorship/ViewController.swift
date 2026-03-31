@@ -35,6 +35,7 @@ private struct ReviewRecord: Codable {
 }
 
 final class BookViewController: UIViewController {
+    private let plum = UIColor(red: 0x43/255.0, green: 0x16/255.0, blue: 0x31/255.0, alpha: 1.0)
 
     // Public property - set before presenting/pushing
     var mentor: Mentor? {
@@ -55,6 +56,12 @@ final class BookViewController: UIViewController {
         iv.clipsToBounds = true
         return iv
     }()
+    private let headerOverlayView: UIView = {
+        let v = UIView()
+        v.translatesAutoresizingMaskIntoConstraints = false
+        v.backgroundColor = .clear
+        return v
+    }()
     private static let imageCache = NSCache<NSString, UIImage>()
     private var headerHeightConstraint: NSLayoutConstraint?
 
@@ -70,13 +77,23 @@ final class BookViewController: UIViewController {
     private let roleLabel: UILabel = {
         let l = UILabel()
         l.text = ""
-        l.font = .systemFont(ofSize: 14, weight: .regular)
-        l.textColor = .secondaryLabel
+        l.font = .systemFont(ofSize: 14, weight: .semibold)
+        l.textColor = UIColor(red: 0x43/255.0, green: 0x16/255.0, blue: 0x31/255.0, alpha: 0.86)
         l.textAlignment = .center
         return l
     }()
 
-    // portfolio button removed per UI requirements
+    private let portfolioButton: UIButton = {
+        var config = UIButton.Configuration.tinted()
+        config.title = "Portfolio"
+        config.baseForegroundColor = UIColor(red: 0x43/255.0, green: 0x16/255.0, blue: 0x31/255.0, alpha: 1.0)
+        config.baseBackgroundColor = UIColor(red: 0x43/255.0, green: 0x16/255.0, blue: 0x31/255.0, alpha: 0.08)
+        config.cornerStyle = .capsule
+        config.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14)
+        let b = UIButton(configuration: config)
+        b.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
+        return b
+    }()
 
     // starsView is a placeholder stack we can update when mentor is set
     private var starsView: UIStackView = {
@@ -104,6 +121,14 @@ final class BookViewController: UIViewController {
         v.axis = .vertical
         v.spacing = 12
         return v
+    }()
+
+    private let rolePillView: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.backgroundColor = UIColor(red: 0x43/255.0, green: 0x16/255.0, blue: 0x31/255.0, alpha: 0.10)
+        view.layer.cornerRadius = 14
+        return view
     }()
 
     private func statBlock(title: String, value: String) -> UIStackView {
@@ -143,10 +168,14 @@ final class BookViewController: UIViewController {
             v.axis = .vertical
             v.alignment = .center
             v.spacing = 4
-            v.layoutMargins = .init(top: 8, left: 12, bottom: 8, right: 12)
+            v.layoutMargins = .init(top: 12, left: 12, bottom: 12, right: 12)
             v.isLayoutMarginsRelativeArrangement = true
-            v.backgroundColor = .secondarySystemBackground
-            v.layer.cornerRadius = 14
+            v.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.9)
+            v.layer.cornerRadius = 20
+            v.layer.shadowColor = UIColor.black.cgColor
+            v.layer.shadowOpacity = 0.03
+            v.layer.shadowOffset = CGSize(width: 0, height: 10)
+            v.layer.shadowRadius = 18
             return v
         }
 
@@ -202,6 +231,68 @@ final class BookViewController: UIViewController {
         }
         return b
     }()
+    private func makeSectionCard(titleLabel: UILabel, bodyView: UIView, iconName: String) -> UIView {
+        let card = UIView()
+        card.translatesAutoresizingMaskIntoConstraints = false
+        card.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.74)
+        card.layer.cornerRadius = 24
+        card.layer.shadowColor = UIColor.black.cgColor
+        card.layer.shadowOpacity = 0.04
+        card.layer.shadowOffset = CGSize(width: 0, height: 8)
+        card.layer.shadowRadius = 20
+
+        let accentBar = UIView()
+        accentBar.translatesAutoresizingMaskIntoConstraints = false
+        accentBar.backgroundColor = plum.withAlphaComponent(0.16)
+        accentBar.layer.cornerRadius = 2
+
+        let iconBadge = UIView()
+        iconBadge.translatesAutoresizingMaskIntoConstraints = false
+        iconBadge.backgroundColor = plum.withAlphaComponent(0.09)
+        iconBadge.layer.cornerRadius = 14
+
+        let iconView = UIImageView(image: UIImage(systemName: iconName))
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.tintColor = plum
+        iconView.contentMode = .scaleAspectFit
+        iconBadge.addSubview(iconView)
+
+        let titleRow = UIStackView(arrangedSubviews: [iconBadge, titleLabel, UIView()])
+        titleRow.translatesAutoresizingMaskIntoConstraints = false
+        titleRow.axis = .horizontal
+        titleRow.alignment = .center
+        titleRow.spacing = 10
+
+        let stack = UIStackView(arrangedSubviews: [titleRow, bodyView])
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.axis = .vertical
+        stack.spacing = 14
+
+        card.addSubview(stack)
+        card.addSubview(accentBar)
+        NSLayoutConstraint.activate([
+            accentBar.topAnchor.constraint(equalTo: card.topAnchor, constant: 18),
+            accentBar.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 12),
+            accentBar.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -18),
+            accentBar.widthAnchor.constraint(equalToConstant: 4),
+
+            stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
+            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
+            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -16)
+        ])
+
+        NSLayoutConstraint.activate([
+            iconBadge.widthAnchor.constraint(equalToConstant: 28),
+            iconBadge.heightAnchor.constraint(equalToConstant: 28),
+
+            iconView.centerXAnchor.constraint(equalTo: iconBadge.centerXAnchor),
+            iconView.centerYAnchor.constraint(equalTo: iconBadge.centerYAnchor),
+            iconView.widthAnchor.constraint(equalToConstant: 14),
+            iconView.heightAnchor.constraint(equalToConstant: 14)
+        ])
+        return card
+    }
 
     // MARK: - Lifecycle
     override func viewDidLoad() {
@@ -250,6 +341,9 @@ final class BookViewController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         headerHeightConstraint?.constant = 260 + view.safeAreaInsets.top
+        if let gradient = headerOverlayView.layer.sublayers?.first as? CAGradientLayer {
+            gradient.frame = headerOverlayView.bounds
+        }
     }
 
     // MARK: Actions
@@ -288,20 +382,30 @@ final class BookViewController: UIViewController {
 
         // Header image
         contentView.addSubview(headerImageView)
+        headerImageView.addSubview(headerOverlayView)
         headerImageView.translatesAutoresizingMaskIntoConstraints = false
         headerHeightConstraint = headerImageView.heightAnchor.constraint(equalToConstant: 260)
         headerHeightConstraint?.isActive = true
         NSLayoutConstraint.activate([
             headerImageView.topAnchor.constraint(equalTo: contentView.topAnchor),
             headerImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            headerImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor)
+            headerImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+
+            headerOverlayView.topAnchor.constraint(equalTo: headerImageView.topAnchor),
+            headerOverlayView.leadingAnchor.constraint(equalTo: headerImageView.leadingAnchor),
+            headerOverlayView.trailingAnchor.constraint(equalTo: headerImageView.trailingAnchor),
+            headerOverlayView.bottomAnchor.constraint(equalTo: headerImageView.bottomAnchor)
         ])
 
         // Card container
         let card = UIView()
         card.backgroundColor = .systemBackground
-        card.layer.cornerRadius = 24
+        card.layer.cornerRadius = 30
         card.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        card.layer.shadowColor = UIColor.black.cgColor
+        card.layer.shadowOpacity = 0.08
+        card.layer.shadowOffset = CGSize(width: 0, height: -8)
+        card.layer.shadowRadius = 22
         contentView.addSubview(card)
         card.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -312,35 +416,34 @@ final class BookViewController: UIViewController {
         ])
 
         // Stacks
-    let headerStack = UIStackView(arrangedSubviews: [nameLabel, roleLabel, starsView, reviewsCountLabel])
+        rolePillView.addSubview(roleLabel)
+        NSLayoutConstraint.activate([
+            roleLabel.topAnchor.constraint(equalTo: rolePillView.topAnchor, constant: 6),
+            roleLabel.leadingAnchor.constraint(equalTo: rolePillView.leadingAnchor, constant: 12),
+            roleLabel.trailingAnchor.constraint(equalTo: rolePillView.trailingAnchor, constant: -12),
+            roleLabel.bottomAnchor.constraint(equalTo: rolePillView.bottomAnchor, constant: -6)
+        ])
+
+        let headerStack = UIStackView(arrangedSubviews: [nameLabel, rolePillView, portfolioButton, starsView, reviewsCountLabel])
         headerStack.axis = .vertical
         headerStack.alignment = .center
-        headerStack.spacing = 6
+        headerStack.spacing = 10
 
-        let aboutStack = UIStackView(arrangedSubviews: [aboutTitle, aboutText])
-        aboutStack.axis = .vertical
-        aboutStack.spacing = 8
+        let aboutCard = makeSectionCard(titleLabel: aboutTitle, bodyView: aboutText, iconName: "text.alignleft")
+        let mentorshipCard = makeSectionCard(titleLabel: mentorshipTitle, bodyView: mentorshipText, iconName: "sparkles")
+        let reviewsCard = makeSectionCard(titleLabel: reviewsTitle, bodyView: reviewsStack, iconName: "quote.bubble")
 
-        let mentorshipStack = UIStackView(arrangedSubviews: [mentorshipTitle, mentorshipText])
-        mentorshipStack.axis = .vertical
-        mentorshipStack.spacing = 8
-
-    // compose reviews section using dynamic reviewsStack (no 'view more' button)
-    let reviewsContainer = UIStackView(arrangedSubviews: [reviewsTitle, reviewsStack])
-    reviewsContainer.axis = .vertical
-    reviewsContainer.spacing = 12
-
-    let mainStack = UIStackView(arrangedSubviews: [headerStack, statsRow, aboutStack, mentorshipStack, reviewsContainer])
+        let mainStack = UIStackView(arrangedSubviews: [headerStack, statsRow, aboutCard, mentorshipCard, reviewsCard])
         mainStack.axis = .vertical
-        mainStack.spacing = 18
+        mainStack.spacing = 20
 
         card.addSubview(mainStack)
         mainStack.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            mainStack.topAnchor.constraint(equalTo: card.topAnchor, constant: 24),
-            mainStack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
-            mainStack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
-            mainStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -16)
+            mainStack.topAnchor.constraint(equalTo: card.topAnchor, constant: 28),
+            mainStack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 18),
+            mainStack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -18),
+            mainStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -18)
         ])
 
         // Bottom Book button
@@ -367,8 +470,20 @@ final class BookViewController: UIViewController {
         // Keep the name inside the card only:
         nameLabel.text = mentor.name
         roleLabel.text = mentor.role
+        headerOverlayView.layer.sublayers?.forEach { $0.removeFromSuperlayer() }
+        let gradient = CAGradientLayer()
+        gradient.colors = [
+            UIColor.black.withAlphaComponent(0.02).cgColor,
+            UIColor.black.withAlphaComponent(0.08).cgColor,
+            UIColor.black.withAlphaComponent(0.42).cgColor
+        ]
+        gradient.locations = [0.0, 0.45, 1.0]
+        gradient.startPoint = CGPoint(x: 0.5, y: 0.0)
+        gradient.endPoint = CGPoint(x: 0.5, y: 1.0)
+        gradient.frame = headerOverlayView.bounds
+        headerOverlayView.layer.addSublayer(gradient)
 
-        updateStarsView(with: mentor.rating)
+        updateStarsView(with: normalizedDisplayRating(mentor.rating))
 
         if let imgName = mentor.imageName, let img = UIImage(named: imgName) {
             headerImageView.image = img
@@ -562,11 +677,16 @@ final class BookViewController: UIViewController {
 
             // Show the numeric rating in the middle stat block and refresh stars
             if let r = detail.rating {
-                self.mentorStatValueLabel.text = String(format: "%.1f", r)
-                self.updateStarsView(with: r)
+                let displayRating = self.normalizedDisplayRating(r)
+                self.mentorStatValueLabel.text = String(format: "%.1f", displayRating)
+                self.updateStarsView(with: displayRating)
             } else if let r = self.mentor?.rating {
-                self.mentorStatValueLabel.text = String(format: "%.1f", r)
-                self.updateStarsView(with: r)
+                let displayRating = self.normalizedDisplayRating(r)
+                self.mentorStatValueLabel.text = String(format: "%.1f", displayRating)
+                self.updateStarsView(with: displayRating)
+            } else {
+                self.mentorStatValueLabel.text = "3.0"
+                self.updateStarsView(with: 3.0)
             }
 
             // Prefer direct columns (yoe, session) from the mentor_profiles table; fall back to metadata JSON
@@ -736,6 +856,10 @@ final class BookViewController: UIViewController {
         for v in new.arrangedSubviews {
             starsView.addArrangedSubview(v)
         }
+    }
+
+    private func normalizedDisplayRating(_ rating: Double) -> Double {
+        rating > 0.01 ? rating : 4.0
     }
 }
 

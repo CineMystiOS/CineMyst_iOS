@@ -13,32 +13,47 @@ import Supabase
 // MARK: - MentorCardCell (tightened layout + aligned rating)
 final class MentorCardCell: UITableViewCell {
     static let reuseIdentifier = "MentorCardCell"
+    private let plum = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1)
+    private let softPlum = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 0.08)
+    private let deepShadow = UIColor.black.withAlphaComponent(0.05)
 
     private let cardView: UIView = {
         let v = UIView()
         v.backgroundColor = .systemBackground
-        v.layer.cornerRadius = 12
+        v.layer.cornerRadius = 26
         v.layer.masksToBounds = false
         v.translatesAutoresizingMaskIntoConstraints = false
-        v.layer.shadowColor = UIColor.black.withAlphaComponent(0.06).cgColor
+        v.layer.shadowColor = UIColor.black.withAlphaComponent(0.08).cgColor
         v.layer.shadowOpacity = 1
-        v.layer.shadowRadius = 8
-        v.layer.shadowOffset = CGSize(width: 0, height: 4)
+        v.layer.shadowRadius = 22
+        v.layer.shadowOffset = CGSize(width: 0, height: 12)
+        v.layer.borderWidth = 1
+        v.layer.borderColor = UIColor.white.withAlphaComponent(0.82).cgColor
         return v
+    }()
+
+    private let cardGlowView: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.backgroundColor = UIColor.white.withAlphaComponent(0.55)
+        view.layer.cornerRadius = 26
+        view.isUserInteractionEnabled = false
+        return view
     }()
 
     // Left info
     private let nameLabel: UILabel = {
         let l = UILabel()
-        l.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+        l.font = UIFont.systemFont(ofSize: 20, weight: .bold)
         l.textColor = .label
+        l.numberOfLines = 2
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
     private let roleLabel: UILabel = {
         let l = UILabel()
-        l.font = UIFont.systemFont(ofSize: 13, weight: .regular)
-        l.textColor = UIColor(red: 0.36, green: 0.17, blue: 0.28, alpha: 1) // plum-ish
+        l.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        l.textColor = UIColor(red: 0.36, green: 0.17, blue: 0.28, alpha: 0.92)
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
@@ -56,7 +71,7 @@ final class MentorCardCell: UITableViewCell {
         let s = UIStackView()
         s.axis = .vertical
         s.alignment = .trailing
-        s.spacing = 2
+        s.spacing = 6
         s.translatesAutoresizingMaskIntoConstraints = false
         return s
     }()
@@ -82,6 +97,16 @@ final class MentorCardCell: UITableViewCell {
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
+    private let ratingPillView: UIVisualEffectView = {
+        let blur = UIBlurEffect(style: .systemUltraThinMaterialLight)
+        let view = UIVisualEffectView(effect: blur)
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.layer.cornerRadius = 14
+        view.layer.masksToBounds = true
+        view.layer.borderWidth = 1
+        view.layer.borderColor = UIColor.white.withAlphaComponent(0.65).cgColor
+        return view
+    }()
     private let reviewsLabel: UILabel = {
         let l = UILabel()
         l.font = UIFont.systemFont(ofSize: 11)
@@ -91,34 +116,81 @@ final class MentorCardCell: UITableViewCell {
     }()
     private let priceLabel: UILabel = {
         let l = UILabel()
-        l.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
-        l.textColor = .secondaryLabel
-        l.textAlignment = .right
+        l.font = UIFont.systemFont(ofSize: 12, weight: .bold)
+        l.textColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 0.9)
+        l.textAlignment = .center
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
+    }()
+
+    private let pricePillView: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.backgroundColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 0.09)
+        view.layer.cornerRadius = 14
+        return view
+    }()
+
+    private let subtitleStack: UIStackView = {
+        let stack = UIStackView()
+        stack.axis = .horizontal
+        stack.alignment = .center
+        stack.spacing = 8
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        return stack
+    }()
+
+    private let sessionBadge: UILabel = {
+        let label = UILabel()
+        label.font = UIFont.systemFont(ofSize: 11, weight: .semibold)
+        label.textColor = .secondaryLabel
+        label.backgroundColor = UIColor.systemGray6
+        label.layer.cornerRadius = 10
+        label.layer.masksToBounds = true
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
     }()
 
     private let photoView: UIImageView = {
         let iv = UIImageView()
         iv.contentMode = .scaleAspectFill
-        iv.layer.cornerRadius = 10
+        iv.layer.cornerRadius = 18
         iv.layer.masksToBounds = true
         iv.translatesAutoresizingMaskIntoConstraints = false
         iv.backgroundColor = UIColor.systemGray5
         return iv
     }()
 
+    private let imageContainerView: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.layer.cornerRadius = 20
+        view.layer.masksToBounds = true
+        view.backgroundColor = UIColor.systemGray6
+        view.layer.borderWidth = 1
+        view.layer.borderColor = UIColor.white.withAlphaComponent(0.75).cgColor
+        return view
+    }()
+
+    private let imageGradientOverlay: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.08)
+        return view
+    }()
+
     // divider and bottom row
     private let divider: UIView = {
         let v = UIView()
-        v.backgroundColor = UIColor.systemGray5
+        v.backgroundColor = UIColor.systemGray5.withAlphaComponent(0.7)
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
     private let servicesLabel: UILabel = {
         let l = UILabel()
         l.text = "Services"
-        l.font = UIFont.systemFont(ofSize: 13)
+        l.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
         l.textColor = .secondaryLabel
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
@@ -126,7 +198,7 @@ final class MentorCardCell: UITableViewCell {
     private let tagsStack: UIStackView = {
         let s = UIStackView()
         s.axis = .horizontal
-        s.spacing = 12
+        s.spacing = 8
         s.alignment = .leading
         s.translatesAutoresizingMaskIntoConstraints = false
         return s
@@ -137,6 +209,7 @@ final class MentorCardCell: UITableViewCell {
         cfg.cornerStyle = .capsule
         cfg.baseBackgroundColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1)
         cfg.baseForegroundColor = .white
+        cfg.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 18, bottom: 10, trailing: 18)
         let b = UIButton(configuration: cfg)
         b.translatesAutoresizingMaskIntoConstraints = false
         return b
@@ -170,12 +243,17 @@ final class MentorCardCell: UITableViewCell {
         bottomRow.translatesAutoresizingMaskIntoConstraints = false
 
         contentView.addSubview(cardView)
+        cardView.addSubview(cardGlowView)
         cardView.addSubview(topRow)
         cardView.addSubview(divider)
         cardView.addSubview(bottomRow)
+        pricePillView.addSubview(priceLabel)
+        ratingPillView.contentView.addSubview(ratingRow)
 
         // left vertical stack
-        let leftStack = UIStackView(arrangedSubviews: [nameLabel, roleLabel, orgLabel])
+        subtitleStack.addArrangedSubview(roleLabel)
+        subtitleStack.addArrangedSubview(sessionBadge)
+        let leftStack = UIStackView(arrangedSubviews: [nameLabel, subtitleStack, orgLabel])
         leftStack.axis = .vertical
         leftStack.spacing = 6
         leftStack.alignment = .leading
@@ -184,15 +262,17 @@ final class MentorCardCell: UITableViewCell {
         // right vertical stack (ratingStack)
         ratingRow.addArrangedSubview(starImageView)
         ratingRow.addArrangedSubview(ratingLabel)
-        ratingStack.addArrangedSubview(ratingRow)
+        ratingStack.addArrangedSubview(ratingPillView)
         ratingStack.addArrangedSubview(reviewsLabel)
-        ratingStack.addArrangedSubview(priceLabel)
+        ratingStack.addArrangedSubview(pricePillView)
 
         // Build topRow: left, spacer, ratingStack, photo
         topRow.addArrangedSubview(leftStack)
         topRow.addArrangedSubview(UIView()) // flexible spacer
         topRow.addArrangedSubview(ratingStack)
-        topRow.addArrangedSubview(photoView)
+        imageContainerView.addSubview(photoView)
+        imageContainerView.addSubview(imageGradientOverlay)
+        topRow.addArrangedSubview(imageContainerView)
 
         // Build bottomRow
         bottomRow.addArrangedSubview(servicesLabel)
@@ -207,31 +287,58 @@ final class MentorCardCell: UITableViewCell {
             cardView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             cardView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
 
-            topRow.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 12),
-            topRow.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 14),
-            topRow.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -14),
+            cardGlowView.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 1),
+            cardGlowView.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 1),
+            cardGlowView.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -1),
+            cardGlowView.heightAnchor.constraint(equalToConstant: 72),
 
-            photoView.widthAnchor.constraint(equalToConstant: 78),
-            photoView.heightAnchor.constraint(equalToConstant: 78),
+            topRow.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 16),
+            topRow.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 16),
+            topRow.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -16),
+
+            imageContainerView.widthAnchor.constraint(equalToConstant: 96),
+            imageContainerView.heightAnchor.constraint(equalToConstant: 96),
+
+            photoView.topAnchor.constraint(equalTo: imageContainerView.topAnchor),
+            photoView.leadingAnchor.constraint(equalTo: imageContainerView.leadingAnchor),
+            photoView.trailingAnchor.constraint(equalTo: imageContainerView.trailingAnchor),
+            photoView.bottomAnchor.constraint(equalTo: imageContainerView.bottomAnchor),
+
+            imageGradientOverlay.leadingAnchor.constraint(equalTo: imageContainerView.leadingAnchor),
+            imageGradientOverlay.trailingAnchor.constraint(equalTo: imageContainerView.trailingAnchor),
+            imageGradientOverlay.bottomAnchor.constraint(equalTo: imageContainerView.bottomAnchor),
+            imageGradientOverlay.heightAnchor.constraint(equalTo: imageContainerView.heightAnchor, multiplier: 0.42),
 
             starImageView.widthAnchor.constraint(equalToConstant: 14),
             starImageView.heightAnchor.constraint(equalToConstant: 14),
 
-            divider.topAnchor.constraint(equalTo: topRow.bottomAnchor, constant: 12),
-            divider.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 12),
-            divider.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -12),
+            ratingRow.topAnchor.constraint(equalTo: ratingPillView.contentView.topAnchor, constant: 6),
+            ratingRow.bottomAnchor.constraint(equalTo: ratingPillView.contentView.bottomAnchor, constant: -6),
+            ratingRow.leadingAnchor.constraint(equalTo: ratingPillView.contentView.leadingAnchor, constant: 10),
+            ratingRow.trailingAnchor.constraint(equalTo: ratingPillView.contentView.trailingAnchor, constant: -10),
+
+            priceLabel.topAnchor.constraint(equalTo: pricePillView.topAnchor, constant: 7),
+            priceLabel.leadingAnchor.constraint(equalTo: pricePillView.leadingAnchor, constant: 11),
+            priceLabel.trailingAnchor.constraint(equalTo: pricePillView.trailingAnchor, constant: -11),
+            priceLabel.bottomAnchor.constraint(equalTo: pricePillView.bottomAnchor, constant: -7),
+
+            sessionBadge.heightAnchor.constraint(equalToConstant: 20),
+
+            divider.topAnchor.constraint(equalTo: topRow.bottomAnchor, constant: 14),
+            divider.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 16),
+            divider.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -16),
             divider.heightAnchor.constraint(equalToConstant: 1),
 
             bottomRow.topAnchor.constraint(equalTo: divider.bottomAnchor, constant: 12),
-            bottomRow.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 12),
-            bottomRow.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -12),
-            bottomRow.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -12),
+            bottomRow.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 16),
+            bottomRow.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -16),
+            bottomRow.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -14),
 
-            bookButton.widthAnchor.constraint(equalToConstant: 92),
-            bookButton.heightAnchor.constraint(equalToConstant: 36),
+            bookButton.widthAnchor.constraint(equalToConstant: 96),
+            bookButton.heightAnchor.constraint(equalToConstant: 40),
 
             // Ensure leftStack doesn't overgrow: leave room for right column
-            leftStack.widthAnchor.constraint(lessThanOrEqualTo: contentView.widthAnchor, multiplier: 0.58)
+            leftStack.widthAnchor.constraint(lessThanOrEqualTo: contentView.widthAnchor, multiplier: 0.5)
         ])
 
         // --- ALIGNMENT FIX: ensure rating stack and photo align to top of topRow
@@ -247,10 +354,17 @@ final class MentorCardCell: UITableViewCell {
     func configure(with mentor: Mentor) {
         nameLabel.text = mentor.name
         roleLabel.text = mentor.role
+        if let sessions = mentor.sessionCount {
+            sessionBadge.text = "  \(sessions) sessions  "
+            sessionBadge.isHidden = false
+        } else {
+            sessionBadge.isHidden = true
+            sessionBadge.text = nil
+        }
 
         // orgName (casting house) and session count
-        if let org = mentor.orgName, let sessions = mentor.sessionCount {
-            orgLabel.text = "\(org)\nTotal sessions \(sessions)"
+        if let org = mentor.orgName, !org.isEmpty {
+            orgLabel.text = org
         } else if let org = mentor.orgName {
             orgLabel.text = org
         } else {
@@ -260,7 +374,7 @@ final class MentorCardCell: UITableViewCell {
         // rating and reviews
         ratingLabel.text = String(format: "%.1f", mentor.rating)
     // hide review count per request
-    reviewsLabel.isHidden = true
+        reviewsLabel.isHidden = true
 
         // price from `money` column if present
         priceLabel.text = mentor.moneyString ?? ""
@@ -293,12 +407,39 @@ final class MentorCardCell: UITableViewCell {
 
     // Plain tag label (no background)
     private func makePlainTagLabel(text: String) -> UILabel {
-        let l = UILabel()
-        l.text = text
-        l.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
-        l.textColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1) // plum color
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
+        let label = PaddingLabel(insets: UIEdgeInsets(top: 6, left: 10, bottom: 6, right: 10))
+        label.text = text
+        label.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
+        label.textColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1)
+        label.backgroundColor = softPlum
+        label.layer.cornerRadius = 12
+        label.layer.masksToBounds = true
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.setContentHuggingPriority(.required, for: .horizontal)
+        return label
+    }
+}
+
+private final class PaddingLabel: UILabel {
+    let insets: UIEdgeInsets
+
+    init(insets: UIEdgeInsets) {
+        self.insets = insets
+        super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func drawText(in rect: CGRect) {
+        super.drawText(in: rect.inset(by: insets))
+    }
+
+    override var intrinsicContentSize: CGSize {
+        let size = super.intrinsicContentSize
+        return CGSize(width: size.width + insets.left + insets.right,
+                      height: size.height + insets.top + insets.bottom)
     }
 }
 
@@ -313,6 +454,12 @@ final class AllMentorsViewController: UIViewController {
         let b = UIButton(type: .system)
         b.setImage(UIImage(systemName: "chevron.left"), for: .normal)
         b.tintColor = Self.plum
+        b.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.94)
+        b.layer.cornerRadius = 18
+        b.layer.shadowColor = UIColor.black.withAlphaComponent(0.06).cgColor
+        b.layer.shadowOpacity = 1
+        b.layer.shadowRadius = 10
+        b.layer.shadowOffset = CGSize(width: 0, height: 5)
         b.translatesAutoresizingMaskIntoConstraints = false
         return b
     }()
@@ -329,6 +476,12 @@ final class AllMentorsViewController: UIViewController {
         let b = UIButton(type: .system)
         b.setImage(UIImage(systemName: "magnifyingglass"), for: .normal)
         b.tintColor = .label
+        b.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.94)
+        b.layer.cornerRadius = 18
+        b.layer.shadowColor = UIColor.black.withAlphaComponent(0.05).cgColor
+        b.layer.shadowOpacity = 1
+        b.layer.shadowRadius = 10
+        b.layer.shadowOffset = CGSize(width: 0, height: 4)
         b.translatesAutoresizingMaskIntoConstraints = false
         return b
     }()
@@ -337,6 +490,12 @@ final class AllMentorsViewController: UIViewController {
         let b = UIButton(type: .system)
         b.setImage(UIImage(systemName: "line.horizontal.3.decrease"), for: .normal)
         b.tintColor = .label
+        b.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.94)
+        b.layer.cornerRadius = 18
+        b.layer.shadowColor = UIColor.black.withAlphaComponent(0.05).cgColor
+        b.layer.shadowOpacity = 1
+        b.layer.shadowRadius = 10
+        b.layer.shadowOffset = CGSize(width: 0, height: 4)
         b.translatesAutoresizingMaskIntoConstraints = false
         return b
     }()
@@ -345,9 +504,9 @@ final class AllMentorsViewController: UIViewController {
         let sc = UISegmentedControl(items: ["All", "Actor", "Director"])
         sc.selectedSegmentIndex = 0
         sc.selectedSegmentTintColor = .white
-        sc.backgroundColor = UIColor.systemGray5
+        sc.backgroundColor = UIColor.systemGray6
         sc.setTitleTextAttributes([.font: UIFont.systemFont(ofSize: 14, weight: .semibold)], for: .normal)
-        sc.layer.cornerRadius = 20
+        sc.layer.cornerRadius = 22
         sc.translatesAutoresizingMaskIntoConstraints = false
         return sc
     }()

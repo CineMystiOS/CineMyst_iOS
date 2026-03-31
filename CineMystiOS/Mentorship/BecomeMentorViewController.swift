@@ -8,6 +8,7 @@
 import UIKit
 import PhotosUI
 import Supabase
+import QuartzCore
 
 // MARK: - BecomeMentorViewController
 final class BecomeMentorViewController: UITableViewController {
@@ -63,6 +64,9 @@ final class BecomeMentorViewController: UITableViewController {
         title = "Become a Mentor"
         navigationItem.largeTitleDisplayMode = .never
 
+    // Prefill full name from user's profile if available
+    Task { await prefillFullNameFromProfile() }
+
         tableView = UITableView(frame: .zero, style: .insetGrouped)
         tableView.register(TextFieldCell.self, forCellReuseIdentifier: ID.textField)
         tableView.register(TextViewCell.self, forCellReuseIdentifier: ID.textView)
@@ -85,6 +89,59 @@ final class BecomeMentorViewController: UITableViewController {
         ])
 
         tableView.tableFooterView = footer
+    }
+
+    // MARK: - Prefill helpers
+    private func dictFrom(_ raw: Any?) -> [String: Any]? {
+        guard let raw = raw else { return nil }
+        if let d = raw as? [String: Any] { return d }
+        if let data = raw as? Data {
+            return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        }
+        if let s = raw as? String, let data = s.data(using: .utf8) {
+            return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        }
+        return nil
+    }
+
+    @MainActor
+    private func prefillFullNameFromProfile() async {
+        // don't overwrite a name already entered
+        if let name = form.fullName, !name.trimmingCharacters(in: .whitespaces).isEmpty {
+            return
+        }
+
+        do {
+            let session = try await supabase.auth.session
+            let userId = session.user.id.uuidString
+
+            let res = try await supabase
+                .from("profiles")
+                .select("full_name, username")
+                .eq("id", value: userId)
+                .single()
+                .execute()
+
+            if let dict = dictFrom(res.data) {
+                let fullName = (dict["full_name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let username = (dict["username"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let emailPrefix = session.user.email?.split(separator: "@").first.map(String.init)?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                let candidates: [String?] = [fullName, username, emailPrefix]
+                let resolvedName = candidates.compactMap { candidate -> String? in
+                    guard let candidate, !candidate.isEmpty else { return nil }
+                    return candidate
+                }.first
+
+                if let resolvedName {
+                    self.form.fullName = resolvedName
+                    let indexPath = IndexPath(row: 0, section: Section.basicInfo.rawValue)
+                    tableView.reloadRows(at: [indexPath], with: .automatic)
+                }
+            }
+        } catch {
+            print("[BecomeMentor] prefill full name failed: \(error)")
+        }
     }
 
     // MARK: - Sections
@@ -513,6 +570,17 @@ final class BecomeMentorViewController: UITableViewController {
         setSubmitting(true)
         defer { setSubmitting(false) }
 
+        let userId: String
+        do {
+            let session = try await supabase.auth.session
+            userId = session.user.id.uuidString
+        } catch {
+            await MainActor.run {
+                self.showAlert(title: "Session error", message: "Please sign in again and try submitting your mentor profile.")
+            }
+            return
+        }
+
         // Build payload as a concrete Encodable struct (Supabase client expects Encodable)
         let areas = Array(form.mentorshipAreas.keys)
 
@@ -528,6 +596,17 @@ final class BecomeMentorViewController: UITableViewController {
         if let langs = form.languages { metadataFlat["languages"] = langs }
         if let city = form.city { metadataFlat["city"] = city }
         if let country = form.country { metadataFlat["country"] = country }
+        
+        // Persist selected availability slots as ISO8601 strings in metadata so the backend
+        // receives the mentor's availability. Stored under key `availability_slots_json`.
+        if !form.slots.isEmpty {
+            let iso = ISO8601DateFormatter()
+            let slotsStrings = form.slots.map { iso.string(from: $0) }
+            if let data = try? JSONSerialization.data(withJSONObject: slotsStrings),
+               let s = String(data: data, encoding: .utf8) {
+                metadataFlat["availability_slots_json"] = s
+            }
+        }
 
         // Helper: map human-friendly years string to an integer yoe value
         func mapYearsToYOE(_ years: String?) -> Int? {
@@ -544,7 +623,19 @@ final class BecomeMentorViewController: UITableViewController {
             }
         }
 
+        func normalizedMoneyValue(from prices: [String: String]) -> Double? {
+            let values = prices.values.compactMap { raw -> Double? in
+                let lower = raw.lowercased()
+                let multiplier: Double = lower.contains("k") ? 1000.0 : 1.0
+                let digits = lower.components(separatedBy: CharacterSet(charactersIn: "0123456789.").inverted).joined()
+                guard let value = Double(digits) else { return nil }
+                return value * multiplier
+            }
+            return values.filter { $0 > 0 }.min()
+        }
+
         struct MentorInsert: Encodable {
+            let user_id: String
             let display_name: String
             let name: String
             let role: String
@@ -554,74 +645,150 @@ final class BecomeMentorViewController: UITableViewController {
             let rating: Double
             let rating_count: Int
             let yoe: Int?
+            let money: Double?
+            let session: Int
+            let profile_picture_url: String?
         }
 
-        let insertItem = MentorInsert(
+        struct MentorProfileRecord: Decodable {
+            let id: String
+            let profile_picture_url: String?
+            let rating: Double?
+            let rating_count: Int?
+            let session: Int?
+        }
+
+        let uploadedProfilePictureURL = await uploadMentorImageIfNeeded(userId: userId, image: form.avatarImage)
+        let defaultMoney = normalizedMoneyValue(from: form.mentorshipAreas)
+
+        let profilePayload = MentorInsert(
+            user_id: userId,
             display_name: form.fullName ?? "",
             name: form.fullName ?? "",
             role: form.professionalTitle ?? "",
             about: form.about ?? "",
             mentorship_areas: areas,
             metadata: metadataFlat.isEmpty ? nil : metadataFlat,
-            rating: 0.0,
+            rating: 4.0,
             rating_count: 0,
-            yoe: mapYearsToYOE(form.years)
+            yoe: mapYearsToYOE(form.years),
+            money: defaultMoney,
+            session: 0,
+            profile_picture_url: uploadedProfilePictureURL
         )
 
         do {
-            let res = try await supabase.database
+            let existingRes = try await supabase.database
                 .from("mentor_profiles")
-                .insert(insertItem)
-                .select()
+                .select("id, profile_picture_url")
+                .eq("user_id", value: userId)
+                .limit(1)
                 .execute()
 
-            // Ensure the insert returned rows (some SDKs embed errors instead of throwing).
-            var returnedRows: [Any] = []
-            if let rows = try? MentorsProvider.rowsArray(from: res.data) {
-                returnedRows = rows
-            }
-            if returnedRows.isEmpty {
-                await MainActor.run {
-                    showAlert(title: "Save failed", message: "No rows returned from insert.")
-                }
-                return
+            let existingProfiles = try JSONDecoder().decode([MentorProfileRecord].self, from: existingRes.data)
+            let existingProfile = existingProfiles.first
+            let finalProfilePictureURL = uploadedProfilePictureURL ?? existingProfile?.profile_picture_url
+
+            let finalPayload = MentorInsert(
+                user_id: profilePayload.user_id,
+                display_name: profilePayload.display_name,
+                name: profilePayload.name,
+                role: profilePayload.role,
+                about: profilePayload.about,
+                mentorship_areas: profilePayload.mentorship_areas,
+                metadata: profilePayload.metadata,
+                rating: existingProfile?.rating ?? profilePayload.rating,
+                rating_count: existingProfile?.rating_count ?? 0,
+                yoe: profilePayload.yoe,
+                money: profilePayload.money,
+                session: existingProfile?.session ?? 0,
+                profile_picture_url: finalProfilePictureURL
+            )
+
+            let mentorId: String
+            if let existingProfile {
+                _ = try await supabase.database
+                    .from("mentor_profiles")
+                    .update(finalPayload)
+                    .eq("id", value: existingProfile.id)
+                    .execute()
+                mentorId = existingProfile.id
+            } else {
+                let res = try await supabase.database
+                    .from("mentor_profiles")
+                    .insert(finalPayload)
+                    .select("id")
+                    .single()
+                    .execute()
+
+                let inserted = try JSONDecoder().decode(MentorProfileRecord.self, from: res.data)
+                mentorId = inserted.id
             }
 
-            // Success: navigate same as before
-            await MainActor.run {
-                showAlert(title: "Submitted", message: "Your profile has been submitted.") { [weak self] in
-                    guard let self = self else { return }
-                    DispatchQueue.main.async {
-                        // Create mentor panel
-                        let mentorPanel = MentorPanelViewController()
-                        if let tabBar = self.tabBarController {
-                            let mentorshipIndex = 3
-                            if mentorshipIndex < (tabBar.viewControllers?.count ?? 0),
-                               let mentorNav = tabBar.viewControllers?[mentorshipIndex] as? UINavigationController {
-                                let home = MentorshipHomeViewController()
-                                mentorNav.setViewControllers([home, mentorPanel], animated: true)
-                                tabBar.selectedIndex = mentorshipIndex
-                                return
-                            }
-                            if let vcs = tabBar.viewControllers {
-                                for (idx, vc) in vcs.enumerated() {
-                                    if let nav = vc as? UINavigationController {
-                                        nav.pushViewController(mentorPanel, animated: true)
-                                        tabBar.selectedIndex = idx
-                                        return
-                                    }
-                                }
-                            }
-                        }
-                        if let nav = self.navigationController {
-                            nav.pushViewController(mentorPanel, animated: true)
-                            return
-                        }
-                        let modal = UINavigationController(rootViewController: mentorPanel)
-                        modal.modalPresentationStyle = .fullScreen
-                        self.present(modal, animated: true, completion: nil)
+            UserDefaults.standard.set(true, forKey: "mentor_profile_exists_\(userId)")
+            UserDefaults.standard.set([mentorId], forKey: "mentor_profile_ids_\(userId)")
+
+            var profileUpdates: [String: String] = [:]
+            if let fullName = form.fullName, !fullName.isEmpty {
+                profileUpdates["full_name"] = fullName
+            }
+            if let finalProfilePictureURL, !finalProfilePictureURL.isEmpty {
+                profileUpdates["profile_picture_url"] = finalProfilePictureURL
+            }
+            if !profileUpdates.isEmpty {
+                try? await supabase.database
+                    .from("profiles")
+                    .update(profileUpdates)
+                    .eq("id", value: userId)
+                    .execute()
+            }
+
+            do {
+                try await supabase.database
+                    .from("mentor_availability_slots")
+                    .delete()
+                    .eq("mentor_id", value: mentorId)
+                    .execute()
+
+                if !form.slots.isEmpty {
+                    let iso = ISO8601DateFormatter()
+                    struct AvailabilityInsert: Encodable {
+                        let mentor_id: String
+                        let start_at: String
+                        let end_at: String
+                        let is_recurring: Bool
+                        let recurrence_rule: String?
+                        let is_active: Bool
                     }
+
+                    let availInserts: [AvailabilityInsert] = form.slots.map { slot in
+                        let start = iso.string(from: slot)
+                        let end = iso.string(from: slot.addingTimeInterval(60 * 60))
+                        return AvailabilityInsert(
+                            mentor_id: mentorId,
+                            start_at: start,
+                            end_at: end,
+                            is_recurring: false,
+                            recurrence_rule: nil,
+                            is_active: true
+                        )
+                    }
+
+                    _ = try await supabase.database
+                        .from("mentor_availability_slots")
+                        .insert(availInserts)
+                        .execute()
                 }
+            } catch {
+                print("❌ Failed to save availability slots: \(error)")
+                await MainActor.run {
+                    showAlert(title: "Submitted with warnings",
+                              message: "Profile saved but availability could not be saved. Please try again.")
+                }
+            }
+
+            await MainActor.run {
+                self.presentMentorCelebration()
             }
         } catch {
             await MainActor.run {
@@ -637,6 +804,86 @@ final class BecomeMentorViewController: UITableViewController {
         let ac = UIAlertController(title: title, message: message, preferredStyle: .alert)
         ac.addAction(UIAlertAction(title: "OK", style: .default) { _ in completion?() })
         present(ac, animated: true)
+    }
+
+    private func uploadMentorImageIfNeeded(userId: String, image: UIImage?) async -> String? {
+        guard let image else { return nil }
+        guard let imageData = image.jpegData(compressionQuality: 0.75) else { return nil }
+
+        let filePath = "\(userId)/mentor_profile.jpg"
+
+        do {
+            try await supabase.storage
+                .from("profile-pictures")
+                .upload(
+                    path: filePath,
+                    file: imageData,
+                    options: FileOptions(
+                        cacheControl: "3600",
+                        contentType: "image/jpeg",
+                        upsert: true
+                    )
+                )
+
+            let publicURL = try supabase.storage
+                .from("profile-pictures")
+                .getPublicURL(path: filePath)
+
+            print("[BecomeMentor] uploaded mentor image: \(publicURL.absoluteString)")
+            return publicURL.absoluteString
+        } catch {
+            print("[BecomeMentor] image upload failed: \(error)")
+            return nil
+        }
+    }
+
+    @MainActor
+    private func presentMentorCelebration() {
+        let celebration = MentorCelebrationViewController(
+            titleText: "Woww, you're a mentor now!",
+            messageText: "Help people with your guidance and start creating meaningful sessions."
+        )
+        celebration.onContinue = { [weak self] in
+            self?.navigateToMentorshipHome()
+        }
+        present(celebration, animated: true)
+    }
+
+    @MainActor
+    private func navigateToMentorshipHome() {
+        if let tabBar = self.tabBarController {
+            let mentorshipIndex = 3
+            if mentorshipIndex < (tabBar.viewControllers?.count ?? 0),
+               let mentorNav = tabBar.viewControllers?[mentorshipIndex] as? UINavigationController {
+                let home = MentorshipHomeViewController()
+                home.initialSegmentIndex = 1
+                mentorNav.setViewControllers([home], animated: true)
+                tabBar.selectedIndex = mentorshipIndex
+                return
+            }
+            if let vcs = tabBar.viewControllers {
+                for (idx, vc) in vcs.enumerated() {
+                    if let nav = vc as? UINavigationController {
+                        let home = MentorshipHomeViewController()
+                        home.initialSegmentIndex = 1
+                        nav.setViewControllers([home], animated: true)
+                        tabBar.selectedIndex = idx
+                        return
+                    }
+                }
+            }
+        }
+        if let nav = self.navigationController {
+            let home = MentorshipHomeViewController()
+            home.initialSegmentIndex = 1
+            nav.setViewControllers([home], animated: true)
+            return
+        }
+        let home = MentorshipHomeViewController()
+        home.initialSegmentIndex = 1
+        let modal = UINavigationController(rootViewController: home)
+        modal.modalPresentationStyle = .fullScreen
+        self.present(modal, animated: true, completion: nil)
     }
 }
 
@@ -1300,21 +1547,286 @@ final class PickerCell: UITableViewCell {
 }
 
 final class AvatarCell: UITableViewCell {
+    private let previewImageView: UIImageView = {
+        let imageView = UIImageView()
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        imageView.contentMode = .scaleAspectFill
+        imageView.layer.cornerRadius = 30
+        imageView.clipsToBounds = true
+        imageView.backgroundColor = .systemGray5
+        return imageView
+    }()
+
+    private let titleLabelView: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = .preferredFont(forTextStyle: .body)
+        return label
+    }()
+
+    private let subtitleLabelView: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = .systemFont(ofSize: 13)
+        label.textColor = .secondaryLabel
+        return label
+    }()
+
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: .default, reuseIdentifier: reuseIdentifier)
-        if let img = imageView {
-            img.translatesAutoresizingMaskIntoConstraints = false
-            img.contentMode = .scaleAspectFill
-            img.layer.cornerRadius = 20
-            img.clipsToBounds = true
-            NSLayoutConstraint.activate([ img.widthAnchor.constraint(equalToConstant: 40), img.heightAnchor.constraint(equalToConstant: 40) ])
-        }
-        textLabel?.font = .preferredFont(forTextStyle: .body)
+
+        contentView.addSubview(previewImageView)
+        contentView.addSubview(titleLabelView)
+        contentView.addSubview(subtitleLabelView)
         accessoryType = .disclosureIndicator
+
+        NSLayoutConstraint.activate([
+            previewImageView.leadingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.leadingAnchor),
+            previewImageView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
+            previewImageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -10),
+            previewImageView.widthAnchor.constraint(equalToConstant: 60),
+            previewImageView.heightAnchor.constraint(equalToConstant: 60),
+
+            titleLabelView.leadingAnchor.constraint(equalTo: previewImageView.trailingAnchor, constant: 14),
+            titleLabelView.trailingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.trailingAnchor, constant: -24),
+            titleLabelView.topAnchor.constraint(equalTo: previewImageView.topAnchor, constant: 6),
+
+            subtitleLabelView.leadingAnchor.constraint(equalTo: titleLabelView.leadingAnchor),
+            subtitleLabelView.trailingAnchor.constraint(equalTo: titleLabelView.trailingAnchor),
+            subtitleLabelView.topAnchor.constraint(equalTo: titleLabelView.bottomAnchor, constant: 4)
+        ])
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     func configure(image: UIImage?, onTap: @escaping () -> Void) {
-        if let img = image { imageView?.image = img; textLabel?.text = "Change photo" }
-        else { imageView?.image = UIImage(systemName: "person.crop.circle.fill"); imageView?.tintColor = .systemGray3; textLabel?.text = "Upload profile photo"; textLabel?.textColor = .secondaryLabel }
+        if let img = image {
+            previewImageView.image = img
+            previewImageView.tintColor = nil
+            titleLabelView.text = "Change photo"
+            subtitleLabelView.text = "Selected image will be uploaded to your mentor profile"
+        } else {
+            previewImageView.image = UIImage(systemName: "person.crop.circle.fill")
+            previewImageView.tintColor = .systemGray3
+            titleLabelView.text = "Upload profile photo"
+            subtitleLabelView.text = "Choose the picture you want mentees to see"
+        }
+    }
+}
+
+final class MentorCelebrationViewController: UIViewController {
+    var onContinue: (() -> Void)?
+
+    private let titleText: String
+    private let messageText: String
+
+    private let dimView: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.32)
+        view.alpha = 0
+        return view
+    }()
+
+    private let cardView: UIVisualEffectView = {
+        let blur = UIBlurEffect(style: .systemUltraThinMaterialLight)
+        let view = UIVisualEffectView(effect: blur)
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.layer.cornerRadius = 28
+        view.layer.masksToBounds = true
+        return view
+    }()
+
+    private let glowView: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.backgroundColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 0.12)
+        return view
+    }()
+
+    private let badgeView: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.backgroundColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1)
+        view.layer.cornerRadius = 34
+        return view
+    }()
+
+    private let badgeIcon: UIImageView = {
+        let imageView = UIImageView(image: UIImage(systemName: "sparkles"))
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        imageView.tintColor = .white
+        imageView.contentMode = .scaleAspectFit
+        return imageView
+    }()
+
+    private lazy var titleLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = .systemFont(ofSize: 28, weight: .bold)
+        label.textColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1)
+        label.numberOfLines = 0
+        label.textAlignment = .center
+        label.text = titleText
+        return label
+    }()
+
+    private lazy var messageLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = .systemFont(ofSize: 16, weight: .medium)
+        label.textColor = .secondaryLabel
+        label.numberOfLines = 0
+        label.textAlignment = .center
+        label.text = messageText
+        return label
+    }()
+
+    private let continueButton: UIButton = {
+        var config = UIButton.Configuration.filled()
+        config.title = "Let’s go"
+        config.cornerStyle = .capsule
+        config.baseBackgroundColor = UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1)
+        config.baseForegroundColor = .white
+        let button = UIButton(configuration: config)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
+    private let emitterLayer = CAEmitterLayer()
+
+    init(titleText: String, messageText: String) {
+        self.titleText = titleText
+        self.messageText = messageText
+        super.init(nibName: nil, bundle: nil)
+        modalPresentationStyle = .overFullScreen
+        modalTransitionStyle = .crossDissolve
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .clear
+
+        view.addSubview(dimView)
+        view.addSubview(cardView)
+        cardView.contentView.addSubview(glowView)
+        cardView.contentView.addSubview(badgeView)
+        badgeView.addSubview(badgeIcon)
+        cardView.contentView.addSubview(titleLabel)
+        cardView.contentView.addSubview(messageLabel)
+        cardView.contentView.addSubview(continueButton)
+
+        continueButton.addTarget(self, action: #selector(continueTapped), for: .touchUpInside)
+
+        NSLayoutConstraint.activate([
+            dimView.topAnchor.constraint(equalTo: view.topAnchor),
+            dimView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            dimView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            dimView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            cardView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            cardView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            cardView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 28),
+            cardView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -28),
+
+            glowView.topAnchor.constraint(equalTo: cardView.contentView.topAnchor),
+            glowView.leadingAnchor.constraint(equalTo: cardView.contentView.leadingAnchor),
+            glowView.trailingAnchor.constraint(equalTo: cardView.contentView.trailingAnchor),
+            glowView.heightAnchor.constraint(equalToConstant: 120),
+
+            badgeView.topAnchor.constraint(equalTo: cardView.contentView.topAnchor, constant: 28),
+            badgeView.centerXAnchor.constraint(equalTo: cardView.contentView.centerXAnchor),
+            badgeView.widthAnchor.constraint(equalToConstant: 68),
+            badgeView.heightAnchor.constraint(equalToConstant: 68),
+
+            badgeIcon.centerXAnchor.constraint(equalTo: badgeView.centerXAnchor),
+            badgeIcon.centerYAnchor.constraint(equalTo: badgeView.centerYAnchor),
+            badgeIcon.widthAnchor.constraint(equalToConstant: 28),
+            badgeIcon.heightAnchor.constraint(equalToConstant: 28),
+
+            titleLabel.topAnchor.constraint(equalTo: badgeView.bottomAnchor, constant: 22),
+            titleLabel.leadingAnchor.constraint(equalTo: cardView.contentView.leadingAnchor, constant: 24),
+            titleLabel.trailingAnchor.constraint(equalTo: cardView.contentView.trailingAnchor, constant: -24),
+
+            messageLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 12),
+            messageLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            messageLabel.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
+
+            continueButton.topAnchor.constraint(equalTo: messageLabel.bottomAnchor, constant: 24),
+            continueButton.leadingAnchor.constraint(equalTo: cardView.contentView.leadingAnchor, constant: 28),
+            continueButton.trailingAnchor.constraint(equalTo: cardView.contentView.trailingAnchor, constant: -28),
+            continueButton.heightAnchor.constraint(equalToConstant: 50),
+            continueButton.bottomAnchor.constraint(equalTo: cardView.contentView.bottomAnchor, constant: -24)
+        ])
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        runEntranceAnimation()
+        fireConfetti()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        emitterLayer.emitterPosition = CGPoint(x: view.bounds.midX, y: -10)
+        emitterLayer.emitterSize = CGSize(width: view.bounds.width, height: 2)
+    }
+
+    private func runEntranceAnimation() {
+        cardView.transform = CGAffineTransform(scaleX: 0.88, y: 0.88).concatenating(CGAffineTransform(translationX: 0, y: 24))
+        cardView.alpha = 0
+        UIView.animate(withDuration: 0.22) {
+            self.dimView.alpha = 1
+        }
+        UIView.animate(withDuration: 0.52,
+                       delay: 0.02,
+                       usingSpringWithDamping: 0.78,
+                       initialSpringVelocity: 0.72,
+                       options: [.curveEaseOut]) {
+            self.cardView.transform = .identity
+            self.cardView.alpha = 1
+        }
+    }
+
+    private func fireConfetti() {
+        let colors: [UIColor] = [
+            UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1),
+            UIColor.systemPink,
+            UIColor.systemYellow,
+            UIColor.systemOrange
+        ]
+
+        emitterLayer.emitterShape = .line
+        emitterLayer.birthRate = 1
+        emitterLayer.beginTime = CACurrentMediaTime()
+
+        emitterLayer.emitterCells = colors.map { color in
+            let cell = CAEmitterCell()
+            cell.birthRate = 5
+            cell.lifetime = 5.0
+            cell.velocity = 180
+            cell.velocityRange = 90
+            cell.emissionLongitude = .pi
+            cell.emissionRange = .pi / 6
+            cell.spin = 3.5
+            cell.spinRange = 4
+            cell.scale = 0.45
+            cell.scaleRange = 0.18
+            cell.color = color.cgColor
+            cell.contents = UIImage(systemName: "circle.fill")?.withTintColor(color, renderingMode: .alwaysOriginal).cgImage
+            return cell
+        }
+
+        view.layer.insertSublayer(emitterLayer, above: dimView.layer)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            self.emitterLayer.birthRate = 0
+        }
+    }
+
+    @objc private func continueTapped() {
+        dismiss(animated: true) {
+            self.onContinue?()
+        }
     }
 }

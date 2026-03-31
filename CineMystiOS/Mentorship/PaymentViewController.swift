@@ -19,12 +19,14 @@ final class PaymentViewController: UIViewController {
     private let selectedArea: String?
     private let selectedDate: Date?
     private let selectedTime: String?
+    private var bookingAmountCents: Int?
+    private var backendCardHolderName: String?
 
     /// accept mentor (optional)
     var mentor: Mentor? {
         didSet {
             // If mentor assigned after view loaded, refresh price
-            Task { await loadPriceFromSessionIfNeeded() }
+            Task { await loadPriceFromBackendIfNeeded() }
         }
     }
 
@@ -250,9 +252,10 @@ final class PaymentViewController: UIViewController {
         showCard(animated: false)
         // initial populate from store
         refreshCardFromStore()
+        Task { await loadCardHolderNameFromBackend() }
 
-    // Load price from mentorship_sessions table (if mentor provided)
-    Task { await self.loadPriceFromSessionIfNeeded() }
+    // Load selected service pricing from mentor_profiles
+    Task { await self.loadPriceFromBackendIfNeeded() }
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -295,6 +298,9 @@ final class PaymentViewController: UIViewController {
         let confirmationVC = PaymentConfirmationViewController()
         confirmationVC.mentor = self.mentor
         confirmationVC.scheduledDate = self.selectedDate
+        confirmationVC.selectedArea = self.selectedArea
+        confirmationVC.selectedTime = self.selectedTime
+        confirmationVC.bookingAmountCents = self.bookingAmountCents
         present(confirmationVC, animated: true)
     }
 
@@ -311,34 +317,40 @@ final class PaymentViewController: UIViewController {
     }
 
     // MARK: - Price loading
-    private func loadPriceFromSessionIfNeeded() async {
+    private func loadPriceFromBackendIfNeeded() async {
         guard let mentorId = mentor?.id else { return }
         do {
             let res = try await supabase.database
-                .from("mentorship_sessions")
-                .select("price_cents")
-                .eq("mentor_id", value: mentorId)
-                .order("created_at", ascending: false)
+                .from("mentor_profiles")
+                .select("metadata, money")
+                .eq("id", value: mentorId)
                 .limit(1)
                 .execute()
-            print("[Payment] price query data=\(String(describing: res.data))")
-            if let rows = try rowsArray(from: res.data), !rows.isEmpty {
-                if let first = rows.first as? [String: Any] {
-                    var cents: Int? = nil
-                    if let v = first["price_cents"] as? Int { cents = v }
-                    else if let s = first["price_cents"] as? String, let iv = Int(s) { cents = iv }
-                    else if let d = first["price_cents"] as? Double { cents = Int(d) }
 
-                    if let c = cents {
-                        await MainActor.run {
-                            self.amountLabel.text = Self.formatPrice(cents: c)
-                        }
-                        return
+            if let rows = try rowsArray(from: res.data),
+               let first = rows.first as? [String: Any] {
+                let selectedAreas = Self.parseSelectedAreas(from: selectedArea)
+                let priceMap = Self.extractPriceMap(from: first["metadata"])
+
+                let totalRupees = Self.totalAmount(for: selectedAreas, using: priceMap, fallbackMoney: first["money"])
+                if let totalRupees, totalRupees > 0 {
+                    let cents = Int((totalRupees * 100.0).rounded())
+                    await MainActor.run {
+                        self.bookingAmountCents = cents
+                        self.amountLabel.text = Self.formatPrice(cents: cents)
                     }
+                    return
                 }
             }
         } catch {
             print("[Payment] error loading price: \(error)")
+        }
+
+        if let fallbackCents = Self.fallbackAmountCents(from: mentor, selectedArea: selectedArea) {
+            await MainActor.run {
+                self.bookingAmountCents = fallbackCents
+                self.amountLabel.text = Self.formatPrice(cents: fallbackCents)
+            }
         }
     }
 
@@ -353,6 +365,132 @@ final class PaymentViewController: UIViewController {
         }
         // fallback simple formatting
         return "₹\(Int(amount))"
+    }
+
+    private struct PaymentProfileRecord: Decodable {
+        let full_name: String?
+        let username: String?
+    }
+
+    private func loadCardHolderNameFromBackend() async {
+        do {
+            let session = try await supabase.auth.session
+            let userId = session.user.id.uuidString
+
+            let res = try await supabase
+                .from("profiles")
+                .select("full_name, username")
+                .eq("id", value: userId)
+                .single()
+                .execute()
+
+            let profile = try JSONDecoder().decode(PaymentProfileRecord.self, from: res.data)
+            let resolvedName =
+                profile.full_name?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ??
+                profile.username?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ??
+                session.user.email?.split(separator: "@").first.map(String.init)?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+
+            await MainActor.run {
+                self.backendCardHolderName = resolvedName?.uppercased()
+                self.refreshCardFromStore()
+            }
+        } catch {
+            print("[Payment] failed to load card holder name from backend: \(error)")
+        }
+    }
+
+    private static func parseSelectedAreas(from raw: String?) -> [String] {
+        guard let raw, !raw.isEmpty else { return [] }
+        return raw
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private static func extractPriceMap(from rawMetadata: Any?) -> [String: Any] {
+        let metadataObject: [String: Any]?
+        if let dict = rawMetadata as? [String: Any] {
+            metadataObject = dict
+        } else if let string = rawMetadata as? String,
+                  let data = string.data(using: .utf8),
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            metadataObject = object
+        } else {
+            metadataObject = nil
+        }
+
+        guard let metadataObject,
+              let pricesRaw = metadataObject["prices_json"] else { return [:] }
+
+        if let prices = pricesRaw as? [String: Any] {
+            return prices
+        }
+        if let pricesString = pricesRaw as? String,
+           let data = pricesString.data(using: .utf8),
+           let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return object
+        }
+        return [:]
+    }
+
+    private static func numericPrice(from raw: Any?) -> Double? {
+        if let number = raw as? NSNumber { return number.doubleValue }
+        if let double = raw as? Double { return double }
+        if let int = raw as? Int { return Double(int) }
+        if let string = raw as? String {
+            let lower = string.lowercased()
+            let multiplier: Double = lower.contains("k") ? 1000.0 : 1.0
+            let digits = lower.components(separatedBy: CharacterSet(charactersIn: "0123456789.").inverted).joined()
+            guard let value = Double(digits) else { return nil }
+            return value * multiplier
+        }
+        return nil
+    }
+
+    private static func totalAmount(for selectedAreas: [String], using priceMap: [String: Any], fallbackMoney: Any?) -> Double? {
+        guard !selectedAreas.isEmpty else { return numericPrice(from: fallbackMoney) }
+
+        let areaTotals = selectedAreas.compactMap { area -> Double? in
+            if let direct = priceMap[area] {
+                return numericPrice(from: direct)
+            }
+
+            let lowerArea = area.lowercased()
+            if let match = priceMap.first(where: { $0.key.lowercased() == lowerArea }) {
+                return numericPrice(from: match.value)
+            }
+            return nil
+        }
+
+        if areaTotals.count == selectedAreas.count {
+            return areaTotals.reduce(0, +)
+        }
+
+        if let fallback = numericPrice(from: fallbackMoney) {
+            return fallback * Double(max(selectedAreas.count, 1))
+        }
+
+        return areaTotals.isEmpty ? nil : areaTotals.reduce(0, +)
+    }
+
+    private static func fallbackAmountCents(from mentor: Mentor?, selectedArea: String?) -> Int? {
+        guard let mentor else { return nil }
+        let selectedCount = max(parseSelectedAreas(from: selectedArea).count, 1)
+
+        if let money = mentor.moneyString, let amount = numericPrice(from: money) {
+            return Int((amount * Double(selectedCount) * 100.0).rounded())
+        }
+
+        if let cents = mentor.priceCents, cents > 0 {
+            return cents * selectedCount
+        }
+
+        let metadataMap = extractPriceMap(from: mentor.metadataJson)
+        if let total = totalAmount(for: parseSelectedAreas(from: selectedArea), using: metadataMap, fallbackMoney: nil) {
+            return Int((total * 100.0).rounded())
+        }
+
+        return nil
     }
 
     // Normalize response.data into an array of Any for decoding. Matches helper in other files.
@@ -601,7 +739,8 @@ final class PaymentViewController: UIViewController {
     }
 
     private func applyCardToUI(_ c: Card) {
-        cardHolderNameLabel.text = c.holderName.uppercased()
+        let fallbackName = c.holderName.trimmingCharacters(in: .whitespacesAndNewlines)
+        cardHolderNameLabel.text = backendCardHolderName ?? fallbackName.uppercased()
         cardNumberLabel.text = c.number
         expiresValueLabel.text = c.expiry
         cvvValueLabel.text = (c.cvv.isEmpty ? "••••" : c.cvv)
@@ -614,5 +753,11 @@ private extension UIView {
         self.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         heightAnchor.constraint(equalToConstant: height).isActive = true
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }

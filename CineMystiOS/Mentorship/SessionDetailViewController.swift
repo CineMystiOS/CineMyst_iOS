@@ -260,7 +260,10 @@ final class SessionDetailViewController: UIViewController {
                 mentorRole: self.session.mentorRole,
                 date: newDate,
                 createdAt: self.session.createdAt,
-                mentorImageName: self.session.mentorImageName
+                mentorImageName: self.session.mentorImageName,
+                mentorImageURL: self.session.mentorImageURL,
+                mentorshipArea: self.session.mentorshipArea,
+                scheduledTimeText: self.session.scheduledTimeText
             )
             // Replace existing session: simple approach -> remove old and add updated
             SessionStore.shared.remove(id: self.session.id)
