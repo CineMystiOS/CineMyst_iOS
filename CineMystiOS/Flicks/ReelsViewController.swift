@@ -420,8 +420,7 @@ extension ReelsViewController: ReelCellDelegate {
     
     func didTapProfile(on cell: ReelCell, userId: String) {
         // Navigate to user profile
-        let profileVC = ProfileViewController()
-        profileVC.viewingUserId = userId
+        let profileVC = ActorProfileViewController()
         profileVC.hidesBottomBarWhenPushed = true
         
         // Push to current navigation controller

@@ -418,7 +418,7 @@ final class HomeDashboardViewController: UIViewController {
         rebuildFeed(); tableView.reloadData()
     }
 
-    @objc private func profileTapped() { navigationController?.pushViewController(ProfileViewController(), animated: true) }
+    @objc private func profileTapped() { navigationController?.pushViewController(ActorProfileViewController(), animated: true) }
     @objc private func bellTapped() {
         let vc = NotificationsViewController(); vc.hidesBottomBarWhenPushed = true
         navigationController?.pushViewController(vc, animated: true)
@@ -699,7 +699,7 @@ extension HomeDashboardViewController: UITableViewDataSource, UITableViewDelegat
             cell.configure(with: post)
             cell.onComment = { [weak self] in self?.openComments(for: post) }
             cell.onShare   = { [weak self] in self?.openShareSheet(for: post) }
-            cell.onProfile = { [weak self] in self?.navigationController?.pushViewController(ProfileViewController(), animated: true) }
+            cell.onProfile = { [weak self] in self?.navigationController?.pushViewController(ActorProfileViewController(), animated: true) }
             return cell
         case .job(let job):
             let cell = tableView.dequeueReusableCell(withIdentifier: CastingFeedCell.reuseId, for: indexPath) as! CastingFeedCell

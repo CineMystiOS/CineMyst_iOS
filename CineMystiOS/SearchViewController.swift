@@ -287,8 +287,7 @@ extension SearchViewController: UITableViewDelegate, UITableViewDataSource {
         let result = searchResults[indexPath.row]
         
         // Navigate to other user's profile
-        let profileVC = ProfileViewController()
-        profileVC.viewingUserId = result.id // Pass the user ID
+        let profileVC = ActorProfileViewController()
         navigationController?.pushViewController(profileVC, animated: true)
     }
 }

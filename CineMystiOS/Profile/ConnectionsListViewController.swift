@@ -122,8 +122,7 @@ extension ConnectionsListViewController: UITableViewDelegate, UITableViewDataSou
         
         let user = connections[indexPath.row]
         
-        let profileVC = ProfileViewController()
-        profileVC.viewingUserId = user.id
+        let profileVC = ActorProfileViewController()
         navigationController?.pushViewController(profileVC, animated: true)
     }
 }
