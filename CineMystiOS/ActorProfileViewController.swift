@@ -1076,7 +1076,7 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
 
         let titleLabel = UILabel()
         titleLabel.text      = "CineMyst"
-        titleLabel.font      = UIFont(name: "Georgia-Bold", size: 20) ?? UIFont.systemFont(ofSize: 20, weight: .bold)
+        titleLabel.font      = UIFont.systemFont(ofSize: 20, weight: .bold)
         titleLabel.textColor = ActorProfileDS.deepPlum
         titleLabel.sizeToFit()
         navigationItem.titleView = titleLabel

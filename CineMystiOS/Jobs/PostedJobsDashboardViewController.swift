@@ -19,7 +19,7 @@ class PostedJobsDashboardViewController: UIViewController {
     private let titleLabel: UILabel = {
         let lbl = UILabel()
         lbl.text = "My Jobs and Tasks"
-        lbl.font = UIFont(name: "Georgia-Bold", size: 26) ?? UIFont.boldSystemFont(ofSize: 26)
+        lbl.font = .systemFont(ofSize: 26, weight: .bold)
         lbl.textColor = CineMystTheme.ink
         return lbl
     }()
@@ -276,4 +276,3 @@ extension UIColor {
         self.init(red: r, green: g, blue: b, alpha: 1)
     }
 }
-

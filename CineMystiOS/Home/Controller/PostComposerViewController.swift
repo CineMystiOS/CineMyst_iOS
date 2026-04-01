@@ -136,7 +136,7 @@ final class PostComposerViewController: UIViewController {
 
         // Title
         titleLabel.text          = "New Post"
-        titleLabel.font          = UIFont(name: "Georgia-Bold", size: 17) ?? .boldSystemFont(ofSize: 17)
+        titleLabel.font          = .systemFont(ofSize: 17, weight: .bold)
         titleLabel.textColor     = .label
         titleLabel.textAlignment = .center
         headerView.addSubview(titleLabel)
@@ -286,7 +286,7 @@ final class PostComposerViewController: UIViewController {
         let container = UIView()
         container.translatesAutoresizingMaskIntoConstraints = false
 
-        captionTextView.font               = UIFont(name: "Georgia", size: 16) ?? .systemFont(ofSize: 16)
+        captionTextView.font               = .systemFont(ofSize: 16, weight: .regular)
         captionTextView.textColor          = .label
         captionTextView.backgroundColor    = .clear
         captionTextView.isScrollEnabled    = false
@@ -297,7 +297,7 @@ final class PostComposerViewController: UIViewController {
         captionTextView.translatesAutoresizingMaskIntoConstraints = false
 
         captionPlaceholder.text          = "What's on your mind? Share your film story…"
-        captionPlaceholder.font          = UIFont(name: "Georgia", size: 16) ?? .systemFont(ofSize: 16)
+        captionPlaceholder.font          = .systemFont(ofSize: 16, weight: .regular)
         captionPlaceholder.textColor     = .placeholderText
         captionPlaceholder.numberOfLines = 3
         container.addSubview(captionPlaceholder)

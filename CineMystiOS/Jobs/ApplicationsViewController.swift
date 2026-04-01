@@ -147,7 +147,7 @@ class ApplicationsViewController: UIViewController {
     private let countLabel: UILabel = {
         let lbl = UILabel()
         lbl.text = "25 applications"
-        lbl.font = UIFont(name: "Georgia-Bold", size: 21) ?? UIFont.boldSystemFont(ofSize: 21)
+        lbl.font = .systemFont(ofSize: 21, weight: .bold)
         lbl.textColor = CineMystTheme.ink
         lbl.translatesAutoresizingMaskIntoConstraints = false
         return lbl
@@ -195,11 +195,11 @@ class ApplicationsViewController: UIViewController {
         appearance.shadowColor = .clear
         appearance.largeTitleTextAttributes = [
             .foregroundColor: CineMystTheme.ink,
-            .font: UIFont(name: "Georgia-Bold", size: 32) ?? UIFont.boldSystemFont(ofSize: 32)
+            .font: UIFont.systemFont(ofSize: 32, weight: .bold)
         ]
         appearance.titleTextAttributes = [
             .foregroundColor: CineMystTheme.ink,
-            .font: UIFont(name: "Georgia-Bold", size: 22) ?? UIFont.boldSystemFont(ofSize: 22)
+            .font: UIFont.systemFont(ofSize: 22, weight: .bold)
         ]
         
         navigationController?.navigationBar.standardAppearance = appearance

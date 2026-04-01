@@ -39,7 +39,7 @@ class SavedPostViewController: UIViewController {
         navigationController?.navigationBar.tintColor = CineMystTheme.brandPlum
         navigationController?.navigationBar.titleTextAttributes = [
             .foregroundColor: CineMystTheme.ink,
-            .font: UIFont(name: "Georgia-Bold", size: 22) ?? UIFont.boldSystemFont(ofSize: 22)
+            .font: UIFont.systemFont(ofSize: 22, weight: .bold)
         ]
     }
 

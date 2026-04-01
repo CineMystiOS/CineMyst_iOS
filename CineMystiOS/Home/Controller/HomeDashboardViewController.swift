@@ -240,7 +240,7 @@ final class HomeDashboardViewController: UIViewController {
 
             let titleLabel = UILabel()
             titleLabel.text = "CineMyst"
-            titleLabel.font = UIFont(name: "Georgia-Bold", size: 26) ?? .boldSystemFont(ofSize: 26)
+            titleLabel.font = .systemFont(ofSize: 26, weight: .bold)
             titleLabel.textColor = CineMystTheme.ink
             titleLabel.translatesAutoresizingMaskIntoConstraints = false
             titleLabel.tag = 999
@@ -597,8 +597,8 @@ private final class HomeEditorialHeaderView: UIView {
         introLabel.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.62)
         introLabel.textAlignment = .center
 
-        titleLabel.text = "Discover your next scene   "
-        titleLabel.font = UIFont(name: "Georgia-Bold", size: 23) ?? .boldSystemFont(ofSize: 23)
+        titleLabel.text = "Discover your next scene         "
+        titleLabel.font = .systemFont(ofSize: 23, weight: .bold)
         titleLabel.textColor = CineMystTheme.ink
         titleLabel.numberOfLines = 2
         titleLabel.textAlignment = .center
@@ -712,7 +712,7 @@ private final class QuickLinkBubbleView: UIView {
 
         let label = UILabel()
         label.text = link.title
-        label.font = UIFont(name: "Georgia", size: 12.5) ?? .systemFont(ofSize: 12.5, weight: .medium)
+        label.font = .systemFont(ofSize: 12.5, weight: .medium)
         label.textColor = CineMystTheme.ink
         label.textAlignment = .center
         label.numberOfLines = 2
@@ -921,7 +921,7 @@ private final class FeedSectionHeaderCell: UITableViewCell {
 
         let title = UILabel()
         title.text = "Latest From Creators"
-        title.font = UIFont(name: "Georgia-Bold", size: 18) ?? .boldSystemFont(ofSize: 18)
+        title.font = .systemFont(ofSize: 18, weight: .bold)
         title.textColor = CineMystTheme.ink
         title.numberOfLines = 1
 
@@ -1265,7 +1265,7 @@ private final class PromoCardView: UIView {
         ringB.backgroundColor = UIColor.white.withAlphaComponent(0.04)
 
         titleLabel.text = promo.title
-        titleLabel.font = UIFont(name: "Georgia-Bold", size: 19) ?? .boldSystemFont(ofSize: 19)
+        titleLabel.font = .systemFont(ofSize: 19, weight: .bold)
         titleLabel.textColor = .white
         titleLabel.numberOfLines = 1
         contentMaskView.addSubview(titleLabel)
@@ -1472,7 +1472,7 @@ final class PostFeedCell: UITableViewCell {
         card.addSubview(headerRow); headerRow.translatesAutoresizingMaskIntoConstraints = false
 
         // Caption
-        captionLabel.font = UIFont(name: "Georgia", size: 13.5) ?? .systemFont(ofSize: 13.5)
+        captionLabel.font = .systemFont(ofSize: 13.5, weight: .regular)
         captionLabel.textColor = CineMystTheme.ink.withAlphaComponent(0.92)
         captionLabel.numberOfLines = 4
         card.addSubview(captionLabel); captionLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -1830,7 +1830,7 @@ final class CastingFeedCell: UITableViewCell {
         let hs = UIStackView(arrangedSubviews: [avatarView, is2, mb]); hs.axis = .horizontal; hs.spacing = 10; hs.alignment = .center
         card.addSubview(hs); hs.translatesAutoresizingMaskIntoConstraints = false
 
-        captionLabel.font = UIFont(name: "Georgia", size: 12.5) ?? .systemFont(ofSize: 12.5)
+        captionLabel.font = .systemFont(ofSize: 12.5, weight: .regular)
         captionLabel.textColor = UIColor.white.withAlphaComponent(0.65); captionLabel.numberOfLines = 2
         card.addSubview(captionLabel); captionLabel.translatesAutoresizingMaskIntoConstraints = false
 
@@ -1917,7 +1917,7 @@ final class CastingBannerView: UIView {
         gradientLayer.startPoint = CGPoint(x:0,y:0); gradientLayer.endPoint = CGPoint(x:1,y:1)
         layer.addSublayer(gradientLayer)
         castingLabel.text = "CASTING"
-        castingLabel.font = UIFont(name: "Georgia-BoldItalic", size: 36) ?? .boldSystemFont(ofSize: 36)
+        castingLabel.font = .systemFont(ofSize: 36, weight: .bold)
         castingLabel.textColor = UIColor(red:0.8,green:0.12,blue:0.12,alpha:1); castingLabel.textAlignment = .center
         castingLabel.layer.shadowColor = UIColor.red.cgColor; castingLabel.layer.shadowRadius = 16
         castingLabel.layer.shadowOpacity = 0.7; castingLabel.layer.shadowOffset = .zero

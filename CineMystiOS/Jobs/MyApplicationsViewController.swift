@@ -138,7 +138,7 @@ class MyApplicationsViewController: UIViewController {
         backgroundGradient.startPoint = CGPoint(x: 0.1, y: 0)
         backgroundGradient.endPoint = CGPoint(x: 0.9, y: 1)
         view.layer.insertSublayer(backgroundGradient, at: 0)
-        titleLabel.font = UIFont(name: "Georgia-Bold", size: 26) ?? UIFont.boldSystemFont(ofSize: 26)
+        titleLabel.font = .systemFont(ofSize: 26, weight: .bold)
         titleLabel.textColor = CineMystTheme.ink
         subtitleLabel.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.62)
         segmentedControl.backgroundColor = UIColor.white.withAlphaComponent(0.5)

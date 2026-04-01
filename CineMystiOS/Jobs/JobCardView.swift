@@ -92,7 +92,7 @@ class JobCardView: UIView {
         profileImageView.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.12).cgColor
         
         // Title
-        titleLabel.font = UIFont(name: "Georgia-Bold", size: 18) ?? UIFont.boldSystemFont(ofSize: 18)
+        titleLabel.font = .systemFont(ofSize: 18, weight: .bold)
         titleLabel.numberOfLines = 2
         titleLabel.textColor = CineMystTheme.ink
         

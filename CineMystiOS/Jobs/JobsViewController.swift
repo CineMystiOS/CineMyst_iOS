@@ -41,7 +41,7 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
     private let titleLabel: UILabel = {
         let l = UILabel()
         l.text = "Explore Jobs"
-        l.font = UIFont(name: "Georgia-Bold", size: 28) ?? UIFont.boldSystemFont(ofSize: 28)
+        l.font = .systemFont(ofSize: 28, weight: .bold)
         l.textColor = CineMystTheme.ink
         return l
     }()
@@ -89,7 +89,7 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
     private let curatedLabel: UILabel = {
         let l = UILabel()
         l.text = "Curated for You"
-        l.font = UIFont(name: "Georgia-Bold", size: 21) ?? UIFont.boldSystemFont(ofSize: 21)
+        l.font = .systemFont(ofSize: 21, weight: .bold)
         l.textColor = CineMystTheme.ink
         return l
     }()

@@ -13,7 +13,7 @@ class JobDetailsViewController: UIViewController {
     private let titleLabel: UILabel = {
         let lbl = UILabel()
         lbl.text = "Details"
-        lbl.font = UIFont(name: "Georgia-Bold", size: 28) ?? UIFont.boldSystemFont(ofSize: 28)
+        lbl.font = .systemFont(ofSize: 28, weight: .bold)
         lbl.textColor = CineMystTheme.ink
         return lbl
     }()
@@ -239,7 +239,7 @@ Seeking a versatile actor for the lead role in an upcoming independent film. The
         
         let titleLabel = UILabel()
         titleLabel.text = title
-        titleLabel.font = UIFont(name: "Georgia-Bold", size: 19) ?? UIFont.boldSystemFont(ofSize: 19)
+        titleLabel.font = .systemFont(ofSize: 19, weight: .bold)
         titleLabel.textColor = CineMystTheme.ink
         
         let bodyLabel = UILabel()
@@ -280,7 +280,7 @@ Seeking a versatile actor for the lead role in an upcoming independent film. The
 
         let title = UILabel()
         title.text = "Requirements"
-        title.font = UIFont(name: "Georgia-Bold", size: 19) ?? UIFont.boldSystemFont(ofSize: 19)
+        title.font = .systemFont(ofSize: 19, weight: .bold)
         title.textColor = CineMystTheme.ink
         
         let skillsTitle = makeSmallSectionTitle("SKILLS")

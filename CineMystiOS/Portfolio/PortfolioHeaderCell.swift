@@ -19,7 +19,7 @@ final class PortfolioHeaderCell: UICollectionViewCell {
     
     private let nameLabel: UILabel = {
         let lbl = UILabel()
-        lbl.font = UIFont(name: "CormorantGaramond-Medium", size: 28) ?? UIFont.systemFont(ofSize: 28, weight: .medium)
+        lbl.font = UIFont.systemFont(ofSize: 28, weight: .medium)
         lbl.textColor = UIColor(red: 207/255, green: 184/255, blue: 146/255, alpha: 1) // #CFB892
         lbl.translatesAutoresizingMaskIntoConstraints = false
         return lbl
