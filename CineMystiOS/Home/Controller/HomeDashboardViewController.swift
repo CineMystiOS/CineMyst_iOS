@@ -820,7 +820,11 @@ extension HomeDashboardViewController: UITableViewDataSource, UITableViewDelegat
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         switch feedItems[indexPath.row] {
         case .promoBanner:
-            return tableView.dequeueReusableCell(withIdentifier: PromoBannerCell.reuseId, for: indexPath) as! PromoBannerCell
+            let cell = tableView.dequeueReusableCell(withIdentifier: PromoBannerCell.reuseId, for: indexPath) as! PromoBannerCell
+            cell.onPromoTap = { [weak self] promo in
+                self?.handlePromoTap(promo)
+            }
+            return cell
         case .communityHeader:
             return tableView.dequeueReusableCell(withIdentifier: FeedSectionHeaderCell.reuseId, for: indexPath) as! FeedSectionHeaderCell
         case .post(let post):
@@ -836,6 +840,23 @@ extension HomeDashboardViewController: UITableViewDataSource, UITableViewDelegat
         case .ad(let ad):
             let cell = tableView.dequeueReusableCell(withIdentifier: AdBannerCell.reuseId, for: indexPath) as! AdBannerCell
             cell.configure(with: ad); return cell
+        }
+    }
+
+    private func handlePromoTap(_ promo: PromoCard) {
+        switch promo.ctaText {
+        case "Browse Castings":
+            tabBarController?.selectedIndex = 1
+        case "Upload Reel":
+            let vc = FlickUploadViewController()
+            vc.hidesBottomBarWhenPushed = true
+            navigationController?.pushViewController(vc, animated: true)
+        case "Book Session":
+            let vc = AllMentorsViewController()
+            vc.hidesBottomBarWhenPushed = true
+            navigationController?.pushViewController(vc, animated: true)
+        default:
+            break
         }
     }
 
@@ -970,6 +991,7 @@ extension HomeDashboardViewController: PostComposerDelegate {
 // MARK: ═══════════════════════════════════════════
 final class PromoBannerCell: UITableViewCell, UIScrollViewDelegate {
     static let reuseId = "PromoBannerCell"
+    var onPromoTap: ((PromoCard) -> Void)?
 
     private let shellView = UIView()
     private let scrollView  = UIScrollView()
@@ -1009,6 +1031,8 @@ final class PromoBannerCell: UITableViewCell, UIScrollViewDelegate {
         scrollView.delegate = self
         scrollView.clipsToBounds = false
         scrollView.decelerationRate = .fast
+        scrollView.delaysContentTouches = false
+        scrollView.canCancelContentTouches = true
 
         // ✅ KEEP PEEK VISUAL ONLY
         scrollView.contentInset = UIEdgeInsets(top: 0, left: cardPeek, bottom: 0, right: cardPeek)
@@ -1083,6 +1107,9 @@ final class PromoBannerCell: UITableViewCell, UIScrollViewDelegate {
 
         for (i, card) in PromoCard.all.enumerated() {
             let v = PromoCardView(promo: card)
+            v.onCTATap = { [weak self] promo in
+                self?.onPromoTap?(promo)
+            }
             scrollView.addSubview(v)
             cardViews.append(v)
 
@@ -1178,6 +1205,7 @@ private final class ShimmerLineView: UIView {
 
 private final class PromoCardView: UIView {
     private let promo: PromoCard
+    var onCTATap: ((PromoCard) -> Void)?
     private let contentMaskView = UIView()
     private let gradientLayer = CAGradientLayer()
     private let glowLayer = CAGradientLayer()
@@ -1209,6 +1237,10 @@ private final class PromoCardView: UIView {
         contentMaskView.backgroundColor = UIColor.white.withAlphaComponent(0.05)
         addSubview(contentMaskView)
         contentMaskView.translatesAutoresizingMaskIntoConstraints = false
+
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(ctaTapped))
+        tapGesture.cancelsTouchesInView = false
+        contentMaskView.addGestureRecognizer(tapGesture)
 
         gradientLayer.colors = [promo.gradientStart.cgColor, promo.gradientEnd.cgColor]
         gradientLayer.startPoint = CGPoint(x: 0, y: 0)
@@ -1253,12 +1285,14 @@ private final class PromoCardView: UIView {
                 .font: UIFont.systemFont(ofSize: 11.5, weight: .semibold)
             ])
         )
-        config.image = UIImage(
-            systemName: "arrow.up.right",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
-        )
-        config.imagePlacement = .trailing
-        config.imagePadding = 4
+        if promo.ctaText != "Start Networking" {
+            config.image = UIImage(
+                systemName: "arrow.up.right",
+                withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
+            )
+            config.imagePlacement = .trailing
+            config.imagePadding = 4
+        }
         config.contentInsets = NSDirectionalEdgeInsets(top: 7, leading: 12, bottom: 7, trailing: 12)
         ctaButton.configuration = config
         ctaButton.tintColor = .white
@@ -1272,6 +1306,7 @@ private final class PromoCardView: UIView {
         ctaButton.layer.shadowOffset = CGSize(width: 0, height: 6)
         ctaButton.setContentCompressionResistancePriority(.required, for: .horizontal)
         ctaButton.setContentHuggingPriority(.required, for: .horizontal)
+        ctaButton.addTarget(self, action: #selector(ctaTapped), for: .touchUpInside)
         contentMaskView.addSubview(ctaButton)
         ctaButton.translatesAutoresizingMaskIntoConstraints = false
 
@@ -1309,6 +1344,10 @@ private final class PromoCardView: UIView {
         super.layoutSubviews()
         updateLayout()
         layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: 24).cgPath
+    }
+
+    @objc private func ctaTapped() {
+        onCTATap?(promo)
     }
 
     func updateLayout() {
