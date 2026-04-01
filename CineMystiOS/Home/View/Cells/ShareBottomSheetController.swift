@@ -8,6 +8,12 @@
 import UIKit
 
 final class ShareBottomSheetController: UIViewController {
+    private enum ShareAction: Int {
+        case system
+        case message
+        case whatsapp
+        case instagram
+    }
 
     private let post: Post
 
@@ -51,6 +57,8 @@ final class ShareBottomSheetController: UIViewController {
             button.titleLabel?.textAlignment = .center
             button.contentHorizontalAlignment = .center
             button.titleEdgeInsets.top = 8
+            button.tag = i
+            button.addTarget(self, action: #selector(handleShareOption(_:)), for: .touchUpInside)
             button.translatesAutoresizingMaskIntoConstraints = false
             button.heightAnchor.constraint(equalToConstant: 60).isActive = true
             shareStack.addArrangedSubview(button)
@@ -67,5 +75,37 @@ final class ShareBottomSheetController: UIViewController {
             stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16)
         ])
+    }
+
+    @objc private func handleShareOption(_ sender: UIButton) {
+        guard let action = ShareAction(rawValue: sender.tag) else { return }
+
+        let shareText = buildShareText()
+
+        switch action {
+        case .system:
+            let activity = UIActivityViewController(activityItems: [shareText], applicationActivities: nil)
+            if let popover = activity.popoverPresentationController {
+                popover.sourceView = sender
+                popover.sourceRect = sender.bounds
+            }
+            present(activity, animated: true)
+
+        case .message, .whatsapp, .instagram:
+            let activity = UIActivityViewController(activityItems: [shareText], applicationActivities: nil)
+            if let popover = activity.popoverPresentationController {
+                popover.sourceView = sender
+                popover.sourceRect = sender.bounds
+            }
+            present(activity, animated: true)
+        }
+    }
+
+    private func buildShareText() -> String {
+        let caption = post.caption?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let caption, !caption.isEmpty {
+            return "Check out this post on CineMyst:\n\n\(caption)"
+        }
+        return "Check out this post on CineMyst."
     }
 }
