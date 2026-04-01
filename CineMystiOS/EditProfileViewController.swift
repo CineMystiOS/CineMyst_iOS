@@ -22,7 +22,6 @@ class EditProfileViewController: UIViewController {
     private let skillsField = UITextField()
     private let experienceField = UITextField()
     
-    private let profilePictureButton = UIButton(type: .system)
     private let saveButton = UIButton(type: .system)
 
     weak var delegate: EditProfileDelegate?
@@ -73,20 +72,6 @@ class EditProfileViewController: UIViewController {
         contentStack.spacing = 16
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(contentStack)
-        
-        // MARK: - Profile Picture Section
-        let picHeader = createSectionHeader("Profile Picture")
-        contentStack.addArrangedSubview(picHeader)
-        
-        profilePictureButton.setTitle("📷 Change Profile Picture", for: .normal)
-        profilePictureButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
-        profilePictureButton.backgroundColor = ActorProfileDS.palePink
-        profilePictureButton.setTitleColor(ActorProfileDS.deepPlum, for: .normal)
-        profilePictureButton.layer.cornerRadius = 10
-        profilePictureButton.translatesAutoresizingMaskIntoConstraints = false
-        profilePictureButton.heightAnchor.constraint(equalToConstant: 44).isActive = true
-        profilePictureButton.addTarget(self, action: #selector(changeProfilePicture), for: .touchUpInside)
-        contentStack.addArrangedSubview(profilePictureButton)
         
         // MARK: - Personal Information
         let personalHeader = createSectionHeader("Personal Information")
@@ -361,9 +346,6 @@ extension EditProfileViewController: UIImagePickerControllerDelegate, UINavigati
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
         if let image = info[.editedImage] as? UIImage ?? info[.originalImage] as? UIImage {
             selectedProfileImage = image
-            profilePictureButton.setTitle("✅ Image Selected", for: .normal)
-            profilePictureButton.backgroundColor = ActorProfileDS.deepPlum
-            profilePictureButton.setTitleColor(.white, for: .normal)
         }
         picker.dismiss(animated: true)
     }

@@ -13,6 +13,7 @@ import Supabase
 // MARK: - MentorCardCell (tightened layout + aligned rating)
 final class MentorCardCell: UITableViewCell {
     static let reuseIdentifier = "MentorCardCell"
+    var onExtraServicesTap: (([String]) -> Void)?
     private let plum = MentorshipUI.brandPlum
     private let softPlum = MentorshipUI.plumChip
     private let deepShadow = MentorshipUI.shadow
@@ -192,6 +193,8 @@ final class MentorCardCell: UITableViewCell {
         l.text = "Services"
         l.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
         l.textColor = .secondaryLabel
+        l.setContentCompressionResistancePriority(.required, for: .horizontal)
+        l.setContentHuggingPriority(.required, for: .horizontal)
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
@@ -214,6 +217,7 @@ final class MentorCardCell: UITableViewCell {
         b.translatesAutoresizingMaskIntoConstraints = false
         return b
     }()
+    private var allServicesForAlert: [String] = []
 
     // stacking containers
     private let topRow = UIStackView()
@@ -240,6 +244,7 @@ final class MentorCardCell: UITableViewCell {
         bottomRow.axis = .horizontal
         bottomRow.alignment = .center
         bottomRow.spacing = 12
+        bottomRow.distribution = .fill
         bottomRow.translatesAutoresizingMaskIntoConstraints = false
 
         contentView.addSubview(cardView)
@@ -348,6 +353,10 @@ final class MentorCardCell: UITableViewCell {
 
         // default styling for tagsStack (plain text tags)
         tagsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        tagsStack.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        tagsStack.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        bookButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        bookButton.setContentHuggingPriority(.required, for: .horizontal)
     }
 
     // Configure using your Mentor model, with static demo fields to match mock
@@ -399,9 +408,16 @@ final class MentorCardCell: UITableViewCell {
         // tags — use mentorshipAreas if present
         tagsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         let tagNames = mentor.mentorshipAreas ?? []
-        for t in tagNames.prefix(4) {
-            let label = makePlainTagLabel(text: t)
+        allServicesForAlert = tagNames
+
+        if let first = tagNames.first {
+            let label = makePlainTagLabel(text: first)
             tagsStack.addArrangedSubview(label)
+        }
+
+        if tagNames.count > 1 {
+            let badge = makeMoreBadge(count: tagNames.count - 1)
+            tagsStack.addArrangedSubview(badge)
         }
     }
 
@@ -417,6 +433,24 @@ final class MentorCardCell: UITableViewCell {
         label.translatesAutoresizingMaskIntoConstraints = false
         label.setContentHuggingPriority(.required, for: .horizontal)
         return label
+    }
+
+    private func makeMoreBadge(count: Int) -> UIButton {
+        let button = UIButton(type: .system)
+        button.setTitle("+\(count)", for: .normal)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
+        button.setTitleColor(MentorshipUI.brandPlum, for: .normal)
+        button.backgroundColor = softPlum
+        button.layer.cornerRadius = 12
+        button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 10, bottom: 6, right: 10)
+        button.addTarget(self, action: #selector(didTapMoreServices), for: .touchUpInside)
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        return button
+    }
+
+    @objc private func didTapMoreServices() {
+        guard !allServicesForAlert.isEmpty else { return }
+        onExtraServicesTap?(allServicesForAlert)
     }
 }
 
@@ -775,6 +809,9 @@ extension AllMentorsViewController: UITableViewDataSource, UITableViewDelegate {
         }
         let m = mentors[indexPath.row]
         cell.configure(with: m)
+        cell.onExtraServicesTap = { [weak self] services in
+            self?.showExtraServices(services)
+        }
         cell.bookButton.tag = indexPath.row
         cell.bookButton.addTarget(self, action: #selector(didTapBook(_:)), for: .touchUpInside)
         return cell
@@ -788,6 +825,16 @@ extension AllMentorsViewController: UITableViewDataSource, UITableViewDelegate {
         vc.hidesBottomBarWhenPushed = true
 
         navigationController?.pushViewController(vc, animated: true)
+    }
+
+    private func showExtraServices(_ services: [String]) {
+        let alert = UIAlertController(
+            title: "Services",
+            message: services.joined(separator: "\n"),
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
     }
 
 

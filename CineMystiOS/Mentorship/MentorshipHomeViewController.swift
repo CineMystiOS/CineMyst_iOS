@@ -96,6 +96,18 @@ final class MentorCell: UICollectionViewCell {
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
+    
+    private lazy var rolePriceRow: UIStackView = {
+        let spacer = UIView()
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let s = UIStackView(arrangedSubviews: [roleLabel, spacer, priceChipView])
+        s.axis = .horizontal
+        s.alignment = .center
+        s.spacing = 8
+        s.translatesAutoresizingMaskIntoConstraints = false
+        return s
+    }()
 
     private let starImageView: UIImageView = {
         let iv = UIImageView(image: UIImage(systemName: "star.fill"))
@@ -136,9 +148,9 @@ final class MentorCell: UICollectionViewCell {
     }()
 
     private lazy var textStack: UIStackView = {
-        let stack = UIStackView(arrangedSubviews: [nameLabel, roleLabel, priceChipView])
+        let stack = UIStackView(arrangedSubviews: [nameLabel, rolePriceRow])
         stack.axis = .vertical
-        stack.spacing = 6
+        stack.spacing = 5
         stack.alignment = .leading
         stack.translatesAutoresizingMaskIntoConstraints = false
         return stack
@@ -159,9 +171,11 @@ final class MentorCell: UICollectionViewCell {
         nameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         nameLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
         nameLabel.setContentCompressionResistancePriority(.required, for: .vertical)
+        roleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        roleLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
         roleLabel.setContentCompressionResistancePriority(.required, for: .vertical)
-        roleLabel.setContentHuggingPriority(.required, for: .vertical)
-        priceChipView.setContentCompressionResistancePriority(.required, for: .vertical)
+        priceChipView.setContentCompressionResistancePriority(.required, for: .horizontal)
+        priceChipView.setContentHuggingPriority(.required, for: .horizontal)
         ratingStack.setContentCompressionResistancePriority(.required, for: .horizontal)
         ratingStack.setContentHuggingPriority(.required, for: .horizontal)
 
@@ -177,10 +191,10 @@ final class MentorCell: UICollectionViewCell {
             cardView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
             cardView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
 
-            imageContainerView.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 10),
-            imageContainerView.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 10),
-            imageContainerView.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -10),
-            imageContainerView.heightAnchor.constraint(equalTo: cardView.widthAnchor, multiplier: 0.52),
+            imageContainerView.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 9),
+            imageContainerView.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 9),
+            imageContainerView.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -9),
+            imageContainerView.heightAnchor.constraint(equalTo: cardView.widthAnchor, multiplier: 0.48),
 
             photoView.topAnchor.constraint(equalTo: imageContainerView.topAnchor),
             photoView.leadingAnchor.constraint(equalTo: imageContainerView.leadingAnchor),
@@ -195,10 +209,10 @@ final class MentorCell: UICollectionViewCell {
             ratingStack.trailingAnchor.constraint(equalTo: ratingBadgeView.trailingAnchor, constant: -8),
             ratingStack.bottomAnchor.constraint(equalTo: ratingBadgeView.bottomAnchor, constant: -6),
 
-            textStack.topAnchor.constraint(equalTo: imageContainerView.bottomAnchor, constant: 12),
-            textStack.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 12),
-            textStack.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -12),
-            textStack.bottomAnchor.constraint(lessThanOrEqualTo: cardView.bottomAnchor, constant: -12),
+            textStack.topAnchor.constraint(equalTo: imageContainerView.bottomAnchor, constant: 10),
+            textStack.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 11),
+            textStack.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -11),
+            textStack.bottomAnchor.constraint(lessThanOrEqualTo: cardView.bottomAnchor, constant: -10),
 
             priceLabel.topAnchor.constraint(equalTo: priceChipView.topAnchor, constant: 5),
             priceLabel.leadingAnchor.constraint(equalTo: priceChipView.leadingAnchor, constant: 8),
@@ -1649,7 +1663,7 @@ extension MentorshipHomeViewController: UICollectionViewDataSource, UICollection
         let insets = layout.sectionInset.left + layout.sectionInset.right
         let spacing = layout.minimumInteritemSpacing
         let width = floor((collectionView.bounds.width - insets - spacing) / 2.0)
-        let height = max(width * 1.06, 208)
+        let height = max(width * 0.98, 192)
         return CGSize(width: width, height: height)
     }
 

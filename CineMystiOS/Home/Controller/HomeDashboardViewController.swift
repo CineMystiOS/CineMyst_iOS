@@ -1463,11 +1463,7 @@ final class PostFeedCell: UITableViewCell {
         metaRow.axis = .horizontal; metaRow.spacing = 4; metaRow.alignment = .center
         let infoStack = UIStackView(arrangedSubviews: [nameLabel, metaRow])
         infoStack.axis = .vertical; infoStack.spacing = 2
-        let moreBtn = UIButton(type: .system)
-        moreBtn.setImage(UIImage(systemName: "ellipsis"), for: .normal); moreBtn.tintColor = .secondaryLabel
-        moreBtn.translatesAutoresizingMaskIntoConstraints = false
-        moreBtn.widthAnchor.constraint(equalToConstant: 28).isActive = true
-        let headerRow = UIStackView(arrangedSubviews: [avatarView, infoStack, moreBtn])
+        let headerRow = UIStackView(arrangedSubviews: [avatarView, infoStack])
         headerRow.axis = .horizontal; headerRow.spacing = 10; headerRow.alignment = .center
         card.addSubview(headerRow); headerRow.translatesAutoresizingMaskIntoConstraints = false
 
