@@ -221,16 +221,13 @@ class LoginViewController: UIViewController {
     private func checkUserProfile() async throws -> Bool {
         guard let session = try await AuthManager.shared.currentSession() else {
             print("❌ No session available for profile check")
-            throw LoginError.profileCheckFailed("Session not found")
+            // Auth succeeded but session missing — still let them in, send to onboarding
+            return false
         }
 
         let userId = session.user.id
         print("🔍 Checking profile for user: \(userId)")
-
-        struct ProfileCheck: Codable {
-            let onboarding_completed: Bool?
-        }
-
+        
         do {
             let profile: ProfileCheck = try await supabase
                 .from("profiles")
@@ -238,15 +235,32 @@ class LoginViewController: UIViewController {
                 .eq("id", value: userId.uuidString)
                 .single()
                 .execute()
-                .value
-
-            let completed = profile.onboarding_completed ?? false
-            print("✅ Profile found - Onboarding complete: \(completed)")
-            return completed
+            
+            guard let data = response.data as? [String: Any] else {
+                print("⚠️ Profile data could not be decoded")
+                throw LoginError.profileCheckFailed("Profile data missing")
+            }
+            
+            // ✅ Handle NULL or missing onboarding_completed field - default to false
+            let onboardingCompleted: Bool
+            if let value = data["onboarding_completed"] as? Bool {
+                onboardingCompleted = value
+            } else if let value = data["onboarding_completed"] as? NSNull {
+                // Field is NULL in database - treat as incomplete
+                print("⚠️ onboarding_completed is NULL - defaulting to false")
+                onboardingCompleted = false
+            } else {
+                // Field is missing - also treat as incomplete
+                print("⚠️ onboarding_completed field missing - defaulting to false")
+                onboardingCompleted = false
+            }
+            
+            print("✅ Profile found - Onboarding complete: \(onboardingCompleted)")
+            return onboardingCompleted
+            
         } catch {
-            print("⚠️ Profile not found or error — defaulting to onboarding: \(error)")
-            // If no profile row exists yet, send to onboarding
-            return false
+            print("❌ Profile check error: \(error)")
+            throw LoginError.profileCheckFailed(error.localizedDescription)
         }
     }
 
