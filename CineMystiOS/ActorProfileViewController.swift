@@ -56,9 +56,9 @@ class ActorProfileCardView: UIView {
     let roleLabel = UILabel()
     let connectionsLabel = UILabel()
     let editPortfolioButton = GradientButton(type: .system)
-    let avatarEditButton = UIButton(type: .system)
-    private let bannerGradientLayer = CAGradientLayer()
-    private let ringGradientLayer = CAGradientLayer()
+    let connectButton = GradientButton(type: .system)   // shown for other users
+    let moreButton = UIButton(type: .system)
+    let shareButton = UIButton(type: .system)
     
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -161,7 +161,17 @@ class ActorProfileCardView: UIView {
         editPortfolioButton.widthAnchor.constraint(equalToConstant: 132).isActive = true
         buttonStack.addArrangedSubview(UIView())
         buttonStack.addArrangedSubview(editPortfolioButton)
-        buttonStack.addArrangedSubview(UIView())
+
+        // Connect Button (other users)
+        connectButton.setTitle("Connect", for: .normal)
+        connectButton.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
+        connectButton.setTitleColor(.white, for: .normal)
+        connectButton.layer.cornerRadius = 10
+        connectButton.layer.masksToBounds = true
+        connectButton.translatesAutoresizingMaskIntoConstraints = false
+        connectButton.setupGradient(colors: [ActorProfileDS.deepPlum, ActorProfileDS.rosePink])
+        connectButton.isHidden = true   // shown only for other users
+        buttonStack.addArrangedSubview(connectButton)
         
         // Layout with NSLayoutConstraint
         NSLayoutConstraint.activate([
@@ -691,11 +701,9 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
     private var posts: [PostData] = []
     private let userId: UUID?
     private var hasPortfolio: Bool = false
-    private enum ImageEditTarget {
-        case banner
-        case avatar
-    }
-    private var pendingImageEditTarget: ImageEditTarget?
+    private var isOwnProfile: Bool = true
+    // "none" | "pending" | "connected"
+    private var connectionState: String = "none"
     
     init(userId: UUID? = nil) {
         self.userId = userId
@@ -762,11 +770,22 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
 
                 let isFirstLoad = self.profileData == nil
                 self.profileData = combined
+
+                // Determine if viewing own profile
+                let currentUserId = try await AuthManager.shared.currentSession()?.user.id
+                self.isOwnProfile = (self.userId == nil || self.userId == currentUserId)
+
                 // Fetch posts for gallery
                 self.posts = try await ProfileService.shared.fetchUserPosts(userId: combined.profile.id)
 
                 // Check if the user already has a portfolio (checks portfolios table, not items)
                 self.hasPortfolio = await ProfileService.shared.hasPortfolio(userId: combined.profile.id)
+
+                // Fetch connection state if viewing another user
+                if !self.isOwnProfile, let otherId = self.userId, let meId = currentUserId {
+                    self.connectionState = await ProfileService.shared.connectionState(
+                        requesterId: meId, receiverId: otherId)
+                }
 
                 await MainActor.run {
                     self.loadingView.stopAnimating()
@@ -805,11 +824,27 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
                     profileCard.bannerImageView.image = image
                 }
             }
-            profileCard.avatarEditButton.removeTarget(nil, action: nil, for: .allEvents)
-            profileCard.avatarEditButton.addTarget(self, action: #selector(editProfileImageTapped), for: .touchUpInside)
-            profileCard.editPortfolioButton.removeTarget(nil, action: nil, for: .allEvents)
-            profileCard.editPortfolioButton.addTarget(self, action: #selector(editPortfolioTapped), for: .touchUpInside)
-            profileCard.editPortfolioButton.setTitle(hasPortfolio ? "Edit Portfolio" : "Create Portfolio", for: .normal)
+            profileCard.badgeView.isHidden = !data.profile.isVerified
+
+            // Show/hide correct buttons depending on own vs other profile
+            profileCard.editProfileButton.isHidden  = !isOwnProfile
+            profileCard.editPortfolioButton.isHidden = !isOwnProfile
+            profileCard.connectButton.isHidden = isOwnProfile
+
+            if isOwnProfile {
+                // Wire edit buttons (remove stale targets first)
+                profileCard.editProfileButton.removeTarget(nil, action: nil, for: .allEvents)
+                profileCard.editPortfolioButton.removeTarget(nil, action: nil, for: .allEvents)
+                profileCard.editProfileButton.addTarget(self, action: #selector(editProfileTapped), for: .touchUpInside)
+                profileCard.editPortfolioButton.addTarget(self, action: #selector(editPortfolioTapped), for: .touchUpInside)
+                // Set portfolio button title based on whether portfolio exists
+                profileCard.editPortfolioButton.setTitle(hasPortfolio ? "Edit Portfolio" : "Create Portfolio", for: .normal)
+            } else {
+                // Wire connect button
+                profileCard.connectButton.removeTarget(nil, action: nil, for: .allEvents)
+                profileCard.connectButton.addTarget(self, action: #selector(connectTapped), for: .touchUpInside)
+                updateConnectButton(profileCard.connectButton)
+            }
         }
 
         // --- Stats ---
@@ -881,6 +916,101 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
     func editProfileDidSave() {
         print("🔄 Profile saved — reloading data from Supabase...")
         loadProfileData()
+    }
+
+    // MARK: - Connect
+    private func updateConnectButton(_ btn: GradientButton) {
+        switch connectionState {
+        case "pending":
+            btn.setTitle("Pending ⏳", for: .normal)
+            btn.isEnabled = false
+            btn.alpha = 0.6
+        case "connected":
+            btn.setTitle("✓ Connected", for: .normal)
+            btn.isEnabled = false
+            btn.alpha = 0.7
+        default:
+            btn.setTitle("Connect", for: .normal)
+            btn.isEnabled = true
+            btn.alpha = 1
+        }
+    }
+
+    @objc private func connectTapped() {
+        guard let targetId = userId else { return }
+        Task {
+            do {
+                guard let session = try await AuthManager.shared.currentSession() else { return }
+                let me = session.user
+
+                // Insert connection request
+                struct ConnectionInsert: Encodable {
+                    let requester_id: String
+                    let receiver_id: String
+                    let status: String
+                }
+                try await supabase
+                    .from("connections")
+                    .insert(ConnectionInsert(
+                        requester_id: me.id.uuidString,
+                        receiver_id: targetId.uuidString,
+                        status: "pending"
+                    ))
+                    .execute()
+
+                // Insert notification for the target user
+                let senderName = profileData.flatMap { _ in
+                    // We're on the target's profile, so sender is current user
+                    // We'll fetch current user name from session email as fallback
+                    me.email
+                } ?? me.id.uuidString
+
+                // Fetch current user's name
+                let myName: String
+                do {
+                    let myProfile = try await ProfileService.shared.fetchCurrentUserProfile()
+                    myName = myProfile.profile.fullName ?? myProfile.profile.username ?? me.email ?? "Someone"
+                } catch {
+                    myName = me.email ?? "Someone"
+                }
+
+                struct NotifInsert: Encodable {
+                    let recipient_id: String
+                    let sender_id: String
+                    let type: String
+                    let title: String
+                    let message: String
+                }
+                try await supabase
+                    .from("notifications")
+                    .insert(NotifInsert(
+                        recipient_id: targetId.uuidString,
+                        sender_id: me.id.uuidString,
+                        type: "connection_request",
+                        title: myName,
+                        message: "\(myName) wants to connect with you."
+                    ))
+                    .execute()
+
+                await MainActor.run {
+                    self.connectionState = "pending"
+                    if let profileCard = self.contentStackView.arrangedSubviews.first as? ActorProfileCardView {
+                        self.updateConnectButton(profileCard.connectButton)
+                    }
+                    let a = UIAlertController(title: "🎉 Request Sent",
+                                             message: "Your connection request has been sent!",
+                                             preferredStyle: .alert)
+                    a.addAction(UIAlertAction(title: "OK", style: .default))
+                    self.present(a, animated: true)
+                }
+            } catch {
+                await MainActor.run {
+                    let a = UIAlertController(title: "Error", message: error.localizedDescription, preferredStyle: .alert)
+                    a.addAction(UIAlertAction(title: "OK", style: .default))
+                    self.present(a, animated: true)
+                }
+            }
+        }
     }
     
     @objc private func portfolioCreated() {
