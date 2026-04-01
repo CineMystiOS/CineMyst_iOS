@@ -1015,6 +1015,7 @@ class PortfolioCreationViewController: UIViewController {
                     throw NSError(domain: "Auth", code: 401)
                 }
                 let uid = session.user.id.uuidString
+                print("🚀 Submitting portfolio for UID: \(uid)")
 
                 struct PortfolioInsert: Encodable {
                     // personal

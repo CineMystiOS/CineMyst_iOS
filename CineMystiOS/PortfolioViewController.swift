@@ -293,16 +293,34 @@ class PortfolioViewController: UIViewController {
             do {
                 let userId = try await resolveUserId()
 
-                // Fetch portfolio header
-                let portfolioResp = try await supabase
+                // Fetch portfolio header - Try portfolios table first
+                var portfolioResp = try await supabase
                     .from("portfolios")
                     .select()
                     .eq("user_id", value: userId)
                     .eq("is_primary", value: true)
                     .execute()
 
-                let portfolios = try JSONDecoder().decode([PortfolioResponse].self, from: portfolioResp.data)
-                guard let p = portfolios.first else { throw NSError(domain: "Portfolio", code: 404) }
+                var portfolios = try JSONDecoder().decode([PortfolioResponse].self, from: portfolioResp.data)
+                
+                // If not found in portfolios, try actor_portfolios table
+                if portfolios.isEmpty {
+                    print("ℹ️ Portfolio not found in 'portfolios', checking 'actor_portfolios'...")
+                    portfolioResp = try await supabase
+                        .from("actor_portfolios")
+                        .select()
+                        .eq("user_id", value: userId)
+                        .execute()
+                    
+                    // We need to map ActorPortfolio to PortfolioResponse or handle it
+                    // For now, we'll try to decode it as PortfolioResponse (they share basic fields)
+                    portfolios = try JSONDecoder().decode([PortfolioResponse].self, from: portfolioResp.data)
+                }
+                
+                guard let p = portfolios.first else { 
+                    print("❌ No portfolio found in either table for userId: \(userId)")
+                    throw NSError(domain: "Portfolio", code: 404) 
+                }
 
                 // Fetch items
                 let allItems = try await PortfolioManager.shared.fetchPortfolioItems(portfolioId: p.id)
@@ -338,7 +356,7 @@ class PortfolioViewController: UIViewController {
 
     // MARK: - Update Hero
     private func updateHero(with p: PortfolioResponse) {
-        nameLabel.text = p.stage_name ?? "Portfolio"
+        nameLabel.text = p.full_name ?? p.stage_name ?? "Portfolio"
         bioLabel.text  = p.bio
         // contact_email is not stored in PortfolioResponse — skip or show id
         emailLabel.isHidden = true
