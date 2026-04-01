@@ -7,6 +7,8 @@
 import UIKit
 import PhotosUI
 import Supabase
+import AVKit
+import AVFoundation
 
 // MARK: - Gradient Button Helper
 
@@ -596,11 +598,18 @@ final class ProfileSettingsViewController: UIViewController {
 
 // MARK: - Gallery Collection View Data Source
 
+struct ProfileMediaItem {
+    let previewURL: String
+    let contentURL: String
+    let type: String
+}
+
 class GalleryCollectionViewDataSource: NSObject, UICollectionViewDataSource, UICollectionViewDelegate {
-    var postMediaItems: [(url: String, type: String)] = []
+    var mediaItems: [ProfileMediaItem] = []
+    var onSelectItem: ((ProfileMediaItem) -> Void)?
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        postMediaItems.count
+        mediaItems.count
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
@@ -609,29 +618,97 @@ class GalleryCollectionViewDataSource: NSObject, UICollectionViewDataSource, UIC
         else {
             return collectionView.dequeueReusableCell(withReuseIdentifier: GalleryCell.reuseId, for: indexPath)
         }
-        cell.configureWithURL(imageURL: postMediaItems[indexPath.item].url)
+        cell.configureWithURL(imageURL: mediaItems[indexPath.item].previewURL)
         return cell
+    }
+
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        guard indexPath.item < mediaItems.count else { return }
+        onSelectItem?(mediaItems[indexPath.item])
+    }
+}
+
+final class ProfileImageViewerController: UIViewController {
+    private let imageURL: String
+    private let imageView = UIImageView()
+
+    init(imageURL: String) {
+        self.imageURL = imageURL
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
+
+        imageView.contentMode = .scaleAspectFit
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(imageView)
+
+        let closeButton = UIButton(type: .system)
+        closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
+        closeButton.tintColor = .white
+        closeButton.backgroundColor = UIColor.white.withAlphaComponent(0.12)
+        closeButton.layer.cornerRadius = 20
+        closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
+        closeButton.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(closeButton)
+
+        NSLayoutConstraint.activate([
+            imageView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            imageView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            imageView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            closeButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
+            closeButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            closeButton.widthAnchor.constraint(equalToConstant: 40),
+            closeButton.heightAnchor.constraint(equalToConstant: 40)
+        ])
+
+        if let url = URL(string: imageURL) {
+            URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+                guard let data, let image = UIImage(data: data) else { return }
+                DispatchQueue.main.async {
+                    self?.imageView.image = image
+                }
+            }.resume()
+        }
+    }
+
+    @objc private func closeTapped() {
+        dismiss(animated: true)
     }
 }
 
 // MARK: - Main Actor Profile ViewController
 
 final class ActorProfileViewController: UIViewController, EditProfileDelegate, PHPickerViewControllerDelegate {
+    private enum MediaTab: Int {
+        case gallery = 0
+        case flicks = 1
+        case tagged = 2
+    }
 
     private let scrollView        = UIScrollView()
     private let contentStackView  = UIStackView()
     private let loadingView       = UIActivityIndicatorView(style: .large)
     private var collectionView: UICollectionView?
+    private var galleryHeaderView: GalleryHeaderView?
     private let galleryDataSource = GalleryCollectionViewDataSource()
     private var galleryHeightConstraint: NSLayoutConstraint?
 
     private var profileData: UserProfileData?
     private var posts:        [PostData] = []
+    private var userFlicks:   [Flick] = []
     private let userId:       UUID?
     private var hasPortfolio: Bool   = false
     private var isOwnProfile: Bool   = true
     /// "none" | "pending" | "connected"
     private var connectionState: String = "none"
+    private var selectedMediaTab: MediaTab = .gallery
 
     // Image editing (own profile only)
     private enum ImageEditTarget { case banner, avatar }
@@ -656,6 +733,9 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
         setupLoadingView()
         setupUI()
         setupLayout()
+        galleryDataSource.onSelectItem = { [weak self] item in
+            self?.openMediaItem(item)
+        }
         loadProfileData()
 
         NotificationCenter.default.addObserver(self, selector: #selector(portfolioCreated),
@@ -698,6 +778,7 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
                 let isFirstLoad    = self.profileData == nil
                 self.profileData   = combined
                 self.posts         = try await ProfileService.shared.fetchUserPosts(userId: combined.profile.id)
+                self.userFlicks    = try await self.fetchUserFlicks(userId: combined.profile.id)
                 self.hasPortfolio  = await ProfileService.shared.hasPortfolio(userId: combined.profile.id)
 
                 // Determine own vs other profile
@@ -783,23 +864,7 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
             }
         }
 
-        // --- Gallery ---
-        var mediaItems: [(url: String, type: String)] = []
-        for post in posts {
-            if let first = post.media.first {
-                let url = (first.mediaType == "video" ? first.thumbnailUrl : nil) ?? first.mediaUrl
-                mediaItems.append((url: url, type: first.mediaType))
-            }
-        }
-        galleryDataSource.postMediaItems = mediaItems
-
-        let itemsPerRow: CGFloat = 3
-        let spacing: CGFloat     = 2
-        let totalWidth           = UIScreen.main.bounds.width - 24
-        let itemWidth            = (totalWidth - (itemsPerRow - 1) * spacing) / itemsPerRow
-        let rows                 = max(1, ceil(CGFloat(mediaItems.count) / itemsPerRow))
-        galleryHeightConstraint?.constant = rows * itemWidth + (rows - 1) * spacing
-        collectionView?.reloadData()
+        updateMediaContent()
     }
 
     // MARK: - Connect (other users)
@@ -1059,6 +1124,68 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
         }.resume()
     }
 
+    private func openMediaItem(_ item: ProfileMediaItem) {
+        if item.type == "video", let url = URL(string: item.contentURL) {
+            let playerVC = AVPlayerViewController()
+            playerVC.player = AVPlayer(url: url)
+            present(playerVC, animated: true) {
+                playerVC.player?.play()
+            }
+            return
+        }
+
+        let viewer = ProfileImageViewerController(imageURL: item.contentURL)
+        viewer.modalPresentationStyle = .fullScreen
+        present(viewer, animated: true)
+    }
+
+    private func fetchUserFlicks(userId: UUID) async throws -> [Flick] {
+        let response = try await supabase
+            .from("flicks")
+            .select("*")
+            .eq("user_id", value: userId.uuidString)
+            .order("created_at", ascending: false)
+            .execute()
+        return try JSONDecoder().decode([Flick].self, from: response.data)
+    }
+
+    @objc private func mediaSegmentChanged(_ sender: UISegmentedControl) {
+        selectedMediaTab = MediaTab(rawValue: sender.selectedSegmentIndex) ?? .gallery
+        updateMediaContent()
+    }
+
+    private func updateMediaContent() {
+        let mediaItems: [ProfileMediaItem]
+
+        switch selectedMediaTab {
+        case .gallery:
+            mediaItems = posts.compactMap { post in
+                guard let first = post.media.first else { return nil }
+                let previewURL = (first.mediaType == "video" ? first.thumbnailUrl : nil) ?? first.mediaUrl
+                return ProfileMediaItem(previewURL: previewURL, contentURL: first.mediaUrl, type: first.mediaType)
+            }
+        case .flicks:
+            mediaItems = userFlicks.compactMap { flick in
+                let previewURL = flick.thumbnailUrl ?? flick.videoUrl
+                guard !previewURL.isEmpty else { return nil }
+                return ProfileMediaItem(previewURL: previewURL, contentURL: flick.videoUrl, type: "video")
+            }
+        case .tagged:
+            mediaItems = []
+        }
+
+        galleryDataSource.mediaItems = mediaItems
+
+        let itemsPerRow: CGFloat = 3
+        let spacing: CGFloat     = 2
+        let totalWidth           = UIScreen.main.bounds.width - 32
+        let itemWidth            = (totalWidth - (itemsPerRow - 1) * spacing) / itemsPerRow
+        let rows                 = mediaItems.isEmpty ? 0 : ceil(CGFloat(mediaItems.count) / itemsPerRow)
+        galleryHeightConstraint?.constant = rows == 0 ? 0 : rows * itemWidth + max(0, rows - 1) * spacing
+        collectionView?.isHidden = mediaItems.isEmpty
+        collectionView?.reloadData()
+    }
+
     private func showErrorMessage(_ message: String) {
         let a = UIAlertController(title: "Error", message: message, preferredStyle: .alert)
         a.addAction(UIAlertAction(title: "OK",    style: .default))
@@ -1162,7 +1289,9 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
         contentStackView.addArrangedSubview(AboutSectionView())
 
         let galleryHeader = GalleryHeaderView()
+        galleryHeader.segmentControl.addTarget(self, action: #selector(mediaSegmentChanged(_:)), for: .valueChanged)
         galleryHeader.heightAnchor.constraint(equalToConstant: 50).isActive = true
+        galleryHeaderView = galleryHeader
         contentStackView.addArrangedSubview(galleryHeader)
 
         let itemsPerRow: CGFloat = 3

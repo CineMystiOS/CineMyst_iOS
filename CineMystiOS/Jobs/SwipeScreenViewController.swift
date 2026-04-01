@@ -292,6 +292,11 @@ class SwipeScreenViewController: UIViewController {
 
         for (index, model) in models.enumerated() {
             let card = CandidateCardView(model: model)
+            card.onProfileTapped = { [weak self] in
+                let profileVC = ActorProfileViewController(userId: model.actorId)
+                profileVC.hidesBottomBarWhenPushed = true
+                self?.navigationController?.pushViewController(profileVC, animated: true)
+            }
             let position = maxCardsOnScreen - 1 - index
             setupCardFrame(card, position: position)
             addPanGesture(to: card)
@@ -582,6 +587,11 @@ class SwipeScreenViewController: UIViewController {
         if cardViews.count < maxCardsOnScreen && cardViews.count < cardData.count {
             let model = cardData[cardViews.count]
             let newCard = CandidateCardView(model: model)
+            newCard.onProfileTapped = { [weak self] in
+                let profileVC = ActorProfileViewController(userId: model.actorId)
+                profileVC.hidesBottomBarWhenPushed = true
+                self?.navigationController?.pushViewController(profileVC, animated: true)
+            }
 
             setupCardFrame(newCard, position: 0)
             addPanGesture(to: newCard)

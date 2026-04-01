@@ -7,6 +7,7 @@ class CandidateCardView: UIView {
     private let model: CandidateModel
     private var player: AVPlayer?
     private var playerLayer: AVPlayerLayer?
+    var onProfileTapped: (() -> Void)?
 
     init(model: CandidateModel) {
         self.model = model
@@ -187,6 +188,7 @@ class CandidateCardView: UIView {
         addSubview(experienceLabel)
         addSubview(submittedBtn)
         addSubview(profileBtn)
+        profileBtn.addTarget(self, action: #selector(profileButtonTapped), for: .touchUpInside)
 
         nameLabel.text = model.name
         locationLabel.text = model.location
@@ -232,6 +234,10 @@ class CandidateCardView: UIView {
             profileBtn.widthAnchor.constraint(equalToConstant: 120),
             profileBtn.heightAnchor.constraint(equalToConstant: 32)
         ])
+    }
+
+    @objc private func profileButtonTapped() {
+        onProfileTapped?()
     }
 
     override func layoutSubviews() {

@@ -832,7 +832,17 @@ extension HomeDashboardViewController: UITableViewDataSource, UITableViewDelegat
             cell.configure(with: post)
             cell.onComment = { [weak self] in self?.openComments(for: post) }
             cell.onShare   = { [weak self] in self?.openShareSheet(for: post) }
-            cell.onProfile = { [weak self] in self?.navigationController?.pushViewController(ActorProfileViewController(), animated: true) }
+            cell.onProfile = { [weak self] in
+                guard let self else { return }
+                let profileVC: ActorProfileViewController
+                if let tappedUserId = UUID(uuidString: post.userId) {
+                    profileVC = ActorProfileViewController(userId: tappedUserId)
+                } else {
+                    profileVC = ActorProfileViewController()
+                }
+                profileVC.hidesBottomBarWhenPushed = true
+                self.navigationController?.pushViewController(profileVC, animated: true)
+            }
             return cell
         case .job(let job):
             let cell = tableView.dequeueReusableCell(withIdentifier: CastingFeedCell.reuseId, for: indexPath) as! CastingFeedCell
@@ -1391,6 +1401,7 @@ final class PostFeedCell: UITableViewCell {
     private let nameLabel      = UILabel()
     private let roleLabel      = UILabel()
     private let timeLabel      = UILabel()
+    private let profileTapButton = UIButton(type: .system)
     private let captionLabel   = UILabel()
     private let mediaContainer = UIView()
     private let likeButton     = UIButton(type: .system)
@@ -1466,6 +1477,10 @@ final class PostFeedCell: UITableViewCell {
         let headerRow = UIStackView(arrangedSubviews: [avatarView, infoStack])
         headerRow.axis = .horizontal; headerRow.spacing = 10; headerRow.alignment = .center
         card.addSubview(headerRow); headerRow.translatesAutoresizingMaskIntoConstraints = false
+        profileTapButton.backgroundColor = .clear
+        profileTapButton.tintColor = .clear
+        profileTapButton.addTarget(self, action: #selector(profileTapped), for: .touchUpInside)
+        card.addSubview(profileTapButton); profileTapButton.translatesAutoresizingMaskIntoConstraints = false
 
         // Caption
         captionLabel.font = .systemFont(ofSize: 13.5, weight: .regular)
@@ -1511,6 +1526,11 @@ final class PostFeedCell: UITableViewCell {
             headerRow.topAnchor.constraint(equalTo: card.topAnchor, constant: 14),
             headerRow.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
             headerRow.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -14),
+
+            profileTapButton.topAnchor.constraint(equalTo: headerRow.topAnchor, constant: -6),
+            profileTapButton.leadingAnchor.constraint(equalTo: headerRow.leadingAnchor, constant: -4),
+            profileTapButton.trailingAnchor.constraint(equalTo: headerRow.trailingAnchor, constant: 4),
+            profileTapButton.bottomAnchor.constraint(equalTo: headerRow.bottomAnchor, constant: 6),
 
             captionLabel.topAnchor.constraint(equalTo: headerRow.bottomAnchor, constant: 8),
             captionLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
@@ -1765,6 +1785,7 @@ final class PostFeedCell: UITableViewCell {
 
     @objc private func commentTapped() { onComment?() }
     @objc private func shareTapped()   { onShare?()   }
+    @objc private func profileTapped() { onProfile?() }
 }
 
 

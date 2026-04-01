@@ -471,11 +471,13 @@ extension ReelsViewController: ReelCellDelegate {
     }
     
     func didTapProfile(on cell: ReelCell, userId: String) {
-        // Navigate to user profile
-        let profileVC = ActorProfileViewController()
+        let profileVC: ActorProfileViewController
+        if let tappedUserId = UUID(uuidString: userId) {
+            profileVC = ActorProfileViewController(userId: tappedUserId)
+        } else {
+            profileVC = ActorProfileViewController()
+        }
         profileVC.hidesBottomBarWhenPushed = true
-        
-        // Push to current navigation controller
         navigationController?.pushViewController(profileVC, animated: true)
     }
 }
