@@ -5,6 +5,7 @@ class ApplicationStartedViewController: UIViewController {
     
     // MARK: - Properties
     var job: Job?
+    private let backgroundGradient = CAGradientLayer()
     private let supabase = SupabaseClient(
         supabaseURL: URL(string: "https://kyhyunyobgouumgwcigk.supabase.co")!,
         supabaseKey: "sb_publishable_oJe1X9aiPdKm6wqR1zvFhA_aIiej9-d"
@@ -230,13 +231,31 @@ class ApplicationStartedViewController: UIViewController {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = CineMystTheme.pinkPale
+        setupTheme()
         
         setupNavigation()
         setupLayout()
         setupActions()
         populateJobInfo()
         animateEntrance()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        backgroundGradient.frame = view.bounds
+    }
+
+    private func setupTheme() {
+        backgroundGradient.colors = [
+            UIColor(red: 0.988, green: 0.978, blue: 0.984, alpha: 1).cgColor,
+            CineMystTheme.plumMist.cgColor,
+            UIColor(red: 0.936, green: 0.892, blue: 0.917, alpha: 1).cgColor
+        ]
+        backgroundGradient.locations = [0, 0.45, 1]
+        backgroundGradient.startPoint = CGPoint(x: 0.1, y: 0)
+        backgroundGradient.endPoint = CGPoint(x: 0.9, y: 1)
+        view.layer.insertSublayer(backgroundGradient, at: 0)
     }
     
     override func viewWillAppear(_ animated: Bool) {

@@ -3,12 +3,12 @@ import Supabase
 
 // MARK: - Colors & Helpers
 fileprivate extension UIColor {
-    static let themePlum = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1)
-    static let softGrayBg = UIColor.systemGroupedBackground
+    static let themePlum = CineMystTheme.brandPlum
+    static let softGrayBg = CineMystTheme.plumMist
 }
 
 fileprivate func makeShadow(on view: UIView, radius: CGFloat = 8, yOffset: CGFloat = 2, opacity: Float = 0.08) {
-    view.layer.shadowColor = UIColor.black.cgColor
+    view.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.18).cgColor
     view.layer.shadowOpacity = opacity
     view.layer.shadowRadius = radius
     view.layer.shadowOffset = CGSize(width: 0, height: yOffset)
@@ -20,6 +20,9 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
     
     // Theme
     private let themeColor = UIColor.themePlum
+    private let backgroundGradient = CAGradientLayer()
+    private let ambientGlowTop = UIView()
+    private let ambientGlowBottom = UIView()
     
     // Core UI
     private let scrollView = UIScrollView()
@@ -38,22 +41,22 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
     private let titleLabel: UILabel = {
         let l = UILabel()
         l.text = "Explore Jobs"
-        l.font = UIFont.systemFont(ofSize: 28, weight: .bold)
-        l.textColor = .label
+        l.font = UIFont(name: "Georgia-Bold", size: 28) ?? UIFont.boldSystemFont(ofSize: 28)
+        l.textColor = CineMystTheme.ink
         return l
     }()
     private let subtitleLabel: UILabel = {
         let l = UILabel()
         l.text = "Discover your next role"
         l.font = UIFont.systemFont(ofSize: 15)
-        l.textColor = .secondaryLabel
+        l.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.62)
         return l
     }()
     private lazy var bookmarkButton: UIButton = {
         let btn = UIButton(type: .system)
         let config = UIImage.SymbolConfiguration(pointSize: 17, weight: .medium)
         btn.setImage(UIImage(systemName: "bookmark", withConfiguration: config), for: .normal)
-        btn.tintColor = .label
+        btn.tintColor = CineMystTheme.brandPlum
         btn.translatesAutoresizingMaskIntoConstraints = false
         btn.widthAnchor.constraint(equalToConstant: 44).isActive = true
         btn.heightAnchor.constraint(equalToConstant: 44).isActive = true
@@ -63,7 +66,7 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
         let btn = UIButton(type: .system)
         let config = UIImage.SymbolConfiguration(pointSize: 17, weight: .medium)
         btn.setImage(UIImage(systemName: "line.3.horizontal.decrease.circle", withConfiguration: config), for: .normal)
-        btn.tintColor = .label
+        btn.tintColor = CineMystTheme.brandPlum
         btn.translatesAutoresizingMaskIntoConstraints = false
         btn.widthAnchor.constraint(equalToConstant: 44).isActive = true
         btn.heightAnchor.constraint(equalToConstant: 44).isActive = true
@@ -86,15 +89,15 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
     private let curatedLabel: UILabel = {
         let l = UILabel()
         l.text = "Curated for You"
-        l.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
-        l.textColor = .label
+        l.font = UIFont(name: "Georgia-Bold", size: 21) ?? UIFont.boldSystemFont(ofSize: 21)
+        l.textColor = CineMystTheme.ink
         return l
     }()
     private let curatedSubtitle: UILabel = {
         let l = UILabel()
         l.text = "Opportunities that match your profile"
         l.font = UIFont.systemFont(ofSize: 15)
-        l.textColor = .secondaryLabel
+        l.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.58)
         l.numberOfLines = 2
         return l
     }()
@@ -124,7 +127,8 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .white
+        view.backgroundColor = CineMystTheme.pinkPale
+        setupBackground()
         
         searchBar.delegate = self
         setupScrollView()
@@ -137,6 +141,13 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
         filterButton.addTarget(self, action: #selector(openFilter), for: .touchUpInside)
         bookmarkButton.addTarget(self, action: #selector(openSavedPosts), for: .touchUpInside)
     }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        backgroundGradient.frame = view.bounds
+        ambientGlowTop.layer.cornerRadius = ambientGlowTop.bounds.width / 2
+        ambientGlowBottom.layer.cornerRadius = ambientGlowBottom.bounds.width / 2
+    }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
@@ -145,6 +156,47 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
     }
     
     // MARK: - ScrollView & Content
+    private func setupBackground() {
+        backgroundGradient.colors = [
+            UIColor(red: 0.988, green: 0.978, blue: 0.984, alpha: 1).cgColor,
+            CineMystTheme.plumMist.cgColor,
+            UIColor(red: 0.936, green: 0.892, blue: 0.917, alpha: 1).cgColor
+        ]
+        backgroundGradient.locations = [0, 0.45, 1]
+        backgroundGradient.startPoint = CGPoint(x: 0.1, y: 0)
+        backgroundGradient.endPoint = CGPoint(x: 0.9, y: 1)
+        view.layer.insertSublayer(backgroundGradient, at: 0)
+
+        ambientGlowTop.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.16)
+        ambientGlowTop.layer.shadowColor = CineMystTheme.brandPlum.cgColor
+        ambientGlowTop.layer.shadowOpacity = 0.22
+        ambientGlowTop.layer.shadowRadius = 80
+        ambientGlowTop.layer.shadowOffset = .zero
+
+        ambientGlowBottom.backgroundColor = CineMystTheme.deepPlumMid.withAlphaComponent(0.11)
+        ambientGlowBottom.layer.shadowColor = CineMystTheme.deepPlumMid.cgColor
+        ambientGlowBottom.layer.shadowOpacity = 0.16
+        ambientGlowBottom.layer.shadowRadius = 90
+        ambientGlowBottom.layer.shadowOffset = .zero
+
+        [ambientGlowTop, ambientGlowBottom].forEach {
+            $0.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview($0)
+        }
+
+        NSLayoutConstraint.activate([
+            ambientGlowTop.widthAnchor.constraint(equalToConstant: 220),
+            ambientGlowTop.heightAnchor.constraint(equalToConstant: 220),
+            ambientGlowTop.topAnchor.constraint(equalTo: view.topAnchor, constant: -26),
+            ambientGlowTop.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: 22),
+
+            ambientGlowBottom.widthAnchor.constraint(equalToConstant: 240),
+            ambientGlowBottom.heightAnchor.constraint(equalToConstant: 240),
+            ambientGlowBottom.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: -82),
+            ambientGlowBottom.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: 42)
+        ])
+    }
+
     private func setupScrollView() {
         view.addSubview(scrollView)
         scrollView.delegate = self
@@ -171,10 +223,13 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
     
     // Title bar at top of content
     private func setupTitleBar() {
+        styleTopActionButton(bookmarkButton)
+        styleTopActionButton(filterButton)
+
         let titleBar = UIStackView(arrangedSubviews: [titleLabel, UIView(), bookmarkButton, filterButton])
         titleBar.axis = .horizontal
         titleBar.alignment = .center
-        titleBar.spacing = 4
+        titleBar.spacing = 8
         titleBar.translatesAutoresizingMaskIntoConstraints = false
         
         contentView.addSubview(titleBar)
@@ -197,8 +252,11 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
     private func setupSearchBar() {
         contentView.addSubview(searchBarContainer)
         searchBarContainer.translatesAutoresizingMaskIntoConstraints = false
-        searchBarContainer.backgroundColor = UIColor(white: 1, alpha: 1)
-        searchBarContainer.layer.cornerRadius = 12
+        searchBarContainer.backgroundColor = UIColor.white.withAlphaComponent(0.38)
+        searchBarContainer.layer.cornerRadius = 18
+        searchBarContainer.layer.borderWidth = 1
+        searchBarContainer.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.15).cgColor
+        makeShadow(on: searchBarContainer, radius: 18, yOffset: 8, opacity: 0.08)
         
         // Add the search bar to the container
         searchBarContainer.addSubview(searchBar)
@@ -215,6 +273,15 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
             searchBar.trailingAnchor.constraint(equalTo: searchBarContainer.trailingAnchor),
             searchBar.bottomAnchor.constraint(equalTo: searchBarContainer.bottomAnchor)
         ])
+
+        let textField = searchBar.searchTextField
+        textField.backgroundColor = .clear
+        textField.textColor = CineMystTheme.ink
+        textField.tintColor = CineMystTheme.brandPlum
+        textField.attributedPlaceholder = NSAttributedString(
+            string: "Search jobs",
+            attributes: [.foregroundColor: CineMystTheme.ink.withAlphaComponent(0.38)]
+        )
     }
     
     // Post buttons row
@@ -234,13 +301,13 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
             let btn = UIButton(type: .system)
             btn.setTitle(t, for: .normal)
             btn.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .medium)
-            btn.setTitleColor(.label, for: .normal)
-            btn.layer.cornerRadius = 10
-            btn.backgroundColor = .systemBackground
+            btn.setTitleColor(CineMystTheme.brandPlum, for: .normal)
+            btn.layer.cornerRadius = 14
+            btn.backgroundColor = UIColor.white.withAlphaComponent(0.54)
             btn.layer.borderWidth = 1
-            btn.layer.borderColor = UIColor.separator.cgColor
+            btn.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.12).cgColor
             
-            makeShadow(on: btn)
+            makeShadow(on: btn, radius: 16, yOffset: 8, opacity: 0.08)
             
             switch t {
             case "Post Job": btn.addTarget(self, action: #selector(postJobTapped), for: .touchUpInside)
@@ -262,7 +329,7 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
         
         // Add separator line
         let separator = UIView()
-        separator.backgroundColor = .separator
+        separator.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.08)
         separator.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(separator)
         
@@ -283,6 +350,14 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
             jobListStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             jobListStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
         ])
+    }
+
+    private func styleTopActionButton(_ button: UIButton) {
+        button.backgroundColor = UIColor.white.withAlphaComponent(0.68)
+        button.layer.cornerRadius = 22
+        button.layer.borderWidth = 1
+        button.layer.borderColor = UIColor.white.withAlphaComponent(0.82).cgColor
+        makeShadow(on: button, radius: 14, yOffset: 6, opacity: 0.08)
     }
     
     // Ensure bottom spacing

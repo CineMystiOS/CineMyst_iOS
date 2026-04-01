@@ -11,6 +11,7 @@ class MyApplicationsViewController: UIViewController {
     
     private var applications: [Application] = []
     private var jobs: [Job] = []
+    private let backgroundGradient = CAGradientLayer()
 
     // MARK: - UI Components
     private let scrollView = UIScrollView()
@@ -57,9 +58,15 @@ class MyApplicationsViewController: UIViewController {
     // MARK: - View Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = CineMystTheme.pinkPale
+        setupTheme()
         setupLayout()
         loadApplications()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        backgroundGradient.frame = view.bounds
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -83,6 +90,7 @@ class MyApplicationsViewController: UIViewController {
     // MARK: - Layout Setup
     private func setupLayout() {
         view.addSubview(scrollView)
+        scrollView.backgroundColor = .clear
         scrollView.addSubview(contentView)
         
         [titleLabel, segmentedControl, subtitleLabel, stackView].forEach {
@@ -123,6 +131,25 @@ class MyApplicationsViewController: UIViewController {
             stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             stackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40)
         ])
+    }
+
+    private func setupTheme() {
+        backgroundGradient.colors = [
+            UIColor(red: 0.988, green: 0.978, blue: 0.984, alpha: 1).cgColor,
+            CineMystTheme.plumMist.cgColor,
+            UIColor(red: 0.936, green: 0.892, blue: 0.917, alpha: 1).cgColor
+        ]
+        backgroundGradient.locations = [0, 0.45, 1]
+        backgroundGradient.startPoint = CGPoint(x: 0.1, y: 0)
+        backgroundGradient.endPoint = CGPoint(x: 0.9, y: 1)
+        view.layer.insertSublayer(backgroundGradient, at: 0)
+        titleLabel.font = UIFont(name: "Georgia-Bold", size: 26) ?? UIFont.boldSystemFont(ofSize: 26)
+        titleLabel.textColor = CineMystTheme.ink
+        subtitleLabel.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.62)
+        segmentedControl.backgroundColor = UIColor.white.withAlphaComponent(0.5)
+        segmentedControl.selectedSegmentTintColor = CineMystTheme.brandPlum
+        segmentedControl.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
+        segmentedControl.setTitleTextAttributes([.foregroundColor: CineMystTheme.brandPlum.withAlphaComponent(0.65)], for: .normal)
     }
 
     // MARK: - Segment Changed
@@ -408,4 +435,3 @@ extension UILabel {
         self.drawText(in: self.bounds.insetBy(dx: -horizontal, dy: -vertical))
     }
 }
-

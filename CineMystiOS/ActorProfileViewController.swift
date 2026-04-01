@@ -32,6 +32,8 @@ enum ActorProfileDS {
     static let deepPlum = UIColor(hex: "#431631")
     static let rosePink = UIColor(hex: "#CD72A8")
     static let midPlum = UIColor(hex: "#6B2050")
+    static let floatingPlumStart = UIColor(red: 0.38, green: 0.11, blue: 0.22, alpha: 1)
+    static let floatingPlumEnd = UIColor(red: 0.27, green: 0.08, blue: 0.17, alpha: 1)
     static let palePink = UIColor(hex: "#F5E8F0")
     static let bgLight = UIColor(hex: "#FAF0F6")
     
@@ -102,7 +104,7 @@ class ActorProfileCardView: UIView {
         // Gradient ring background
         let ringView = UIView()
         ringView.layer.cornerRadius = 68
-        ringGradientLayer.colors = [ActorProfileDS.deepPlum.cgColor, ActorProfileDS.rosePink.cgColor]
+        ringGradientLayer.colors = [ActorProfileDS.floatingPlumStart.cgColor, ActorProfileDS.floatingPlumEnd.cgColor]
         ringGradientLayer.startPoint = CGPoint(x: 0, y: 0)
         ringGradientLayer.endPoint = CGPoint(x: 1, y: 1)
         ringGradientLayer.cornerRadius = 68
@@ -155,7 +157,7 @@ class ActorProfileCardView: UIView {
         editPortfolioButton.layer.cornerRadius = 10
         editPortfolioButton.layer.masksToBounds = true
         editPortfolioButton.translatesAutoresizingMaskIntoConstraints = false
-        editPortfolioButton.setupGradient(colors: [ActorProfileDS.rosePink, ActorProfileDS.deepPlum])
+        editPortfolioButton.setupGradient(colors: [ActorProfileDS.floatingPlumStart, ActorProfileDS.floatingPlumEnd])
         editPortfolioButton.widthAnchor.constraint(equalToConstant: 132).isActive = true
         buttonStack.addArrangedSubview(UIView())
         buttonStack.addArrangedSubview(editPortfolioButton)

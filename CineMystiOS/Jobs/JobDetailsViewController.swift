@@ -8,12 +8,13 @@ class JobDetailsViewController: UIViewController {
     // UI
     private let scrollView = UIScrollView()
     private let contentView = UIView()
+    private let backgroundGradient = CAGradientLayer()
     
     private let titleLabel: UILabel = {
         let lbl = UILabel()
         lbl.text = "Details"
-        lbl.font = UIFont.boldSystemFont(ofSize: 28)
-        lbl.textColor = UIColor(red: 67/255, green: 0/255, blue: 34/255, alpha: 1)
+        lbl.font = UIFont(name: "Georgia-Bold", size: 28) ?? UIFont.boldSystemFont(ofSize: 28)
+        lbl.textColor = CineMystTheme.ink
         return lbl
     }()
     
@@ -21,9 +22,13 @@ class JobDetailsViewController: UIViewController {
         let btn = UIButton(type: .system)
         btn.setTitle("Apply Now", for: .normal)
         btn.setTitleColor(.white, for: .normal)
-        btn.layer.cornerRadius = 12
+        btn.layer.cornerRadius = 16
         btn.titleLabel?.font = UIFont.boldSystemFont(ofSize: 18)
-        btn.backgroundColor = UIColor(red: 67/255, green: 0/255, blue: 34/255, alpha: 1)
+        btn.backgroundColor = CineMystTheme.brandPlum
+        btn.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.34).cgColor
+        btn.layer.shadowOpacity = 0.28
+        btn.layer.shadowRadius = 14
+        btn.layer.shadowOffset = CGSize(width: 0, height: 8)
         btn.addTarget(nil, action: #selector(applyTapped), for: .touchUpInside)
         return btn
    }()
@@ -35,10 +40,16 @@ class JobDetailsViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .white
+        view.backgroundColor = CineMystTheme.pinkPale
+        setupBackground()
         
         setupScrollView()
         setupLayout()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        backgroundGradient.frame = view.bounds
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -67,6 +78,18 @@ class JobDetailsViewController: UIViewController {
 extension JobDetailsViewController {
     
     // ScrollView Setup
+    private func setupBackground() {
+        backgroundGradient.colors = [
+            UIColor(red: 0.988, green: 0.978, blue: 0.984, alpha: 1).cgColor,
+            CineMystTheme.plumMist.cgColor,
+            UIColor(red: 0.936, green: 0.892, blue: 0.917, alpha: 1).cgColor
+        ]
+        backgroundGradient.locations = [0, 0.45, 1]
+        backgroundGradient.startPoint = CGPoint(x: 0.1, y: 0)
+        backgroundGradient.endPoint = CGPoint(x: 0.9, y: 1)
+        view.layer.insertSublayer(backgroundGradient, at: 0)
+    }
+
     private func setupScrollView() {
         view.addSubview(scrollView)
         scrollView.addSubview(contentView)
@@ -203,36 +226,40 @@ Seeking a versatile actor for the lead role in an upcoming independent film. The
     
     // Card Builder
     private func makeCard(title: String, body: String) -> UIView {
-        let card = UIView()
-        card.backgroundColor = .white
-        card.layer.cornerRadius = 16
-        card.layer.shadowColor = UIColor.black.cgColor
-        card.layer.shadowOpacity = 0.1
-        card.layer.shadowOffset = CGSize(width: 0, height: 3)
-        card.layer.shadowRadius = 5
+        let card = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialLight))
+        card.contentView.backgroundColor = UIColor.white.withAlphaComponent(0.44)
+        card.layer.cornerRadius = 20
+        card.clipsToBounds = true
+        card.layer.borderWidth = 1
+        card.layer.borderColor = UIColor.white.withAlphaComponent(0.84).cgColor
+        card.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.14).cgColor
+        card.layer.shadowOpacity = 1
+        card.layer.shadowOffset = CGSize(width: 0, height: 8)
+        card.layer.shadowRadius = 18
         
         let titleLabel = UILabel()
         titleLabel.text = title
-        titleLabel.font = UIFont.boldSystemFont(ofSize: 18)
+        titleLabel.font = UIFont(name: "Georgia-Bold", size: 19) ?? UIFont.boldSystemFont(ofSize: 19)
+        titleLabel.textColor = CineMystTheme.ink
         
         let bodyLabel = UILabel()
         bodyLabel.text = body
         bodyLabel.numberOfLines = 0
         bodyLabel.font = UIFont.systemFont(ofSize: 15)
-        bodyLabel.textColor = .darkGray
+        bodyLabel.textColor = CineMystTheme.ink.withAlphaComponent(0.7)
         
         let stack = UIStackView(arrangedSubviews: [titleLabel, bodyLabel])
         stack.axis = .vertical
         stack.spacing = 8
         
-        card.addSubview(stack)
+        card.contentView.addSubview(stack)
         stack.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 18),
-            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 18),
-            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -18),
-            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -18)
+            stack.topAnchor.constraint(equalTo: card.contentView.topAnchor, constant: 18),
+            stack.leadingAnchor.constraint(equalTo: card.contentView.leadingAnchor, constant: 18),
+            stack.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor, constant: -18),
+            stack.bottomAnchor.constraint(equalTo: card.contentView.bottomAnchor, constant: -18)
         ])
         
         return card
@@ -240,17 +267,21 @@ Seeking a versatile actor for the lead role in an upcoming independent film. The
     
     // Requirements Card (Custom Layout)
     private func makeRequirementsCard(requirements: String) -> UIView {
-        let card = UIView()
-        card.backgroundColor = .white
-        card.layer.cornerRadius = 16
-        card.layer.shadowColor = UIColor.black.cgColor
-        card.layer.shadowOpacity = 0.1
-        card.layer.shadowOffset = CGSize(width: 0, height: 3)
-        card.layer.shadowRadius = 5
-        
+        let card = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialLight))
+        card.contentView.backgroundColor = UIColor.white.withAlphaComponent(0.44)
+        card.layer.cornerRadius = 20
+        card.clipsToBounds = true
+        card.layer.borderWidth = 1
+        card.layer.borderColor = UIColor.white.withAlphaComponent(0.84).cgColor
+        card.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.14).cgColor
+        card.layer.shadowOpacity = 1
+        card.layer.shadowOffset = CGSize(width: 0, height: 8)
+        card.layer.shadowRadius = 18
+
         let title = UILabel()
         title.text = "Requirements"
-        title.font = UIFont.boldSystemFont(ofSize: 18)
+        title.font = UIFont(name: "Georgia-Bold", size: 19) ?? UIFont.boldSystemFont(ofSize: 19)
+        title.textColor = CineMystTheme.ink
         
         let skillsTitle = makeSmallSectionTitle("SKILLS")
         
@@ -275,20 +306,20 @@ Seeking a versatile actor for the lead role in an upcoming independent film. The
         }
         expBody.numberOfLines = 0
         expBody.font = UIFont.systemFont(ofSize: 15)
-        expBody.textColor = .darkGray
+        expBody.textColor = CineMystTheme.ink.withAlphaComponent(0.7)
         
         let stack = UIStackView(arrangedSubviews: [title, skillsTitle, skillsRow, expTitle, expBody])
         stack.axis = .vertical
         stack.spacing = 10
         
-        card.addSubview(stack)
+        card.contentView.addSubview(stack)
         stack.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 18),
-            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 18),
-            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -18),
-            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -18)
+            stack.topAnchor.constraint(equalTo: card.contentView.topAnchor, constant: 18),
+            stack.leadingAnchor.constraint(equalTo: card.contentView.leadingAnchor, constant: 18),
+            stack.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor, constant: -18),
+            stack.bottomAnchor.constraint(equalTo: card.contentView.bottomAnchor, constant: -18)
         ])
         
         return card
@@ -299,7 +330,7 @@ Seeking a versatile actor for the lead role in an upcoming independent film. The
         let lbl = UILabel()
         lbl.text = text
         lbl.font = UIFont.boldSystemFont(ofSize: 13)
-        lbl.textColor = UIColor(red: 67/255, green: 0/255, blue: 34/255, alpha: 1)
+        lbl.textColor = CineMystTheme.brandPlum
         return lbl
     }
     
@@ -309,9 +340,9 @@ Seeking a versatile actor for the lead role in an upcoming independent film. The
             let lbl = UILabel()
             lbl.text = "  \(text)  "
             lbl.font = UIFont.systemFont(ofSize: 14)
-            lbl.textColor = .darkGray
+            lbl.textColor = CineMystTheme.ink.withAlphaComponent(0.75)
             lbl.textAlignment = .center
-            lbl.backgroundColor = UIColor(white: 0.93, alpha: 1)
+            lbl.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.08)
             lbl.layer.cornerRadius = 12
             lbl.clipsToBounds = true
             

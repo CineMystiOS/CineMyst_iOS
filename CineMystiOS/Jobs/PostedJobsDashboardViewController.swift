@@ -4,22 +4,23 @@ import Supabase
 class PostedJobsDashboardViewController: UIViewController {
 
     // MARK: - UI Colors
-    private let themeColor = UIColor(hex: "#431631")
+    private let themeColor = CineMystTheme.brandPlum
+    private let backgroundGradient = CAGradientLayer()
 
     // MARK: - UI Elements
 
     private let backButton: UIButton = {
         let btn = UIButton(type: .system)
         btn.setImage(UIImage(systemName: "chevron.left"), for: .normal)
-        btn.tintColor = .black
+        btn.tintColor = CineMystTheme.brandPlum
         return btn
     }()
 
     private let titleLabel: UILabel = {
         let lbl = UILabel()
         lbl.text = "My Jobs and Tasks"
-        lbl.font = UIFont.boldSystemFont(ofSize: 26)
-        lbl.textColor = UIColor(red: 67/255, green: 0, blue: 34/255, alpha: 1)
+        lbl.font = UIFont(name: "Georgia-Bold", size: 26) ?? UIFont.boldSystemFont(ofSize: 26)
+        lbl.textColor = CineMystTheme.ink
         return lbl
     }()
 
@@ -28,28 +29,35 @@ class PostedJobsDashboardViewController: UIViewController {
         btn.setTitle("Post job", for: .normal)
         btn.setTitleColor(.white, for: .normal)
         btn.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
-        btn.layer.cornerRadius = 15
+        btn.layer.cornerRadius = 16
         btn.backgroundColor = themeColor
         let icon = UIImage(systemName: "plus.circle.fill")
         btn.setImage(icon, for: .normal)
         btn.tintColor = .white
         btn.imageEdgeInsets = UIEdgeInsets(top: 0, left: -4, bottom: 0, right: 0)
+        btn.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.34).cgColor
+        btn.layer.shadowOpacity = 0.28
+        btn.layer.shadowRadius = 12
+        btn.layer.shadowOffset = CGSize(width: 0, height: 8)
         return btn
     }()
 
     private let segmentedControl: UISegmentedControl = {
         let sc = UISegmentedControl(items: ["Active Jobs", "Pending", "Completed"])
         sc.selectedSegmentIndex = 0
-        sc.backgroundColor = UIColor(white: 0.95, alpha: 1)
-        sc.selectedSegmentTintColor = .white
+        sc.backgroundColor = UIColor.white.withAlphaComponent(0.5)
+        sc.selectedSegmentTintColor = CineMystTheme.brandPlum
         sc.setTitleTextAttributes([
             .font: UIFont.systemFont(ofSize: 14, weight: .semibold),
-            .foregroundColor: UIColor.black
+            .foregroundColor: UIColor.white
         ], for: .selected)
         sc.setTitleTextAttributes([
             .font: UIFont.systemFont(ofSize: 14),
-            .foregroundColor: UIColor.gray
+            .foregroundColor: CineMystTheme.brandPlum.withAlphaComponent(0.65)
         ], for: .normal)
+        sc.layer.cornerRadius = 16
+        sc.layer.borderWidth = 1
+        sc.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.12).cgColor
         return sc
     }()
 
@@ -57,7 +65,7 @@ class PostedJobsDashboardViewController: UIViewController {
         let lbl = UILabel()
         lbl.text = "Track your casting journey in one place"
         lbl.font = UIFont.systemFont(ofSize: 14)
-        lbl.textColor = .darkGray
+        lbl.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.62)
         return lbl
     }()
 
@@ -72,12 +80,18 @@ class PostedJobsDashboardViewController: UIViewController {
     // MARK: - View Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor(white: 0.97, alpha: 1)
+        view.backgroundColor = CineMystTheme.pinkPale
+        setupBackground()
 
         setupLayout()
         segmentedControl.addTarget(self, action: #selector(segmentChanged(_:)), for: .valueChanged)
         postJobButton.addTarget(self, action: #selector(didTapPostJob), for: .touchUpInside)
         loadCards(for: 0) // load active jobs initially
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        backgroundGradient.frame = view.bounds
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -126,6 +140,7 @@ class PostedJobsDashboardViewController: UIViewController {
         view.addSubview(subtitleLabel)
         view.addSubview(scrollView)
         scrollView.addSubview(stackView)
+        scrollView.backgroundColor = .clear
 
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         postJobButton.translatesAutoresizingMaskIntoConstraints = false
@@ -166,6 +181,18 @@ class PostedJobsDashboardViewController: UIViewController {
             stackView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
             stackView.widthAnchor.constraint(equalTo: scrollView.widthAnchor, constant: -32)
         ])
+    }
+
+    private func setupBackground() {
+        backgroundGradient.colors = [
+            UIColor(red: 0.988, green: 0.978, blue: 0.984, alpha: 1).cgColor,
+            CineMystTheme.plumMist.cgColor,
+            UIColor(red: 0.936, green: 0.892, blue: 0.917, alpha: 1).cgColor
+        ]
+        backgroundGradient.locations = [0, 0.45, 1]
+        backgroundGradient.startPoint = CGPoint(x: 0.1, y: 0)
+        backgroundGradient.endPoint = CGPoint(x: 0.9, y: 1)
+        view.layer.insertSublayer(backgroundGradient, at: 0)
     }
 
 
@@ -249,5 +276,4 @@ extension UIColor {
         self.init(red: r, green: g, blue: b, alpha: 1)
     }
 }
-
 

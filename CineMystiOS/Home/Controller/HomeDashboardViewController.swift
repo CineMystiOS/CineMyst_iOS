@@ -33,6 +33,7 @@ enum CineMystTheme {
     static let plumGlass     = UIColor(red: 0.333, green: 0.098, blue: 0.204, alpha: 0.10)
     static let cardRadius: CGFloat   = 22
     static let cardRadiusSm: CGFloat = 14
+    static let homeCardInset: CGFloat = 14
 }
 
 // MARK: - Models
@@ -47,7 +48,6 @@ enum FeedItem {
 struct PromoCard {
     let title: String
     let subtitle: String
-    let emoji: String
     let gradientStart: UIColor
     let gradientEnd: UIColor
     let ctaText: String
@@ -55,32 +55,28 @@ struct PromoCard {
     static let all: [PromoCard] = [
         PromoCard(
             title: "Find Your Next Role",
-            subtitle: "Browse 500+ casting calls from top production houses across India.",
-            emoji: "🎬",
+            subtitle: "Browse casting calls from top production houses across India.",
             gradientStart: UIColor(red: 0.176, green: 0.043, blue: 0.118, alpha: 1),
             gradientEnd:   UIColor(red: 0.353, green: 0.118, blue: 0.259, alpha: 1),
             ctaText: "Browse Castings"
         ),
         PromoCard(
             title: "Connect with Directors",
-            subtitle: "DM industry veterans and build your film network on CineMyst.",
-            emoji: "🤝",
+            subtitle: "Build your network with directors and film professionals.",
             gradientStart: UIColor(red: 0.263, green: 0.082, blue: 0.188, alpha: 1),
             gradientEnd:   UIColor(red: 0.659, green: 0.333, blue: 0.969, alpha: 1),
             ctaText: "Start Networking"
         ),
         PromoCard(
             title: "Showcase Your Reel",
-            subtitle: "Upload your portfolio and get discovered by casting directors worldwide.",
-            emoji: "🎥",
+            subtitle: "Upload your portfolio and get discovered by casting teams.",
             gradientStart: UIColor(red: 0.5, green: 0.1, blue: 0.35, alpha: 1),
             gradientEnd:   UIColor(red: 0.804, green: 0.447, blue: 0.659, alpha: 1),
             ctaText: "Upload Reel"
         ),
         PromoCard(
-            title: "Audition Coach — Free Trial",
-            subtitle: "1-on-1 sessions with industry coaches. First session completely free.",
-            emoji: "🎤",
+            title: "Audition Coach",
+            subtitle: "1-on-1 coaching with a free first session.",
             gradientStart: UIColor(red: 0.2, green: 0.05, blue: 0.35, alpha: 1),
             gradientEnd:   UIColor(red: 0.48, green: 0.23, blue: 0.93, alpha: 1),
             ctaText: "Book Session"
@@ -349,7 +345,7 @@ final class HomeDashboardViewController: UIViewController {
     }
 
     private func makeTableHeader() -> UIView {
-        let header = HomeEditorialHeaderView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 314))
+        let header = HomeEditorialHeaderView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 252))
         header.translatesAutoresizingMaskIntoConstraints = false
         header.frame.size.width = view.bounds.width
         header.layoutIfNeeded()
@@ -466,6 +462,7 @@ final class HomeDashboardViewController: UIViewController {
 private final class HomeEditorialHeaderView: UIView {
     private let contentColumn = UIView()
     private let panelView = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialLight))
+    private let accentOrb = UIView()
     private let introLabel = UILabel()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
@@ -480,7 +477,12 @@ private final class HomeEditorialHeaderView: UIView {
     private func setup() {
         backgroundColor = .clear
 
-        panelView.layer.cornerRadius = 28
+        accentOrb.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.08)
+        accentOrb.layer.borderWidth = 0
+        addSubview(accentOrb)
+        accentOrb.translatesAutoresizingMaskIntoConstraints = false
+
+        panelView.layer.cornerRadius = 26
         panelView.clipsToBounds = true
         panelView.layer.borderWidth = 1
         panelView.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.14).cgColor
@@ -504,7 +506,7 @@ private final class HomeEditorialHeaderView: UIView {
         titleLabel.textAlignment = .center
 
         subtitleLabel.text = "Elegant casting opportunities for you"
-        subtitleLabel.font = .systemFont(ofSize: 12.5, weight: .medium)
+        subtitleLabel.font = .systemFont(ofSize: 12, weight: .medium)
         subtitleLabel.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.54)
         subtitleLabel.numberOfLines = 1
         subtitleLabel.textAlignment = .center
@@ -513,7 +515,7 @@ private final class HomeEditorialHeaderView: UIView {
         contentColumn.translatesAutoresizingMaskIntoConstraints = false
 
         gridStack.axis = .vertical
-        gridStack.spacing = 16
+        gridStack.spacing = 10
         gridStack.distribution = .fillEqually
 
         [introLabel, titleLabel, subtitleLabel, gridStack].forEach {
@@ -522,15 +524,20 @@ private final class HomeEditorialHeaderView: UIView {
         }
 
         NSLayoutConstraint.activate([
-            panelView.topAnchor.constraint(equalTo: topAnchor, constant: 10),
-            panelView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
-            panelView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
-            panelView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4),
+            accentOrb.widthAnchor.constraint(equalToConstant: 190),
+            accentOrb.heightAnchor.constraint(equalToConstant: 190),
+            accentOrb.topAnchor.constraint(equalTo: topAnchor, constant: -116),
+            accentOrb.trailingAnchor.constraint(equalTo: trailingAnchor, constant: 34),
 
-            contentColumn.topAnchor.constraint(equalTo: panelView.contentView.topAnchor, constant: 16),
-            contentColumn.leadingAnchor.constraint(equalTo: panelView.contentView.leadingAnchor, constant: 16),
-            contentColumn.trailingAnchor.constraint(equalTo: panelView.contentView.trailingAnchor, constant: -16),
-            contentColumn.bottomAnchor.constraint(equalTo: panelView.contentView.bottomAnchor, constant: -16)
+            panelView.topAnchor.constraint(equalTo: topAnchor, constant: 10),
+            panelView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: CineMystTheme.homeCardInset),
+            panelView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -CineMystTheme.homeCardInset),
+            panelView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -2),
+
+            contentColumn.topAnchor.constraint(equalTo: panelView.contentView.topAnchor, constant: 12),
+            contentColumn.leadingAnchor.constraint(equalTo: panelView.contentView.leadingAnchor, constant: 18),
+            contentColumn.trailingAnchor.constraint(equalTo: panelView.contentView.trailingAnchor, constant: -18),
+            contentColumn.bottomAnchor.constraint(equalTo: panelView.contentView.bottomAnchor, constant: -12)
         ])
 
         let rows = stride(from: 0, to: HomeQuickLink.all.count, by: 2).map {
@@ -540,7 +547,7 @@ private final class HomeEditorialHeaderView: UIView {
         for rowItems in rows {
             let row = UIStackView()
             row.axis = .horizontal
-            row.spacing = 18
+            row.spacing = 14
             row.distribution = .fillEqually
             rowItems.forEach { row.addArrangedSubview(QuickLinkBubbleView(link: $0)) }
             gridStack.addArrangedSubview(row)
@@ -551,19 +558,24 @@ private final class HomeEditorialHeaderView: UIView {
             introLabel.leadingAnchor.constraint(equalTo: contentColumn.leadingAnchor),
             introLabel.trailingAnchor.constraint(equalTo: contentColumn.trailingAnchor),
 
-            titleLabel.topAnchor.constraint(equalTo: introLabel.bottomAnchor, constant: 4),
+            titleLabel.topAnchor.constraint(equalTo: introLabel.bottomAnchor, constant: 2),
             titleLabel.leadingAnchor.constraint(equalTo: contentColumn.leadingAnchor, constant: 10),
             titleLabel.trailingAnchor.constraint(equalTo: contentColumn.trailingAnchor, constant: -10),
 
-            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
             subtitleLabel.leadingAnchor.constraint(equalTo: contentColumn.leadingAnchor, constant: 10),
             subtitleLabel.trailingAnchor.constraint(equalTo: contentColumn.trailingAnchor, constant: -10),
 
-            gridStack.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 18),
-            gridStack.leadingAnchor.constraint(equalTo: contentColumn.leadingAnchor, constant: 12),
-            gridStack.trailingAnchor.constraint(equalTo: contentColumn.trailingAnchor, constant: -12),
-            gridStack.bottomAnchor.constraint(equalTo: contentColumn.bottomAnchor, constant: -6)
+            gridStack.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 8),
+            gridStack.leadingAnchor.constraint(equalTo: contentColumn.leadingAnchor, constant: 10),
+            gridStack.trailingAnchor.constraint(equalTo: contentColumn.trailingAnchor, constant: -10),
+            gridStack.bottomAnchor.constraint(equalTo: contentColumn.bottomAnchor, constant: -2)
         ])
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        accentOrb.layer.cornerRadius = accentOrb.bounds.width / 2
     }
 }
 
@@ -610,12 +622,12 @@ private final class QuickLinkBubbleView: UIView {
         label.translatesAutoresizingMaskIntoConstraints = false
 
         NSLayoutConstraint.activate([
-            heightAnchor.constraint(equalToConstant: 92),
+            heightAnchor.constraint(equalToConstant: 84),
 
             blob.topAnchor.constraint(equalTo: topAnchor),
             blob.centerXAnchor.constraint(equalTo: centerXAnchor),
-            blob.widthAnchor.constraint(equalToConstant: 78),
-            blob.heightAnchor.constraint(equalToConstant: 62),
+            blob.widthAnchor.constraint(equalToConstant: 72),
+            blob.heightAnchor.constraint(equalToConstant: 56),
 
             iconWrap.centerXAnchor.constraint(equalTo: blob.centerXAnchor),
             iconWrap.centerYAnchor.constraint(equalTo: blob.centerYAnchor, constant: -1),
@@ -625,7 +637,7 @@ private final class QuickLinkBubbleView: UIView {
             iconView.centerXAnchor.constraint(equalTo: iconWrap.centerXAnchor),
             iconView.centerYAnchor.constraint(equalTo: iconWrap.centerYAnchor),
 
-            label.topAnchor.constraint(equalTo: blob.bottomAnchor, constant: 10),
+            label.topAnchor.constraint(equalTo: blob.bottomAnchor, constant: 8),
             label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 2),
             label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -2)
         ])
@@ -731,7 +743,7 @@ extension HomeDashboardViewController: UITableViewDataSource, UITableViewDelegat
 
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         switch feedItems[indexPath.row] {
-        case .promoBanner: return 210
+        case .promoBanner: return 194
         case .communityHeader: return 72
         case .post:        return UITableView.automaticDimension
         case .job:         return UITableView.automaticDimension
@@ -741,7 +753,7 @@ extension HomeDashboardViewController: UITableViewDataSource, UITableViewDelegat
 
     func tableView(_ tableView: UITableView, estimatedHeightForRowAt indexPath: IndexPath) -> CGFloat {
         switch feedItems[indexPath.row] {
-        case .promoBanner: return 210
+        case .promoBanner: return 194
         case .communityHeader: return 72
         case .post:        return 380
         case .job:         return 280
@@ -877,7 +889,7 @@ final class PromoBannerCell: UITableViewCell, UIScrollViewDelegate {
     // ✅ KEEP PEEK BUT HANDLE IT CORRECTLY
     private let cardPeek: CGFloat = 8
     private let cardGap: CGFloat = 14
-    private let cardHeight: CGFloat = 172
+    private let cardHeight: CGFloat = 154
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -908,14 +920,21 @@ final class PromoBannerCell: UITableViewCell, UIScrollViewDelegate {
 
         pageControl.numberOfPages = PromoCard.all.count
         pageControl.currentPage   = 0
-        pageControl.currentPageIndicatorTintColor = CineMystTheme.brandPlum
-        pageControl.pageIndicatorTintColor        = CineMystTheme.brandPlum.withAlphaComponent(0.18)
-        pageControl.transform = CGAffineTransform(scaleX: 0.75, y: 0.75)
+        pageControl.currentPageIndicatorTintColor = CineMystTheme.brandPlum.withAlphaComponent(0.95)
+        pageControl.pageIndicatorTintColor        = CineMystTheme.brandPlum.withAlphaComponent(0.12)
+        pageControl.backgroundStyle = .minimal
+        pageControl.allowsContinuousInteraction = false
+        pageControl.transform = CGAffineTransform(scaleX: 0.82, y: 0.82)
 
         pagePill.layer.cornerRadius = 16
         pagePill.clipsToBounds = true
         pagePill.layer.borderWidth = 1
-        pagePill.layer.borderColor = UIColor.white.withAlphaComponent(0.85).cgColor
+        pagePill.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.10).cgColor
+        pagePill.contentView.backgroundColor = CineMystTheme.plumMist.withAlphaComponent(0.46)
+        pagePill.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.06).cgColor
+        pagePill.layer.shadowOpacity = 1
+        pagePill.layer.shadowRadius = 10
+        pagePill.layer.shadowOffset = CGSize(width: 0, height: 4)
 
         shellView.addSubview(pagePill)
         pagePill.contentView.addSubview(pageControl)
@@ -924,10 +943,10 @@ final class PromoBannerCell: UITableViewCell, UIScrollViewDelegate {
         pageControl.translatesAutoresizingMaskIntoConstraints = false
 
         NSLayoutConstraint.activate([
-            shellView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
+            shellView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
             shellView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             shellView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            shellView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -4),
+            shellView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -6),
 
             // ✅ 🔥 CRITICAL FIX HERE
             // subtract peek so visual edges align
@@ -937,10 +956,11 @@ final class PromoBannerCell: UITableViewCell, UIScrollViewDelegate {
             scrollView.topAnchor.constraint(equalTo: shellView.topAnchor),
             scrollView.heightAnchor.constraint(equalToConstant: cardHeight),
 
-            pagePill.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 4),
+            pagePill.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 6),
             pagePill.centerXAnchor.constraint(equalTo: shellView.centerXAnchor),
             pagePill.bottomAnchor.constraint(equalTo: shellView.bottomAnchor),
             pagePill.heightAnchor.constraint(equalToConstant: 28),
+            pagePill.widthAnchor.constraint(equalToConstant: 72),
 
             pageControl.centerXAnchor.constraint(equalTo: pagePill.contentView.centerXAnchor),
             pageControl.centerYAnchor.constraint(equalTo: pagePill.contentView.centerYAnchor)
@@ -1064,8 +1084,6 @@ private final class PromoCardView: UIView {
     private let gradientLayer = CAGradientLayer()
     private let glowLayer = CAGradientLayer()
     private let shimmer = ShimmerLineView(frame: .zero)
-    private let badge = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
-    private let emoji = UILabel()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
     private let ctaButton = UIButton(type: .system)
@@ -1116,30 +1134,10 @@ private final class PromoCardView: UIView {
         ringA.layer.borderColor = UIColor.white.withAlphaComponent(0.1).cgColor
         ringB.backgroundColor = UIColor.white.withAlphaComponent(0.04)
 
-        badge.layer.cornerRadius = 14
-        badge.clipsToBounds = true
-        badge.contentView.backgroundColor = UIColor.white.withAlphaComponent(0.12)
-        badge.layer.borderWidth = 1
-        badge.layer.borderColor = UIColor.white.withAlphaComponent(0.28).cgColor
-        contentMaskView.addSubview(badge)
-        badge.translatesAutoresizingMaskIntoConstraints = false
-
-        let badgeLabel = UILabel()
-        badgeLabel.text = "Featured"
-        badgeLabel.font = .systemFont(ofSize: 11, weight: .semibold)
-        badgeLabel.textColor = .white.withAlphaComponent(0.94)
-        badge.contentView.addSubview(badgeLabel)
-        badgeLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        emoji.text = promo.emoji
-        emoji.font = .systemFont(ofSize: 30)
-        contentMaskView.addSubview(emoji)
-        emoji.translatesAutoresizingMaskIntoConstraints = false
-
         titleLabel.text = promo.title
         titleLabel.font = UIFont(name: "Georgia-Bold", size: 19) ?? .boldSystemFont(ofSize: 19)
         titleLabel.textColor = .white
-        titleLabel.numberOfLines = 2
+        titleLabel.numberOfLines = 1
         contentMaskView.addSubview(titleLabel)
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
@@ -1174,6 +1172,8 @@ private final class PromoCardView: UIView {
         ctaButton.layer.shadowOpacity = 1
         ctaButton.layer.shadowRadius = 10
         ctaButton.layer.shadowOffset = CGSize(width: 0, height: 6)
+        ctaButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        ctaButton.setContentHuggingPriority(.required, for: .horizontal)
         contentMaskView.addSubview(ctaButton)
         ctaButton.translatesAutoresizingMaskIntoConstraints = false
 
@@ -1186,27 +1186,18 @@ private final class PromoCardView: UIView {
             contentMaskView.trailingAnchor.constraint(equalTo: trailingAnchor),
             contentMaskView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            badge.topAnchor.constraint(equalTo: contentMaskView.topAnchor, constant: 14),
-            badge.trailingAnchor.constraint(equalTo: contentMaskView.trailingAnchor, constant: -14),
-            badge.heightAnchor.constraint(equalToConstant: 28),
-
-            badgeLabel.leadingAnchor.constraint(equalTo: badge.contentView.leadingAnchor, constant: 10),
-            badgeLabel.trailingAnchor.constraint(equalTo: badge.contentView.trailingAnchor, constant: -10),
-            badgeLabel.centerYAnchor.constraint(equalTo: badge.contentView.centerYAnchor),
-
-            emoji.leadingAnchor.constraint(equalTo: contentMaskView.leadingAnchor, constant: 18),
-            emoji.topAnchor.constraint(equalTo: contentMaskView.topAnchor, constant: 16),
-
             titleLabel.leadingAnchor.constraint(equalTo: contentMaskView.leadingAnchor, constant: 18),
-            titleLabel.topAnchor.constraint(equalTo: emoji.bottomAnchor, constant: 10),
-            titleLabel.trailingAnchor.constraint(equalTo: badge.leadingAnchor, constant: -12),
+            titleLabel.topAnchor.constraint(equalTo: contentMaskView.topAnchor, constant: 24),
+            titleLabel.trailingAnchor.constraint(equalTo: contentMaskView.trailingAnchor, constant: -18),
 
             subtitleLabel.leadingAnchor.constraint(equalTo: contentMaskView.leadingAnchor, constant: 18),
             subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
             subtitleLabel.trailingAnchor.constraint(equalTo: contentMaskView.trailingAnchor, constant: -18),
+            subtitleLabel.bottomAnchor.constraint(lessThanOrEqualTo: ctaButton.topAnchor, constant: -12),
 
             ctaButton.leadingAnchor.constraint(equalTo: contentMaskView.leadingAnchor, constant: 18),
-            ctaButton.bottomAnchor.constraint(equalTo: contentMaskView.bottomAnchor, constant: -18),
+            ctaButton.topAnchor.constraint(greaterThanOrEqualTo: subtitleLabel.bottomAnchor, constant: 12),
+            ctaButton.bottomAnchor.constraint(equalTo: contentMaskView.bottomAnchor, constant: -16),
             ctaButton.heightAnchor.constraint(equalToConstant: 30),
 
             shimmer.leadingAnchor.constraint(equalTo: contentMaskView.leadingAnchor),

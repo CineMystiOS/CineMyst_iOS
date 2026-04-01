@@ -12,6 +12,7 @@ class PostJobViewController: UIViewController {
     // MARK: - UI Components
     private let scrollView = UIScrollView()
     private let contentView = UIView()
+    private let backgroundGradient = CAGradientLayer()
     
     private let formStack: UIStackView = {
         let stack = UIStackView()
@@ -120,7 +121,8 @@ class PostJobViewController: UIViewController {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = CineMystTheme.pinkPale
+        setupTheme()
         setupNavBar()
         setupScrollView()
         buildForm()
@@ -133,6 +135,11 @@ class PostJobViewController: UIViewController {
         Task {
             await fetchSavedCastingProfile()
         }
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        backgroundGradient.frame = view.bounds
     }
     override func viewWillAppear(_ animated: Bool) {
             super.viewWillAppear(animated)
@@ -165,6 +172,11 @@ class PostJobViewController: UIViewController {
     private func setupNavBar() {
         title = "Post a job"
         navigationController?.navigationBar.prefersLargeTitles = false
+        navigationController?.navigationBar.tintColor = CineMystTheme.brandPlum
+        navigationController?.navigationBar.titleTextAttributes = [
+            .foregroundColor: CineMystTheme.ink,
+            .font: UIFont(name: "Georgia-Bold", size: 22) ?? UIFont.boldSystemFont(ofSize: 22)
+        ]
         
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             image: UIImage(systemName: "chevron.left"),
@@ -177,7 +189,7 @@ class PostJobViewController: UIViewController {
     // MARK: - ScrollView + Content
     private func setupScrollView() {
         scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.backgroundColor = .systemGroupedBackground
+        scrollView.backgroundColor = .clear
         contentView.translatesAutoresizingMaskIntoConstraints = false
 
         view.addSubview(scrollView)
@@ -202,6 +214,18 @@ class PostJobViewController: UIViewController {
             formStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             formStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -100)
         ])
+    }
+
+    private func setupTheme() {
+        backgroundGradient.colors = [
+            UIColor(red: 0.988, green: 0.978, blue: 0.984, alpha: 1).cgColor,
+            CineMystTheme.plumMist.cgColor,
+            UIColor(red: 0.936, green: 0.892, blue: 0.917, alpha: 1).cgColor
+        ]
+        backgroundGradient.locations = [0, 0.45, 1]
+        backgroundGradient.startPoint = CGPoint(x: 0.1, y: 0)
+        backgroundGradient.endPoint = CGPoint(x: 0.9, y: 1)
+        view.layer.insertSublayer(backgroundGradient, at: 0)
     }
     
     // MARK: - Date Picker Setup

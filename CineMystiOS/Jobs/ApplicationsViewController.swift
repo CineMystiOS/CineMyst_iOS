@@ -21,6 +21,7 @@ class ApplicationsViewController: UIViewController {
     private var applications: [ApplicationCard] = []
     private var filteredApplications: [ApplicationCard] = []
     private var isFilteredByAI = false
+    private let backgroundGradient = CAGradientLayer()
     // Raw data for debug/info display
     private var dbApplicationsRaw: [Application] = []
     private var taskSubmissionsMap: [UUID: [TaskSubmission]] = [:]
@@ -44,7 +45,7 @@ class ApplicationsViewController: UIViewController {
         let lbl = UILabel()
         lbl.text = "Lead Actor - Drama Series \"City of Dre"
         lbl.font = UIFont.systemFont(ofSize: 16, weight: .regular)
-        lbl.textColor = .gray
+        lbl.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.62)
         lbl.translatesAutoresizingMaskIntoConstraints = false
         return lbl
     }()
@@ -53,12 +54,14 @@ class ApplicationsViewController: UIViewController {
         let tf = UITextField()
         tf.placeholder = "Search by name, location, or email..."
         tf.font = UIFont.systemFont(ofSize: 16)
-        tf.backgroundColor = .white
-        tf.layer.cornerRadius = 16
-        tf.layer.shadowColor = UIColor.black.cgColor
+        tf.backgroundColor = UIColor.white.withAlphaComponent(0.46)
+        tf.layer.cornerRadius = 18
+        tf.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.14).cgColor
         tf.layer.shadowOpacity = 0.08
-        tf.layer.shadowOffset = CGSize(width: 0, height: 2)
-        tf.layer.shadowRadius = 12
+        tf.layer.shadowOffset = CGSize(width: 0, height: 8)
+        tf.layer.shadowRadius = 18
+        tf.layer.borderWidth = 1
+        tf.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.12).cgColor
         tf.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 45, height: 50))
         tf.leftViewMode = .always
         tf.translatesAutoresizingMaskIntoConstraints = false
@@ -68,7 +71,7 @@ class ApplicationsViewController: UIViewController {
     private let searchIcon: UIImageView = {
         let iv = UIImageView()
         iv.image = UIImage(systemName: "magnifyingglass")
-        iv.tintColor = .gray
+        iv.tintColor = CineMystTheme.brandPlum.withAlphaComponent(0.42)
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
@@ -76,13 +79,15 @@ class ApplicationsViewController: UIViewController {
     private let filtersButton: UIButton = {
         let btn = UIButton()
         btn.setTitle(" Filters", for: .normal)
-        btn.setTitleColor(.label, for: .normal)
-        btn.backgroundColor = .white
+        btn.setTitleColor(CineMystTheme.brandPlum, for: .normal)
+        btn.backgroundColor = UIColor.white.withAlphaComponent(0.6)
         btn.layer.cornerRadius = 20
-        btn.layer.shadowColor = UIColor.black.cgColor
+        btn.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.12).cgColor
         btn.layer.shadowOpacity = 0.06
-        btn.layer.shadowOffset = CGSize(width: 0, height: 2)
-        btn.layer.shadowRadius = 8
+        btn.layer.shadowOffset = CGSize(width: 0, height: 6)
+        btn.layer.shadowRadius = 14
+        btn.layer.borderWidth = 1
+        btn.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.10).cgColor
         btn.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
         btn.contentEdgeInsets = UIEdgeInsets(top: 0, left: 28, bottom: 0, right: 16)
         btn.translatesAutoresizingMaskIntoConstraints = false
@@ -92,7 +97,7 @@ class ApplicationsViewController: UIViewController {
     private let filterIcon: UIImageView = {
         let iv = UIImageView()
         iv.image = UIImage(systemName: "slider.horizontal.3")
-        iv.tintColor = .black
+        iv.tintColor = CineMystTheme.brandPlum
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
@@ -100,13 +105,15 @@ class ApplicationsViewController: UIViewController {
     private let topApplicantsButton: UIButton = {
         let btn = UIButton()
         btn.setTitle("Top Applicants ", for: .normal)
-        btn.setTitleColor(.label, for: .normal)
-        btn.backgroundColor = .white
+        btn.setTitleColor(CineMystTheme.brandPlum, for: .normal)
+        btn.backgroundColor = UIColor.white.withAlphaComponent(0.6)
         btn.layer.cornerRadius = 20
-        btn.layer.shadowColor = UIColor.black.cgColor
+        btn.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.12).cgColor
         btn.layer.shadowOpacity = 0.06
-        btn.layer.shadowOffset = CGSize(width: 0, height: 2)
-        btn.layer.shadowRadius = 8
+        btn.layer.shadowOffset = CGSize(width: 0, height: 6)
+        btn.layer.shadowRadius = 14
+        btn.layer.borderWidth = 1
+        btn.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.10).cgColor
         btn.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
         btn.contentEdgeInsets = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 14)
         btn.translatesAutoresizingMaskIntoConstraints = false
@@ -116,7 +123,7 @@ class ApplicationsViewController: UIViewController {
     private let chevronIcon: UIImageView = {
         let iv = UIImageView()
         iv.image = UIImage(systemName: "chevron.down")
-        iv.tintColor = .black
+        iv.tintColor = CineMystTheme.brandPlum
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
@@ -125,9 +132,9 @@ class ApplicationsViewController: UIViewController {
         let btn = UIButton()
         btn.setTitle("Filtered by AI", for: .normal)
         btn.setTitleColor(.white, for: .normal)
-        btn.backgroundColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1.0)
+        btn.backgroundColor = CineMystTheme.brandPlum
         btn.layer.cornerRadius = 20
-        btn.layer.shadowColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.3).cgColor
+        btn.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.3).cgColor
         btn.layer.shadowOpacity = 0.3
         btn.layer.shadowOffset = CGSize(width: 0, height: 4)
         btn.layer.shadowRadius = 10
@@ -140,8 +147,8 @@ class ApplicationsViewController: UIViewController {
     private let countLabel: UILabel = {
         let lbl = UILabel()
         lbl.text = "25 applications"
-        lbl.font = UIFont.systemFont(ofSize: 20, weight: .bold)
-        lbl.textColor = UIColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1.0)
+        lbl.font = UIFont(name: "Georgia-Bold", size: 21) ?? UIFont.boldSystemFont(ofSize: 21)
+        lbl.textColor = CineMystTheme.ink
         lbl.translatesAutoresizingMaskIntoConstraints = false
         return lbl
     }()
@@ -159,11 +166,17 @@ class ApplicationsViewController: UIViewController {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor(red: 0.97, green: 0.97, blue: 0.98, alpha: 1.0)
+        view.backgroundColor = CineMystTheme.pinkPale
+        setupBackground()
         setupNavigationBar()
         setupUI()
         loadApplicationsForJob()
         setupActions()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        backgroundGradient.frame = view.bounds
     }
     
     // MARK: - Setup
@@ -176,23 +189,28 @@ class ApplicationsViewController: UIViewController {
         }
         
         let appearance = UINavigationBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = .white
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundEffect = UIBlurEffect(style: .systemThinMaterialLight)
+        appearance.backgroundColor = UIColor.white.withAlphaComponent(0.68)
         appearance.shadowColor = .clear
         appearance.largeTitleTextAttributes = [
-            .foregroundColor: UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1.0),
-            .font: UIFont.systemFont(ofSize: 34, weight: .bold)
+            .foregroundColor: CineMystTheme.ink,
+            .font: UIFont(name: "Georgia-Bold", size: 32) ?? UIFont.boldSystemFont(ofSize: 32)
+        ]
+        appearance.titleTextAttributes = [
+            .foregroundColor: CineMystTheme.ink,
+            .font: UIFont(name: "Georgia-Bold", size: 22) ?? UIFont.boldSystemFont(ofSize: 22)
         ]
         
         navigationController?.navigationBar.standardAppearance = appearance
         navigationController?.navigationBar.scrollEdgeAppearance = appearance
         
         let profileBtn = UIBarButtonItem(image: UIImage(systemName: "person.circle"), style: .plain, target: self, action: #selector(profileTapped))
-        profileBtn.tintColor = .darkGray
+        profileBtn.tintColor = CineMystTheme.brandPlum
         navigationItem.rightBarButtonItem = profileBtn
         
         let backBtn = UIBarButtonItem(image: UIImage(systemName: "chevron.left"), style: .plain, target: self, action: #selector(backTapped))
-        backBtn.tintColor = .darkGray
+        backBtn.tintColor = CineMystTheme.brandPlum
         navigationItem.leftBarButtonItem = backBtn
     }
     
@@ -207,10 +225,11 @@ class ApplicationsViewController: UIViewController {
     }
 
     private func setupUI() {
-        view.backgroundColor = .white
+        view.backgroundColor = .clear
         
         view.addSubview(scrollView)
         scrollView.addSubview(contentView)
+        scrollView.backgroundColor = .clear
         
         contentView.addSubview(subtitleLabel)
         contentView.addSubview(searchBar)
@@ -283,6 +302,18 @@ class ApplicationsViewController: UIViewController {
             tableView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
             tableView.heightAnchor.constraint(equalToConstant: 700)
         ])
+    }
+
+    private func setupBackground() {
+        backgroundGradient.colors = [
+            UIColor(red: 0.988, green: 0.978, blue: 0.984, alpha: 1).cgColor,
+            CineMystTheme.plumMist.cgColor,
+            UIColor(red: 0.936, green: 0.892, blue: 0.917, alpha: 1).cgColor
+        ]
+        backgroundGradient.locations = [0, 0.45, 1]
+        backgroundGradient.startPoint = CGPoint(x: 0.1, y: 0)
+        backgroundGradient.endPoint = CGPoint(x: 0.9, y: 1)
+        view.layer.insertSublayer(backgroundGradient, at: 0)
     }
     
     private func loadApplicationsForJob() {

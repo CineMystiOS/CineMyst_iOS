@@ -674,6 +674,9 @@ final class BookingCardCell: UITableViewCell {
 final class MentorshipHomeViewController: UIViewController {
 
     private let plum = MentorshipUI.brandPlum
+    private let backgroundGradient = CAGradientLayer()
+    private let ambientGlowTop = UIView()
+    private let ambientGlowBottom = UIView()
     var initialSegmentIndex: Int = 0
     private static let mentorCachePrefix = "mentor_profile_exists_"
     private static let mentorIdsCachePrefix = "mentor_profile_ids_"
@@ -910,7 +913,8 @@ final class MentorshipHomeViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = MentorshipUI.pageBackground
-        titleLabel.textColor = plum
+        setupBackground()
+        titleLabel.textColor = CineMystTheme.ink
         subtitleLabel.textColor = MentorshipUI.mutedText
         mentorsLabel.textColor = MentorshipUI.brandPlum
         bookingsTitle.textColor = MentorshipUI.brandPlum
@@ -963,8 +967,56 @@ final class MentorshipHomeViewController: UIViewController {
         }
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        backgroundGradient.frame = view.bounds
+        ambientGlowTop.layer.cornerRadius = ambientGlowTop.bounds.width / 2
+        ambientGlowBottom.layer.cornerRadius = ambientGlowBottom.bounds.width / 2
+    }
+
     deinit {
         NotificationCenter.default.removeObserver(self)
+    }
+
+    private func setupBackground() {
+        backgroundGradient.colors = [
+            UIColor(red: 0.988, green: 0.978, blue: 0.984, alpha: 1).cgColor,
+            CineMystTheme.plumMist.cgColor,
+            UIColor(red: 0.936, green: 0.892, blue: 0.917, alpha: 1).cgColor
+        ]
+        backgroundGradient.locations = [0, 0.45, 1]
+        backgroundGradient.startPoint = CGPoint(x: 0.1, y: 0)
+        backgroundGradient.endPoint = CGPoint(x: 0.9, y: 1)
+        view.layer.insertSublayer(backgroundGradient, at: 0)
+
+        ambientGlowTop.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.16)
+        ambientGlowTop.layer.shadowColor = CineMystTheme.brandPlum.cgColor
+        ambientGlowTop.layer.shadowOpacity = 0.22
+        ambientGlowTop.layer.shadowRadius = 80
+        ambientGlowTop.layer.shadowOffset = .zero
+
+        ambientGlowBottom.backgroundColor = CineMystTheme.deepPlumMid.withAlphaComponent(0.11)
+        ambientGlowBottom.layer.shadowColor = CineMystTheme.deepPlumMid.cgColor
+        ambientGlowBottom.layer.shadowOpacity = 0.16
+        ambientGlowBottom.layer.shadowRadius = 90
+        ambientGlowBottom.layer.shadowOffset = .zero
+
+        [ambientGlowTop, ambientGlowBottom].forEach {
+            $0.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview($0)
+        }
+
+        NSLayoutConstraint.activate([
+            ambientGlowTop.widthAnchor.constraint(equalToConstant: 220),
+            ambientGlowTop.heightAnchor.constraint(equalToConstant: 220),
+            ambientGlowTop.topAnchor.constraint(equalTo: view.topAnchor, constant: -42),
+            ambientGlowTop.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: 72),
+
+            ambientGlowBottom.widthAnchor.constraint(equalToConstant: 240),
+            ambientGlowBottom.heightAnchor.constraint(equalToConstant: 240),
+            ambientGlowBottom.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: -82),
+            ambientGlowBottom.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: 42)
+        ])
     }
 
     // Public: reload sessions & bookings (used after booking flow)

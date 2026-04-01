@@ -73,33 +73,33 @@ class JobCardView: UIView {
     
     // MARK: - UI Setup
     private func setupUI() {
-        backgroundColor = .white
-        layer.cornerRadius = 20
-        layer.shadowColor = UIColor.black.cgColor
-        layer.shadowOpacity = 0.12
-        layer.shadowRadius = 16
-        layer.shadowOffset = CGSize(width: 0, height: 8)
+        backgroundColor = UIColor.white.withAlphaComponent(0.82)
+        layer.cornerRadius = CineMystTheme.cardRadius
+        layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.16).cgColor
+        layer.shadowOpacity = 1
+        layer.shadowRadius = 22
+        layer.shadowOffset = CGSize(width: 0, height: 10)
         layer.borderWidth = 1
-        layer.borderColor = UIColor.systemGray5.cgColor
+        layer.borderColor = UIColor.white.withAlphaComponent(0.86).cgColor
         
         // Image
         profileImageView.layer.cornerRadius = 32
         profileImageView.layer.masksToBounds = true
         profileImageView.contentMode = .scaleAspectFill
-        profileImageView.backgroundColor = UIColor(red: 249/255, green: 244/255, blue: 252/255, alpha: 1)
+        profileImageView.backgroundColor = CineMystTheme.plumMist
         profileImageView.translatesAutoresizingMaskIntoConstraints = false
         profileImageView.layer.borderWidth = 2
-        profileImageView.layer.borderColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.1).cgColor
+        profileImageView.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.12).cgColor
         
         // Title
-        titleLabel.font = UIFont.systemFont(ofSize: 17, weight: .bold)
+        titleLabel.font = UIFont(name: "Georgia-Bold", size: 18) ?? UIFont.boldSystemFont(ofSize: 18)
         titleLabel.numberOfLines = 2
-        titleLabel.textColor = .label
+        titleLabel.textColor = CineMystTheme.ink
         
         // Company label with subtle background
         companyTagLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
-        companyTagLabel.textColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.8)
-        companyTagLabel.backgroundColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.08)
+        companyTagLabel.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.82)
+        companyTagLabel.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.08)
         companyTagLabel.layer.cornerRadius = 12
         companyTagLabel.clipsToBounds = true
         companyTagLabel.textAlignment = .center
@@ -111,29 +111,33 @@ class JobCardView: UIView {
         
         // Bookmark button - top right floating
         bookmarkButton.setImage(UIImage(systemName: "bookmark"), for: .normal)
-        bookmarkButton.tintColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1)
+        bookmarkButton.tintColor = CineMystTheme.brandPlum
+        bookmarkButton.backgroundColor = UIColor.white.withAlphaComponent(0.72)
+        bookmarkButton.layer.cornerRadius = 13
+        bookmarkButton.layer.borderWidth = 1
+        bookmarkButton.layer.borderColor = UIColor.white.withAlphaComponent(0.84).cgColor
         bookmarkButton.translatesAutoresizingMaskIntoConstraints = false
         addSubview(bookmarkButton)
         bookmarkButton.addTarget(self, action: #selector(bookmarkTapped), for: .touchUpInside)
         
         // Location + Salary row (clean, compact)
-        locationIcon.tintColor = .secondaryLabel
-        clockIcon.tintColor = .secondaryLabel
+        locationIcon.tintColor = CineMystTheme.brandPlum.withAlphaComponent(0.42)
+        clockIcon.tintColor = CineMystTheme.brandPlum.withAlphaComponent(0.42)
         
         locationLabel.font = UIFont.systemFont(ofSize: 14, weight: .regular)
-        locationLabel.textColor = .secondaryLabel
+        locationLabel.textColor = CineMystTheme.ink.withAlphaComponent(0.62)
         locationIcon.translatesAutoresizingMaskIntoConstraints = false
         clockIcon.translatesAutoresizingMaskIntoConstraints = false
         
         salaryLabel.font = UIFont.systemFont(ofSize: 16, weight: .bold)
-        salaryLabel.textColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1)
+        salaryLabel.textColor = CineMystTheme.brandPlum
         
         daysLeftLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
-        daysLeftLabel.textColor = .secondaryLabel
+        daysLeftLabel.textColor = CineMystTheme.ink.withAlphaComponent(0.58)
         
         tagLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
-        tagLabel.textColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.9)
-        tagLabel.backgroundColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.08)
+        tagLabel.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.9)
+        tagLabel.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.08)
         tagLabel.layer.cornerRadius = 13
         tagLabel.clipsToBounds = true
         tagLabel.textAlignment = .center
@@ -141,18 +145,18 @@ class JobCardView: UIView {
         tagLabel.heightAnchor.constraint(equalToConstant: 26).isActive = true
         
         appliedLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
-        appliedLabel.textColor = .tertiaryLabel
+        appliedLabel.textColor = CineMystTheme.ink.withAlphaComponent(0.42)
         
         // Apply button — enhanced style
         applyButton.setTitle("Apply Now", for: .normal)
-        applyButton.backgroundColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1)
+        applyButton.backgroundColor = CineMystTheme.brandPlum
         applyButton.setTitleColor(.white, for: .normal)
         applyButton.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
-        applyButton.layer.cornerRadius = 12
-        applyButton.layer.shadowColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.4).cgColor
+        applyButton.layer.cornerRadius = 14
+        applyButton.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.34).cgColor
         applyButton.layer.shadowOpacity = 0.3
-        applyButton.layer.shadowRadius = 8
-        applyButton.layer.shadowOffset = CGSize(width: 0, height: 4)
+        applyButton.layer.shadowRadius = 10
+        applyButton.layer.shadowOffset = CGSize(width: 0, height: 6)
         applyButton.heightAnchor.constraint(equalToConstant: 44).isActive = true
         applyButton.addTarget(self, action: #selector(applyTapped), for: .touchUpInside)
         

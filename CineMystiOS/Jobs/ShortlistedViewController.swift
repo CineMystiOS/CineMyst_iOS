@@ -197,6 +197,7 @@ final class ShortlistedViewController: UIViewController {
     var job: Job?
     private var tableView = UITableView(frame: .zero, style: .plain)
     private var candidates: [ShortlistedCandidate] = []
+    private let backgroundGradient = CAGradientLayer()
 
     private let subtitleLabel: UILabel = {
         let lbl = UILabel()
@@ -215,11 +216,17 @@ final class ShortlistedViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        view.backgroundColor = .white
+        view.backgroundColor = CineMystTheme.pinkPale
+        setupTheme()
         setupNavBar()
         setupUI()
         setupTable()
         loadShortlistedCandidates()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        backgroundGradient.frame = view.bounds
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -233,6 +240,10 @@ final class ShortlistedViewController: UIViewController {
 
         navigationItem.title = "Shortlisted"
         navigationController?.navigationBar.prefersLargeTitles = false
+        navigationController?.navigationBar.titleTextAttributes = [
+            .foregroundColor: CineMystTheme.ink,
+            .font: UIFont(name: "Georgia-Bold", size: 22) ?? UIFont.boldSystemFont(ofSize: 22)
+        ]
 
         let backBtn = UIBarButtonItem(
             image: UIImage(systemName: "chevron.left"),
@@ -243,6 +254,18 @@ final class ShortlistedViewController: UIViewController {
 
         backBtn.tintColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1)
         navigationItem.leftBarButtonItem = backBtn
+    }
+
+    private func setupTheme() {
+        backgroundGradient.colors = [
+            UIColor(red: 0.988, green: 0.978, blue: 0.984, alpha: 1).cgColor,
+            CineMystTheme.plumMist.cgColor,
+            UIColor(red: 0.936, green: 0.892, blue: 0.917, alpha: 1).cgColor
+        ]
+        backgroundGradient.locations = [0, 0.45, 1]
+        backgroundGradient.startPoint = CGPoint(x: 0.1, y: 0)
+        backgroundGradient.endPoint = CGPoint(x: 0.9, y: 1)
+        view.layer.insertSublayer(backgroundGradient, at: 0)
     }
 
     @objc private func backAction() {

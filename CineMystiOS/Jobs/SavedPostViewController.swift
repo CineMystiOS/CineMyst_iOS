@@ -4,17 +4,24 @@ class SavedPostViewController: UIViewController {
 
     private let scrollView = UIScrollView()
     private let contentView = UIStackView()
+    private let backgroundGradient = CAGradientLayer()
     
     private var bookmarkedJobs: [Job] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        view.backgroundColor = .white
+        view.backgroundColor = CineMystTheme.pinkPale
         title = "Saved Jobs"
+        setupBackground()
         
         setupNavigationBar()
         setupScrollView()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        backgroundGradient.frame = view.bounds
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -29,17 +36,34 @@ class SavedPostViewController: UIViewController {
             target: self,
             action: #selector(handleBack)
         )
-        navigationController?.navigationBar.tintColor = .black
+        navigationController?.navigationBar.tintColor = CineMystTheme.brandPlum
+        navigationController?.navigationBar.titleTextAttributes = [
+            .foregroundColor: CineMystTheme.ink,
+            .font: UIFont(name: "Georgia-Bold", size: 22) ?? UIFont.boldSystemFont(ofSize: 22)
+        ]
     }
 
     @objc private func handleBack() {
         navigationController?.popViewController(animated: true)
     }
 
+    private func setupBackground() {
+        backgroundGradient.colors = [
+            UIColor(red: 0.988, green: 0.978, blue: 0.984, alpha: 1).cgColor,
+            CineMystTheme.plumMist.cgColor,
+            UIColor(red: 0.936, green: 0.892, blue: 0.917, alpha: 1).cgColor
+        ]
+        backgroundGradient.locations = [0, 0.45, 1]
+        backgroundGradient.startPoint = CGPoint(x: 0.1, y: 0)
+        backgroundGradient.endPoint = CGPoint(x: 0.9, y: 1)
+        view.layer.insertSublayer(backgroundGradient, at: 0)
+    }
+
     // MARK: - ScrollView + Stack Setup
     private func setupScrollView() {
         view.addSubview(scrollView)
         scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.backgroundColor = .clear
 
         NSLayoutConstraint.activate([
             scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
@@ -161,8 +185,8 @@ class SavedPostViewController: UIViewController {
         emptyLabel.text = "No saved jobs yet\nBookmark jobs to see them here"
         emptyLabel.textAlignment = .center
         emptyLabel.numberOfLines = 0
-        emptyLabel.font = UIFont.systemFont(ofSize: 16)
-        emptyLabel.textColor = .secondaryLabel
+        emptyLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+        emptyLabel.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.62)
         emptyLabel.translatesAutoresizingMaskIntoConstraints = false
         
         contentView.addArrangedSubview(emptyLabel)
@@ -177,8 +201,8 @@ class SavedPostViewController: UIViewController {
         errorLabel.text = "Failed to load saved jobs\nPlease try again"
         errorLabel.textAlignment = .center
         errorLabel.numberOfLines = 0
-        errorLabel.font = UIFont.systemFont(ofSize: 16)
-        errorLabel.textColor = .systemRed
+        errorLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+        errorLabel.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.72)
         errorLabel.translatesAutoresizingMaskIntoConstraints = false
         
         contentView.addArrangedSubview(errorLabel)
@@ -188,4 +212,3 @@ class SavedPostViewController: UIViewController {
         ])
     }
 }
-

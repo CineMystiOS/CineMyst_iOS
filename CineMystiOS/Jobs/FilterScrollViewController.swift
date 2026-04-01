@@ -1,6 +1,7 @@
 import UIKit
 
 class FilterScrollViewController: UIViewController {
+    private let backgroundGradient = CAGradientLayer()
 
     // MARK: - UI Elements
     let categoryTableView = UITableView()
@@ -37,7 +38,8 @@ class FilterScrollViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .white
+        view.backgroundColor = CineMystTheme.pinkPale
+        setupTheme()
 
         setupUI()
         setupLayout()
@@ -49,19 +51,36 @@ class FilterScrollViewController: UIViewController {
         loadCategory(.rolePreference)
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        backgroundGradient.frame = view.bounds
+    }
+
     // MARK: - UI SETUP
     func setupUI() {
 
         headerLabel.text = "Filter"
         headerLabel.font = .boldSystemFont(ofSize: 22)
-        headerLabel.textColor = UIColor(red: 82/255, green: 7/255, blue: 65/255, alpha: 1)
+        headerLabel.textColor = CineMystTheme.ink
 
-        categoryTableView.backgroundColor = .white
-        optionsContainer.backgroundColor = .white
+        categoryTableView.backgroundColor = UIColor.white.withAlphaComponent(0.5)
+        optionsContainer.backgroundColor = UIColor.white.withAlphaComponent(0.28)
 
         view.addSubview(headerLabel)
         view.addSubview(categoryTableView)
         view.addSubview(optionsContainer)
+    }
+
+    private func setupTheme() {
+        backgroundGradient.colors = [
+            UIColor(red: 0.988, green: 0.978, blue: 0.984, alpha: 1).cgColor,
+            CineMystTheme.plumMist.cgColor,
+            UIColor(red: 0.936, green: 0.892, blue: 0.917, alpha: 1).cgColor
+        ]
+        backgroundGradient.locations = [0, 0.45, 1]
+        backgroundGradient.startPoint = CGPoint(x: 0.1, y: 0)
+        backgroundGradient.endPoint = CGPoint(x: 0.9, y: 1)
+        view.layer.insertSublayer(backgroundGradient, at: 0)
     }
 
     func setupLayout() {

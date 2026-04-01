@@ -17,17 +17,19 @@ class SwipeScreenViewController: UIViewController {
     // MARK: - NEW COUNTERS
     private var shortlistedCount = 0
     private var passedCount = 0
+    private let backgroundGradient = CAGradientLayer()
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        view.backgroundColor = UIColor(red: 44/255, green: 5/255, blue: 35/255, alpha: 1)
+        view.backgroundColor = CineMystTheme.deepPlumDark
+        setupTheme()
         
         configureAudioSession()
         setupNavigationBar()
         setupUI()
     }
-    
+
     private func configureAudioSession() {
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
@@ -35,6 +37,18 @@ class SwipeScreenViewController: UIViewController {
         } catch {
             print("Failed to set audio session category: \(error)")
         }
+    }
+
+    private func setupTheme() {
+        backgroundGradient.colors = [
+            CineMystTheme.deepPlumDark.cgColor,
+            CineMystTheme.deepPlum.cgColor,
+            CineMystTheme.deepPlumMid.cgColor
+        ]
+        backgroundGradient.locations = [0, 0.5, 1]
+        backgroundGradient.startPoint = CGPoint(x: 0.1, y: 0)
+        backgroundGradient.endPoint = CGPoint(x: 0.9, y: 1)
+        view.layer.insertSublayer(backgroundGradient, at: 0)
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -58,6 +72,7 @@ class SwipeScreenViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        backgroundGradient.frame = view.bounds
 
         if !cardsLoaded {
             loadCards()
