@@ -18,6 +18,10 @@ struct FloatingMenuButton: View {
     @State private var isExpanded = false
     @State private var buttonScale: CGFloat = 1.0
     @State private var rotationAngle: Double = 0
+
+    private let askAIOffset = CGSize(width: -104, height: -60)
+    private let cameraOffset = CGSize(width: -56, height: -112)
+    private let galleryOffset = CGSize(width: 2, height: -92)
     
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -26,7 +30,7 @@ struct FloatingMenuButton: View {
                     icon: "brain.head.profile",
                     label: "Ask AI",
                     isVisible: isExpanded,
-                    offset: CGSize(width: -102, height: -102)
+                    offset: askAIOffset
                 ) {
                     collapseAndExecute(didTapAI)
                 }
@@ -39,7 +43,7 @@ struct FloatingMenuButton: View {
                     icon: "camera.fill",
                     label: "Camera",
                     isVisible: isExpanded,
-                    offset: CGSize(width: -54, height: -138)
+                    offset: cameraOffset
                 ) {
                     collapseAndExecute(didTapCamera)
                 }
@@ -52,7 +56,7 @@ struct FloatingMenuButton: View {
                     icon: "photo.on.rectangle",
                     label: "Gallery",
                     isVisible: isExpanded,
-                    offset: CGSize(width: -8, height: -102)
+                    offset: galleryOffset
                 ) {
                     collapseAndExecute(didTapGallery)
                 }
@@ -134,7 +138,7 @@ struct MenuActionButton: View {
         Button(action: {
             action()
         }) {
-            VStack(spacing: 5) {
+            VStack(spacing: 4) {
                 ZStack {
                     Circle()
                         .fill(
@@ -151,18 +155,18 @@ struct MenuActionButton: View {
                             Circle()
                                 .stroke(Color.white.opacity(0.22), lineWidth: 1.1)
                         )
-                        .frame(width: 50, height: 50)
+                        .frame(width: 46, height: 46)
                     Image(systemName: icon)
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
                 }
                 .shadow(color: Color(red: 0.25, green: 0.07, blue: 0.15).opacity(0.28), radius: 16, x: 0, y: 10)
                 
                 Text(label)
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: 8, weight: .semibold))
                     .foregroundColor(Color(red: 0.30, green: 0.12, blue: 0.21))
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
                     .background(
                         Capsule()
                             .fill(Color.white.opacity(0.82))
@@ -175,7 +179,7 @@ struct MenuActionButton: View {
         }
         .buttonStyle(.plain)
         .contentShape(Circle())
-        .frame(width: 68)
+        .frame(width: 64)
         .offset(offset)
         .opacity(isVisible ? 1 : 0)
         .scaleEffect(isVisible ? 1 : 0.1)
