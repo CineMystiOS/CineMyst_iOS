@@ -29,6 +29,9 @@ final class BecomeMentorViewController: UITableViewController {
     }
 
     private var form = Form()
+    private let backgroundGradient = CAGradientLayer()
+    private let ambientGlowTop = UIView()
+    private let ambientGlowBottom = UIView()
 
     // MARK: - UI Identifiers
     private enum ID {
@@ -51,8 +54,14 @@ final class BecomeMentorViewController: UITableViewController {
         let b = UIButton(type: .system)
         b.setTitle("Submit", for: .normal)
         b.setTitleColor(.white, for: .normal)
-        b.backgroundColor = brandColor
-        b.layer.cornerRadius = 12
+        b.backgroundColor = CineMystTheme.brandPlum
+        b.layer.cornerRadius = 16
+        b.layer.borderWidth = 1
+        b.layer.borderColor = UIColor.white.withAlphaComponent(0.22).cgColor
+        b.layer.shadowColor = CineMystTheme.deepPlum.cgColor
+        b.layer.shadowOpacity = 0.18
+        b.layer.shadowRadius = 18
+        b.layer.shadowOffset = CGSize(width: 0, height: 10)
         b.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
         b.addTarget(self, action: #selector(didTapSubmit), for: .touchUpInside)
         return b
@@ -63,6 +72,9 @@ final class BecomeMentorViewController: UITableViewController {
         super.viewDidLoad()
         title = "Become a Mentor"
         navigationItem.largeTitleDisplayMode = .never
+        view.backgroundColor = CineMystTheme.pinkPale
+        setupBackground()
+        setupTheme()
 
     // Prefill full name from user's profile if available
     Task { await prefillFullNameFromProfile() }
@@ -76,8 +88,12 @@ final class BecomeMentorViewController: UITableViewController {
 
         tableView.estimatedRowHeight = 60
         tableView.keyboardDismissMode = .interactive
+        tableView.backgroundColor = .clear
+        tableView.separatorStyle = .none
+        tableView.sectionHeaderTopPadding = 14
 
         let footer = UIView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 96))
+        footer.backgroundColor = .clear
         submitButton.translatesAutoresizingMaskIntoConstraints = false
         footer.addSubview(submitButton)
 
@@ -89,6 +105,96 @@ final class BecomeMentorViewController: UITableViewController {
         ])
 
         tableView.tableFooterView = footer
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        backgroundGradient.frame = view.bounds
+        ambientGlowTop.layer.cornerRadius = ambientGlowTop.bounds.width / 2
+        ambientGlowBottom.layer.cornerRadius = ambientGlowBottom.bounds.width / 2
+    }
+
+    private func setupTheme() {
+        navigationController?.navigationBar.tintColor = CineMystTheme.brandPlum
+        navigationController?.navigationBar.titleTextAttributes = [
+            .foregroundColor: CineMystTheme.ink,
+            .font: UIFont.systemFont(ofSize: 18, weight: .semibold)
+        ]
+    }
+
+    private func setupBackground() {
+        backgroundGradient.colors = [
+            UIColor(red: 0.988, green: 0.978, blue: 0.984, alpha: 1).cgColor,
+            CineMystTheme.plumMist.cgColor,
+            UIColor(red: 0.936, green: 0.892, blue: 0.917, alpha: 1).cgColor
+        ]
+        backgroundGradient.locations = [0, 0.45, 1]
+        backgroundGradient.startPoint = CGPoint(x: 0.1, y: 0)
+        backgroundGradient.endPoint = CGPoint(x: 0.9, y: 1)
+        view.layer.insertSublayer(backgroundGradient, at: 0)
+
+        ambientGlowTop.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.12)
+        ambientGlowTop.layer.shadowColor = CineMystTheme.brandPlum.cgColor
+        ambientGlowTop.layer.shadowOpacity = 0.18
+        ambientGlowTop.layer.shadowRadius = 80
+        ambientGlowTop.layer.shadowOffset = .zero
+
+        ambientGlowBottom.backgroundColor = CineMystTheme.deepPlumMid.withAlphaComponent(0.08)
+        ambientGlowBottom.layer.shadowColor = CineMystTheme.deepPlumMid.cgColor
+        ambientGlowBottom.layer.shadowOpacity = 0.16
+        ambientGlowBottom.layer.shadowRadius = 90
+        ambientGlowBottom.layer.shadowOffset = .zero
+
+        [ambientGlowTop, ambientGlowBottom].forEach {
+            $0.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview($0)
+        }
+
+        NSLayoutConstraint.activate([
+            ambientGlowTop.widthAnchor.constraint(equalToConstant: 220),
+            ambientGlowTop.heightAnchor.constraint(equalToConstant: 220),
+            ambientGlowTop.topAnchor.constraint(equalTo: view.topAnchor, constant: -50),
+            ambientGlowTop.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: 70),
+
+            ambientGlowBottom.widthAnchor.constraint(equalToConstant: 240),
+            ambientGlowBottom.heightAnchor.constraint(equalToConstant: 240),
+            ambientGlowBottom.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: -90),
+            ambientGlowBottom.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: 50)
+        ])
+    }
+
+    private func styleCardCell(_ cell: UITableViewCell, showChevron: Bool = false) {
+        let chevronTag = 88127
+        cell.backgroundColor = .clear
+        cell.contentView.backgroundColor = UIColor.white.withAlphaComponent(0.72)
+        cell.contentView.layer.cornerRadius = 16
+        cell.contentView.layer.borderWidth = 1
+        cell.contentView.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.10).cgColor
+        cell.contentView.layer.masksToBounds = true
+        cell.accessoryType = .none
+        cell.accessoryView = nil
+        cell.tintColor = CineMystTheme.brandPlum
+        let selected = UIView()
+        selected.backgroundColor = CineMystTheme.plumMist.withAlphaComponent(0.85)
+        cell.selectedBackgroundView = selected
+
+        if let existingChevron = cell.contentView.viewWithTag(chevronTag) {
+            existingChevron.removeFromSuperview()
+        }
+
+        if showChevron {
+            let chevron = UIImageView(image: UIImage(systemName: "chevron.right"))
+            chevron.tag = chevronTag
+            chevron.translatesAutoresizingMaskIntoConstraints = false
+            chevron.tintColor = CineMystTheme.brandPlum.withAlphaComponent(0.42)
+            chevron.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
+            cell.contentView.addSubview(chevron)
+
+            NSLayoutConstraint.activate([
+                chevron.centerYAnchor.constraint(equalTo: cell.contentView.centerYAnchor),
+                chevron.trailingAnchor.constraint(equalTo: cell.contentView.trailingAnchor, constant: -16)
+            ])
+        }
     }
 
     // MARK: - Prefill helpers
@@ -159,6 +265,14 @@ final class BecomeMentorViewController: UITableViewController {
         }
     }
 
+    override func tableView(_ tableView: UITableView, willDisplayHeaderView view: UIView, forSection section: Int) {
+        guard let header = view as? UITableViewHeaderFooterView else { return }
+        header.tintColor = .clear
+        header.contentView.backgroundColor = .clear
+        header.textLabel?.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.74)
+        header.textLabel?.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
+    }
+
     // MARK: - Row Count
     override func tableView(_ tableView: UITableView,
                             numberOfRowsInSection section: Int) -> Int {
@@ -212,9 +326,10 @@ final class BecomeMentorViewController: UITableViewController {
                     for: indexPath)
                 var config = cell.defaultContentConfiguration()
                 config.text = form.years ?? "Experience"
-                config.textProperties.color = .systemBlue
+                config.textProperties.color = CineMystTheme.brandPlum
+                config.textProperties.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
                 cell.contentConfiguration = config
-                cell.accessoryType = .disclosureIndicator
+                styleCardCell(cell, showChevron: true)
                 return cell
 
             case 4:
@@ -265,8 +380,11 @@ final class BecomeMentorViewController: UITableViewController {
                 config.secondaryText = form.mentorshipAreas.isEmpty
                     ? "No areas selected"
                     : "\(form.mentorshipAreas.count) selected"
-                config.textProperties.color = .systemBlue
+                config.textProperties.color = CineMystTheme.brandPlum
+                config.textProperties.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+                config.secondaryTextProperties.color = CineMystTheme.ink.withAlphaComponent(0.58)
                 cell.contentConfiguration = config
+                styleCardCell(cell, showChevron: true)
                 return cell
             }
 
@@ -281,8 +399,11 @@ final class BecomeMentorViewController: UITableViewController {
             var config = cell.defaultContentConfiguration()
             config.text = area
             config.secondaryText = price
+            config.textProperties.color = CineMystTheme.ink
+            config.textProperties.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+            config.secondaryTextProperties.color = CineMystTheme.brandPlum
             cell.contentConfiguration = config
-            cell.accessoryType = .disclosureIndicator
+            styleCardCell(cell, showChevron: true)
             return cell
 
         // ----------------------
@@ -297,8 +418,10 @@ final class BecomeMentorViewController: UITableViewController {
                 )
                 var config = cell.defaultContentConfiguration()
                 config.text = "Add Slot"
-                config.textProperties.color = .systemBlue
+                config.textProperties.color = CineMystTheme.brandPlum
+                config.textProperties.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
                 cell.contentConfiguration = config
+                styleCardCell(cell, showChevron: true)
                 return cell
             }
 
@@ -312,9 +435,11 @@ final class BecomeMentorViewController: UITableViewController {
 
             var config = cell.defaultContentConfiguration()
             config.text = formattedSlot(slotDate)
-            config.textProperties.color = .label
+            config.textProperties.color = CineMystTheme.ink
+            config.textProperties.font = UIFont.systemFont(ofSize: 15, weight: .medium)
             cell.selectionStyle = .none
             cell.contentConfiguration = config
+            styleCardCell(cell)
             return cell
 
         // ----------------------
@@ -1457,6 +1582,20 @@ private extension Calendar {
     }
 }
 
+private extension UITextField {
+    func setLeftPaddingPoints(_ amount: CGFloat) {
+        let paddingView = UIView(frame: CGRect(x: 0, y: 0, width: amount, height: 1))
+        leftView = paddingView
+        leftViewMode = .always
+    }
+
+    func setRightPaddingPoints(_ amount: CGFloat) {
+        let paddingView = UIView(frame: CGRect(x: 0, y: 0, width: amount, height: 1))
+        rightView = paddingView
+        rightViewMode = .always
+    }
+}
+
 // MARK: - Minimal cells (TextFieldCell, TextViewCell, PickerCell, AvatarCell)
 final class TextFieldCell: UITableViewCell, UITextFieldDelegate {
     private let textField: UITextField = {
@@ -1464,6 +1603,12 @@ final class TextFieldCell: UITableViewCell, UITextFieldDelegate {
         tf.clearButtonMode = .whileEditing
         tf.font = UIFont.preferredFont(forTextStyle: .body)
         tf.translatesAutoresizingMaskIntoConstraints = false
+        tf.backgroundColor = CineMystTheme.plumMist.withAlphaComponent(0.92)
+        tf.layer.cornerRadius = 14
+        tf.layer.borderWidth = 1
+        tf.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.10).cgColor
+        tf.textColor = CineMystTheme.ink
+        tf.tintColor = CineMystTheme.brandPlum
         return tf
     }()
     private var changeHandler: ((String?) -> Void)?
@@ -1474,14 +1619,22 @@ final class TextFieldCell: UITableViewCell, UITextFieldDelegate {
             textField.leadingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.leadingAnchor),
             textField.trailingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.trailingAnchor),
             textField.topAnchor.constraint(equalTo: contentView.layoutMarginsGuide.topAnchor, constant: 6),
-            textField.bottomAnchor.constraint(equalTo: contentView.layoutMarginsGuide.bottomAnchor, constant: -6)
+            textField.bottomAnchor.constraint(equalTo: contentView.layoutMarginsGuide.bottomAnchor, constant: -6),
+            textField.heightAnchor.constraint(equalToConstant: 50)
         ])
         textField.delegate = self
         selectionStyle = .none
+        backgroundColor = .clear
+        textField.setLeftPaddingPoints(14)
+        textField.setRightPaddingPoints(14)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     func configure(placeholder: String, text: String?, onChange: @escaping (String?) -> Void) {
         textField.placeholder = placeholder
+        textField.attributedPlaceholder = NSAttributedString(
+            string: placeholder,
+            attributes: [.foregroundColor: CineMystTheme.brandPlum.withAlphaComponent(0.42)]
+        )
         textField.text = text
         changeHandler = onChange
     }
@@ -1495,9 +1648,12 @@ final class TextViewCell: UITableViewCell, UITextViewDelegate {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         textView.font = UIFont.preferredFont(forTextStyle: .body)
         textView.isScrollEnabled = false
-        textView.layer.cornerRadius = 8
-        textView.textContainerInset = UIEdgeInsets(top: 10, left: 8, bottom: 10, right: 8)
-        textView.backgroundColor = .secondarySystemBackground
+        textView.layer.cornerRadius = 14
+        textView.layer.borderWidth = 1
+        textView.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.10).cgColor
+        textView.textContainerInset = UIEdgeInsets(top: 12, left: 10, bottom: 12, right: 10)
+        textView.backgroundColor = CineMystTheme.plumMist.withAlphaComponent(0.92)
+        textView.tintColor = CineMystTheme.brandPlum
         textView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(textView)
         NSLayoutConstraint.activate([
@@ -1508,15 +1664,16 @@ final class TextViewCell: UITableViewCell, UITextViewDelegate {
         ])
         textView.delegate = self
         selectionStyle = .none
+        backgroundColor = .clear
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     func configure(text: String?, placeholder: String = "", onChange: @escaping (String?) -> Void) {
         changeHandler = onChange
-        if let t = text, !t.isEmpty { textView.text = t; textView.textColor = .label }
-        else { textView.text = placeholder; textView.textColor = .secondaryLabel }
+        if let t = text, !t.isEmpty { textView.text = t; textView.textColor = CineMystTheme.ink }
+        else { textView.text = placeholder; textView.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.42) }
     }
     func textViewDidBeginEditing(_ textView: UITextView) {
-        if textView.textColor == .secondaryLabel { textView.text = ""; textView.textColor = .label }
+        if textView.textColor != CineMystTheme.ink { textView.text = ""; textView.textColor = CineMystTheme.ink }
     }
     func textViewDidEndEditing(_ textView: UITextView) { changeHandler?(textView.text) }
 }
@@ -1538,10 +1695,12 @@ final class PickerCell: UITableViewCell {
                 dp.topAnchor.constraint(equalTo: contentView.layoutMarginsGuide.topAnchor),
                 dp.bottomAnchor.constraint(equalTo: contentView.layoutMarginsGuide.bottomAnchor)
             ])
+            dp.tintColor = CineMystTheme.brandPlum
             dp.addTarget(self, action: #selector(valueChanged(_:)), for: .valueChanged)
             datePicker = dp
         }
         datePicker?.date = date
+        backgroundColor = .clear
     }
     @objc private func valueChanged(_ dp: UIDatePicker) { handler?(dp.date) }
 }
@@ -1560,7 +1719,8 @@ final class AvatarCell: UITableViewCell {
     private let titleLabelView: UILabel = {
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.font = .preferredFont(forTextStyle: .body)
+        label.font = .systemFont(ofSize: 16, weight: .semibold)
+        label.textColor = CineMystTheme.ink
         return label
     }()
 
@@ -1568,7 +1728,7 @@ final class AvatarCell: UITableViewCell {
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
         label.font = .systemFont(ofSize: 13)
-        label.textColor = .secondaryLabel
+        label.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.62)
         return label
     }()
 
@@ -1579,6 +1739,12 @@ final class AvatarCell: UITableViewCell {
         contentView.addSubview(titleLabelView)
         contentView.addSubview(subtitleLabelView)
         accessoryType = .disclosureIndicator
+        backgroundColor = .clear
+        contentView.backgroundColor = UIColor.white.withAlphaComponent(0.72)
+        contentView.layer.cornerRadius = 18
+        contentView.layer.borderWidth = 1
+        contentView.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.10).cgColor
+        contentView.layer.masksToBounds = true
 
         NSLayoutConstraint.activate([
             previewImageView.leadingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.leadingAnchor),
@@ -1605,7 +1771,7 @@ final class AvatarCell: UITableViewCell {
             subtitleLabelView.text = "Selected image will be uploaded to your mentor profile"
         } else {
             previewImageView.image = UIImage(systemName: "person.crop.circle.fill")
-            previewImageView.tintColor = .systemGray3
+            previewImageView.tintColor = CineMystTheme.brandPlum.withAlphaComponent(0.45)
             titleLabelView.text = "Upload profile photo"
             subtitleLabelView.text = "Choose the picture you want mentees to see"
         }
