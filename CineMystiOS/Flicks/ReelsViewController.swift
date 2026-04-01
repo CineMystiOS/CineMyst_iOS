@@ -26,57 +26,82 @@ final class ReelsViewController: UIViewController {
         return cv
     }()
     
+    // Gradient FAB container — round, bottom-right
+    private let createButtonContainer: UIView = {
+        let v = UIView()
+        v.translatesAutoresizingMaskIntoConstraints = false
+        v.layer.cornerRadius = 30
+        v.layer.masksToBounds = false
+        v.layer.shadowColor   = UIColor(red: 0.80, green: 0.45, blue: 0.66, alpha: 1).cgColor
+        v.layer.shadowOpacity = 0.7
+        v.layer.shadowOffset  = CGSize(width: 0, height: 4)
+        v.layer.shadowRadius  = 12
+        return v
+    }()
+
     private let createButton: UIButton = {
         let btn = UIButton(type: .system)
-        
-        var config = UIButton.Configuration.filled()
-        config.baseBackgroundColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1)
-        config.baseForegroundColor = .white
-        config.cornerStyle = .medium
-        config.image = UIImage(systemName: "plus")
-        config.imagePlacement = .leading
-        config.imagePadding = 6
-        config.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12)
-        
-        let titleAttributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 14, weight: .semibold)
-        ]
-        config.attributedTitle = AttributedString("Create Flick", attributes: AttributeContainer(titleAttributes))
-        
-        btn.configuration = config
-        btn.layer.shadowColor = UIColor.black.cgColor
-        btn.layer.shadowOpacity = 0.3
-        btn.layer.shadowOffset = CGSize(width: 0, height: 2)
-        btn.layer.shadowRadius = 4
         btn.translatesAutoresizingMaskIntoConstraints = false
+        let cfg = UIImage.SymbolConfiguration(pointSize: 22, weight: .semibold)
+        btn.setImage(UIImage(systemName: "sparkles", withConfiguration: cfg), for: .normal)
+        btn.tintColor = .white
         return btn
+    }()
+
+    // Gradient layer for the FAB (inserted in viewDidLoad after layout)
+    private let fabGradient: CAGradientLayer = {
+        let g = CAGradientLayer()
+        g.colors    = [UIColor(red: 0.80, green: 0.45, blue: 0.66, alpha: 1).cgColor,
+                       UIColor(red: 0.26, green: 0.09, blue: 0.19, alpha: 1).cgColor]
+        g.startPoint = CGPoint(x: 0, y: 0)
+        g.endPoint   = CGPoint(x: 1, y: 1)
+        g.cornerRadius = 30
+        return g
+    }()
+    
+    // Top-left title
+    private let titleLabel: UILabel = {
+        let lbl = UILabel()
+        lbl.text = "Flicks"
+        lbl.font = .systemFont(ofSize: 28, weight: .heavy)
+        lbl.textColor = .white
+        lbl.translatesAutoresizingMaskIntoConstraints = false
+        // Subtle drop shadow for readability over videos
+        lbl.layer.shadowColor = UIColor.black.cgColor
+        lbl.layer.shadowOpacity = 0.5
+        lbl.layer.shadowOffset = CGSize(width: 0, height: 2)
+        lbl.layer.shadowRadius = 4
+        return lbl
     }()
     
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
+        extendedLayoutIncludesOpaqueBars = true
+        edgesForExtendedLayout = .all
         configureAudioSession()
         setupCollectionView()
         setupCreateButton()
         loadInitialReels()
     }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        fabGradient.frame = createButtonContainer.bounds
+    }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        // Refresh flicks when returning to the screen
-        Task {
-            await fetchReelsFromSupabase()
-        }
+        navigationController?.setNavigationBarHidden(true, animated: false)
+        reels = []
+        collectionView.reloadData()
+        Task { await fetchReelsFromSupabase() }
     }
-    
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        playCurrentVideo()
-    }
-    
+
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        navigationController?.setNavigationBarHidden(false, animated: false)
         pauseCurrentVideo()
     }
     
@@ -93,23 +118,40 @@ final class ReelsViewController: UIViewController {
     // MARK: - Setup
     private func setupCollectionView() {
         view.addSubview(collectionView)
-        
+        collectionView.contentInsetAdjustmentBehavior = .never
+
         NSLayoutConstraint.activate([
-            collectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            collectionView.topAnchor.constraint(equalTo: view.topAnchor),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            collectionView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
+            collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        
+        // Add title over collection view
+        view.addSubview(titleLabel)
+        NSLayoutConstraint.activate([
+            titleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
+            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20)
         ])
     }
     
     private func setupCreateButton() {
-        view.addSubview(createButton)
-        createButton.addTarget(self, action: #selector(createFlickTapped), for: .touchUpInside)
+        view.addSubview(createButtonContainer)
+        createButtonContainer.layer.addSublayer(fabGradient)
         
+        createButtonContainer.addSubview(createButton)
+        createButton.addTarget(self, action: #selector(createFlickTapped), for: .touchUpInside)
+
         NSLayoutConstraint.activate([
-            createButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            createButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
-            createButton.heightAnchor.constraint(equalToConstant: 36)
+            createButtonContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            createButtonContainer.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -30),
+            createButtonContainer.widthAnchor.constraint(equalToConstant: 60),
+            createButtonContainer.heightAnchor.constraint(equalToConstant: 60),
+
+            createButton.topAnchor.constraint(equalTo: createButtonContainer.topAnchor),
+            createButton.bottomAnchor.constraint(equalTo: createButtonContainer.bottomAnchor),
+            createButton.leadingAnchor.constraint(equalTo: createButtonContainer.leadingAnchor),
+            createButton.trailingAnchor.constraint(equalTo: createButtonContainer.trailingAnchor)
         ])
     }
     
@@ -130,34 +172,43 @@ final class ReelsViewController: UIViewController {
         do {
             let offset = reels.count
             let flicks = try await FlicksService.shared.fetchFlicks(limit: 10, offset: offset)
-            
-            await MainActor.run {
-                let newReels = flicks.map { flick in
-                    Reel.from(flick: flick, isLiked: false)
+
+            // Batch-check liked status concurrently for all fetched flicks
+            var likedMap: [String: Bool] = [:]
+            await withTaskGroup(of: (String, Bool).self) { group in
+                for flick in flicks {
+                    group.addTask {
+                        let liked = (try? await FlicksService.shared.isFlickLiked(flickId: flick.id)) ?? false
+                        return (flick.id, liked)
+                    }
                 }
-                
-                if offset == 0 {
-                    self.reels = newReels
-                } else {
-                    self.reels.append(contentsOf: newReels)
-                }
-                
-                self.collectionView.reloadData()
-                
-                // Check likes for loaded reels
-                Task {
-                    await self.checkLikesForReels()
+                for await (id, liked) in group {
+                    likedMap[id] = liked
                 }
             }
+
+            let newReels = flicks.map { flick in
+                Reel.from(flick: flick, isLiked: likedMap[flick.id] ?? false)
+            }
+
+            if offset == 0 {
+                reels = newReels
+            } else {
+                reels.append(contentsOf: newReels)
+            }
+            collectionView.reloadData()
+
         } catch {
             print("❌ Failed to fetch flicks: \(error)")
-            await MainActor.run {
-                // Show error or fallback to sample data if needed
-                if self.reels.isEmpty {
-                    self.showEmptyState()
-                }
-            }
+            if reels.isEmpty { showEmptyState() }
         }
+    }
+
+    // Call this to force a fresh reload (e.g. after posting)
+    func refreshFlicks() {
+        reels = []
+        collectionView.reloadData()
+        Task { await fetchReelsFromSupabase() }
     }
     
     private func checkLikesForReels() async {
@@ -314,7 +365,8 @@ extension ReelsViewController: UICollectionViewDataSource {
 // MARK: - UICollectionView Delegate
 extension ReelsViewController: UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        return collectionView.bounds.size
+        // Use screen bounds so cells fill edge-to-edge even before layout pass
+        return UIScreen.main.bounds.size
     }
     
     func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {

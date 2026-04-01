@@ -2,6 +2,10 @@ import UIKit
 
 final class NotificationCell: UITableViewCell {
 
+    // MARK: - Callbacks
+    var onAccept:  (() -> Void)?
+    var onDecline: (() -> Void)?
+
     // MARK: - Subviews
     private let iconView: UIImageView = {
         let iv = UIImageView()
@@ -15,7 +19,7 @@ final class NotificationCell: UITableViewCell {
 
     private let titleLabel: UILabel = {
         let l = UILabel()
-        l.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+        l.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
         l.numberOfLines = 1
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
@@ -25,47 +29,64 @@ final class NotificationCell: UITableViewCell {
         let l = UILabel()
         l.font = UIFont.systemFont(ofSize: 14)
         l.textColor = .secondaryLabel
-        l.numberOfLines = 0               // allow wrapping
+        l.numberOfLines = 0
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
 
     private let timeLabel: UILabel = {
         let l = UILabel()
-        l.font = UIFont.systemFont(ofSize: 13)
+        l.font = UIFont.systemFont(ofSize: 12)
         l.textColor = .tertiaryLabel
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
 
-    private let connectButton: UIButton = {
-        let b = UIButton(type: .system)
-        b.setTitle("Connect", for: .normal)
-        b.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
-        b.tintColor = .white
-        b.backgroundColor = UIColor(named: "AppPrimary") ?? .systemPurple
-        b.layer.cornerRadius = 14
-        b.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
-        b.translatesAutoresizingMaskIntoConstraints = false
-        b.setContentHuggingPriority(.required, for: .horizontal)
-        return b
-    }()
-
-    // Stacks
-    private let textStack: UIStackView = {
+    // Accept / Decline row
+    private let actionRow: UIStackView = {
         let s = UIStackView()
-        s.axis = .vertical
-        s.spacing = 4
-        s.alignment = .fill
+        s.axis = .horizontal
+        s.spacing = 10
+        s.distribution = .fillEqually
         s.translatesAutoresizingMaskIntoConstraints = false
         return s
     }()
 
-    private let horizontalStack: UIStackView = {
+    private let acceptButton: UIButton = {
+        let b = UIButton(type: .system)
+        b.setTitle("Accept", for: .normal)
+        b.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        b.setTitleColor(.white, for: .normal)
+        b.backgroundColor = UIColor(red: 0.27, green: 0.08, blue: 0.27, alpha: 1) // deep plum
+        b.layer.cornerRadius = 14
+        b.contentEdgeInsets = UIEdgeInsets(top: 7, left: 16, bottom: 7, right: 16)
+        return b
+    }()
+
+    private let declineButton: UIButton = {
+        let b = UIButton(type: .system)
+        b.setTitle("Decline", for: .normal)
+        b.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        b.setTitleColor(UIColor(red: 0.27, green: 0.08, blue: 0.27, alpha: 1), for: .normal)
+        b.backgroundColor = UIColor(red: 0.27, green: 0.08, blue: 0.27, alpha: 0.1)
+        b.layer.cornerRadius = 14
+        b.contentEdgeInsets = UIEdgeInsets(top: 7, left: 16, bottom: 7, right: 16)
+        return b
+    }()
+
+    private let statusLabel: UILabel = {
+        let l = UILabel()
+        l.font = UIFont.systemFont(ofSize: 13, weight: .medium)
+        l.textColor = .secondaryLabel
+        l.isHidden = true
+        return l
+    }()
+
+    // Text stack
+    private let textStack: UIStackView = {
         let s = UIStackView()
-        s.axis = .horizontal
-        s.alignment = .top
-        s.spacing = 12
+        s.axis = .vertical
+        s.spacing = 4
         s.translatesAutoresizingMaskIntoConstraints = false
         return s
     }()
@@ -74,75 +95,104 @@ final class NotificationCell: UITableViewCell {
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         selectionStyle = .none
-        contentView.backgroundColor = .systemBackground
         setupUI()
     }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    required init?(coder: NSCoder) { fatalError() }
 
     // MARK: - Setup
     private func setupUI() {
-        // Compose stacks
         textStack.addArrangedSubview(titleLabel)
         textStack.addArrangedSubview(messageLabel)
+        textStack.addArrangedSubview(timeLabel)
 
-        horizontalStack.addArrangedSubview(iconView)
-        horizontalStack.addArrangedSubview(textStack)
-        horizontalStack.addArrangedSubview(connectButton)
+        // Accept / Decline buttons in actionRow
+        actionRow.addArrangedSubview(acceptButton)
+        actionRow.addArrangedSubview(declineButton)
+        actionRow.addArrangedSubview(statusLabel)
+        textStack.addArrangedSubview(actionRow)
 
-        contentView.addSubview(horizontalStack)
-        contentView.addSubview(timeLabel)
+        contentView.addSubview(iconView)
+        contentView.addSubview(textStack)
 
-        // Constraints
         NSLayoutConstraint.activate([
-            // icon size
+            iconView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            iconView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 14),
             iconView.widthAnchor.constraint(equalToConstant: 44),
             iconView.heightAnchor.constraint(equalToConstant: 44),
 
-            // horizontalStack pinned to contentView top & sides
-            horizontalStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
-            horizontalStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            horizontalStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-
-            // timeLabel below the horizontalStack and pinned to bottom (important!)
-            timeLabel.topAnchor.constraint(equalTo: horizontalStack.bottomAnchor, constant: 8),
-            timeLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 12),
-            timeLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -16),
-            timeLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12)
+            textStack.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 12),
+            textStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            textStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
+            textStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
         ])
 
-        // Make sure the textStack can shrink when connectButton is present
-        textStack.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
-        // If the connect button is hidden, it shouldn't take space
-        connectButton.isHidden = true
+        acceptButton.addTarget(self, action: #selector(acceptTapped), for: .touchUpInside)
+        declineButton.addTarget(self, action: #selector(declineTapped), for: .touchUpInside)
     }
 
     // MARK: - Configure
     func configure(with item: NotificationItem) {
-        titleLabel.text = item.title
+        titleLabel.text  = item.title
         messageLabel.text = item.message
-        timeLabel.text = item.timeAgo
+        timeLabel.text   = item.timeAgo
 
-        connectButton.isHidden = !item.showConnectButton
-
-        if let name = item.imageName {
-            if item.isSystemIcon {
-                iconView.image = UIImage(systemName: name)
-                iconView.tintColor = .systemOrange
-                iconView.backgroundColor = .clear
-            } else {
-                iconView.image = UIImage(named: name) ?? UIImage(systemName: "person.crop.circle.fill")
-                iconView.backgroundColor = .clear
-            }
+        // Icon
+        if item.isSystemIcon, let name = item.imageName {
+            iconView.image = UIImage(systemName: name)
+            iconView.tintColor = item.type == "connection_request"
+                ? UIColor(red: 0.27, green: 0.08, blue: 0.27, alpha: 1)
+                : .systemOrange
+            iconView.backgroundColor = iconView.tintColor.withAlphaComponent(0.12)
+        } else if let name = item.imageName {
+            iconView.image = UIImage(named: name) ?? UIImage(systemName: "person.crop.circle.fill")
+            iconView.backgroundColor = .clear
         } else {
             iconView.image = UIImage(systemName: "bell.fill")
+            iconView.tintColor = .systemOrange
+        }
+
+        // Action buttons (connection request only)
+        switch item.type {
+        case "connection_request":
+            switch item.actionState {
+            case "pending":
+                actionRow.isHidden = false
+                acceptButton.isHidden  = false
+                declineButton.isHidden = false
+                statusLabel.isHidden   = true
+            case "accepted":
+                actionRow.isHidden = false
+                acceptButton.isHidden  = true
+                declineButton.isHidden = true
+                statusLabel.isHidden   = false
+                statusLabel.text = "✓ Connected"
+                statusLabel.textColor = .systemGreen
+            case "declined":
+                actionRow.isHidden = false
+                acceptButton.isHidden  = true
+                declineButton.isHidden = true
+                statusLabel.isHidden   = false
+                statusLabel.text = "Declined"
+                statusLabel.textColor = .secondaryLabel
+            default:
+                actionRow.isHidden = true
+            }
+        default:
+            actionRow.isHidden = true
         }
     }
 
-    // Ensure layout calculation is stable
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        contentView.layoutIfNeeded()
+    // MARK: - Actions
+    @objc private func acceptTapped()  { onAccept?() }
+    @objc private func declineTapped() { onDecline?() }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        onAccept  = nil
+        onDecline = nil
+        actionRow.isHidden = true
+        statusLabel.isHidden = true
+        acceptButton.isHidden  = false
+        declineButton.isHidden = false
     }
 }

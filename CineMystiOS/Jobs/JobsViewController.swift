@@ -380,16 +380,9 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
         // Clear existing cards
         jobListStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         
-        // If we have cached jobs, reload from filtered list
-        if !allJobs.isEmpty {
-            Task { [weak self] in
-                await self?.displayFilteredJobs()
-            }
-        } else {
-            // Load new cards from API
-            Task { [weak self] in
-                await self?.addJobCards()
-            }
+        // Always load new cards from API to ensure fresh data (like newly posted jobs) reflects instantly
+        Task { [weak self] in
+            await self?.addJobCards()
         }
     }
     
@@ -405,7 +398,8 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
                 
                 // Fetch production house data and application count
                 Task {
-                    let (productionHouse, profilePictureUrl) = await self.fetchProductionHouse(directorId: job.directorId)
+                    let directorUuid = job.directorId ?? UUID()
+                    let (productionHouse, profilePictureUrl) = await self.fetchProductionHouse(directorId: directorUuid)
                     let applicationCount = await self.fetchApplicationCount(jobId: job.id)
                     
                     await MainActor.run {
@@ -419,12 +413,12 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
                                         await MainActor.run {
                                             card.configure(
                                                 image: image,
-                                                title: job.title,
+                                                title: job.title ?? "Untitled",
                                                 company: productionHouse,
-                                                location: job.location,
-                                                salary: "₹ \(job.ratePerDay)/day",
+                                                location: job.location ?? "Remote",
+                                                salary: "₹ \(job.ratePerDay ?? 0)/day",
                                                 daysLeft: job.daysLeftText,
-                                                tag: job.jobType,
+                                                tag: job.jobType ?? "Film",
                                                 appliedCount: "\(applicationCount) applied"
                                             )
                                         }
@@ -438,12 +432,12 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
                         // Set initial configuration with default image
                         card.configure(
                             image: UIImage(named: "avatar_placeholder"),
-                            title: job.title,
+                            title: job.title ?? "Untitled",
                             company: productionHouse,
-                            location: job.location,
-                            salary: "₹ \(job.ratePerDay)/day",
+                            location: job.location ?? "Remote",
+                            salary: "₹ \(job.ratePerDay ?? 0)/day",
                             daysLeft: job.daysLeftText,
-                            tag: job.jobType,
+                            tag: job.jobType ?? "Film",
                             appliedCount: "\(applicationCount) applied"
                         )
                     }
@@ -495,7 +489,7 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
             
             print("📋 Loaded \(jobs.count) active jobs")
             for (index, job) in jobs.enumerated() {
-                print("   Job \(index + 1): '\(job.title)' - Location: '\(job.location)' - Company: '\(job.companyName)'")
+                print("   Job \(index + 1): '\(job.title ?? "Untitled")' - Location: '\(job.location ?? "TBD")' - Company: '\(job.companyName ?? "Unknown")'")
             }
             
             await MainActor.run { [weak self] in
@@ -513,7 +507,8 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
                     
                     // Fetch production house data and application count
                     Task {
-                        let (productionHouse, profilePictureUrl) = await self.fetchProductionHouse(directorId: job.directorId)
+                        let directorUuid = job.directorId ?? UUID()
+                        let (productionHouse, profilePictureUrl) = await self.fetchProductionHouse(directorId: directorUuid)
                         let applicationCount = await self.fetchApplicationCount(jobId: job.id)
                         
                         await MainActor.run {
@@ -527,12 +522,12 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
                                             await MainActor.run {
                                                 card.configure(
                                                     image: image,
-                                                    title: job.title,
+                                                    title: job.title ?? "Untitled",
                                                     company: productionHouse,
-                                                    location: job.location,
-                                                    salary: "₹ \(job.ratePerDay)/day",
+                                                    location: job.location ?? "Remote",
+                                                    salary: "₹ \(job.ratePerDay ?? 0)/day",
                                                     daysLeft: job.daysLeftText,
-                                                    tag: job.jobType,
+                                                    tag: job.jobType ?? "Film",
                                                     appliedCount: "\(applicationCount) applied"
                                                 )
                                             }
@@ -546,12 +541,12 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
                             // Set initial configuration with default image
                             card.configure(
                                 image: UIImage(named: "avatar_placeholder"),
-                                title: job.title,
+                                title: job.title ?? "Untitled Job",
                                 company: productionHouse,
-                                location: job.location,
-                                salary: "₹ \(job.ratePerDay)/day",
+                                location: job.location ?? "Remote",
+                                salary: "₹ \(job.ratePerDay ?? 0)/day",
                                 daysLeft: job.daysLeftText,
-                                tag: job.jobType,
+                                tag: job.jobType ?? "Film",
                                 appliedCount: "\(applicationCount) applied"
                             )
                         }
@@ -794,14 +789,14 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
         // Apply role filter
         if let role = activeRoleFilter {
             filtered = filtered.filter { job in
-                job.jobType.lowercased().contains(role.lowercased())
+                (job.jobType ?? "").lowercased().contains(role.lowercased())
             }
         }
         
         // Apply position filter  
         if let position = activePositionFilter {
             filtered = filtered.filter { job in
-                job.title.lowercased().contains(position.lowercased())
+                (job.title ?? "").lowercased().contains(position.lowercased())
             }
         }
         
@@ -809,15 +804,15 @@ final class jobsViewController: UIViewController, UIScrollViewDelegate {
         if let project = activeProjectFilter {
             filtered = filtered.filter { job in
                 // Check if job description or title contains project type
-                job.title.lowercased().contains(project.lowercased()) ||
-                job.jobType.lowercased().contains(project.lowercased())
+                (job.title ?? "").lowercased().contains(project.lowercased()) ||
+                (job.jobType ?? "").lowercased().contains(project.lowercased())
             }
         }
         
         // Apply earning filter
         if let earning = activeEarningFilter, earning > 0 {
             filtered = filtered.filter { job in
-                job.ratePerDay >= Int(earning)
+                (job.ratePerDay ?? 0) >= Int(earning)
             }
         }
         
@@ -839,19 +834,19 @@ extension jobsViewController: UISearchBarDelegate {
         // Apply active filters first
         if activeRoleFilter != nil || activePositionFilter != nil || activeProjectFilter != nil || activeEarningFilter != nil {
             if let role = activeRoleFilter {
-                jobsToFilter = jobsToFilter.filter { $0.jobType.lowercased().contains(role.lowercased()) }
+                jobsToFilter = jobsToFilter.filter { ($0.jobType ?? "").lowercased().contains(role.lowercased()) }
             }
             if let position = activePositionFilter {
-                jobsToFilter = jobsToFilter.filter { $0.title.lowercased().contains(position.lowercased()) }
+                jobsToFilter = jobsToFilter.filter { ($0.title ?? "").lowercased().contains(position.lowercased()) }
             }
             if let project = activeProjectFilter {
                 jobsToFilter = jobsToFilter.filter { 
-                    $0.title.lowercased().contains(project.lowercased()) ||
-                    $0.jobType.lowercased().contains(project.lowercased())
+                    ($0.title ?? "").lowercased().contains(project.lowercased()) ||
+                    ($0.jobType ?? "").lowercased().contains(project.lowercased())
                 }
             }
             if let earning = activeEarningFilter, earning > 0 {
-                jobsToFilter = jobsToFilter.filter { $0.ratePerDay >= Int(earning) }
+                jobsToFilter = jobsToFilter.filter { ($0.ratePerDay ?? 0) >= Int(earning) }
             }
         }
         
@@ -860,10 +855,10 @@ extension jobsViewController: UISearchBarDelegate {
             filteredJobs = jobsToFilter
         } else {
             filteredJobs = jobsToFilter.filter { job in
-                job.title.lowercased().contains(searchText.lowercased()) ||
-                job.companyName.lowercased().contains(searchText.lowercased()) ||
-                job.location.lowercased().contains(searchText.lowercased()) ||
-                job.jobType.lowercased().contains(searchText.lowercased())
+                (job.title ?? "").lowercased().contains(searchText.lowercased()) ||
+                (job.companyName ?? "").lowercased().contains(searchText.lowercased()) ||
+                (job.location ?? "").lowercased().contains(searchText.lowercased()) ||
+                (job.jobType ?? "").lowercased().contains(searchText.lowercased())
             }
         }
         

@@ -221,47 +221,37 @@ class LoginViewController: UIViewController {
     private func checkUserProfile() async throws -> Bool {
         guard let session = try await AuthManager.shared.currentSession() else {
             print("❌ No session available for profile check")
-            throw LoginError.profileCheckFailed("Session not found")
+            return false  // let them through to onboarding
         }
-        
+
         let userId = session.user.id
         print("🔍 Checking profile for user: \(userId)")
-        
+
+        // response.data is raw Data bytes — 'as? [String:Any]' always fails.
+        // Use Codable .value decoding instead.
+        struct ProfileCheck: Codable {
+            let onboarding_completed: Bool?
+        }
+
         do {
-            let response = try await supabase
+            let profile: ProfileCheck = try await supabase
                 .from("profiles")
-                .select("onboarding_completed, id")
+                .select("onboarding_completed")
                 .eq("id", value: userId.uuidString)
                 .single()
                 .execute()
-            
-            guard let data = response.data as? [String: Any] else {
-                print("⚠️ Profile data could not be decoded")
-                throw LoginError.profileCheckFailed("Profile data missing")
-            }
-            
-            // ✅ Handle NULL or missing onboarding_completed field - default to false
-            let onboardingCompleted: Bool
-            if let value = data["onboarding_completed"] as? Bool {
-                onboardingCompleted = value
-            } else if let value = data["onboarding_completed"] as? NSNull {
-                // Field is NULL in database - treat as incomplete
-                print("⚠️ onboarding_completed is NULL - defaulting to false")
-                onboardingCompleted = false
-            } else {
-                // Field is missing - also treat as incomplete
-                print("⚠️ onboarding_completed field missing - defaulting to false")
-                onboardingCompleted = false
-            }
-            
-            print("✅ Profile found - Onboarding complete: \(onboardingCompleted)")
-            return onboardingCompleted
-            
+                .value
+
+            let completed = profile.onboarding_completed ?? false
+            print("✅ Onboarding complete: \(completed)")
+            return completed
         } catch {
-            print("❌ Profile check error: \(error)")
-            throw LoginError.profileCheckFailed(error.localizedDescription)
+            // No profile row yet — route to onboarding, don't block login
+            print("⚠️ Profile check failed (no row yet?): \(error). Routing to onboarding.")
+            return false
         }
     }
+
 
     // MARK: - RESET PASSWORD
     private func showResetPasswordAlert() {

@@ -9,11 +9,8 @@ import Supabase
 
 class JobsService {
     static let shared = JobsService()
-    private let supabase = SupabaseClient(
-        supabaseURL: URL(string: "https://kyhyunyobgouumgwcigk.supabase.co")!,
-        supabaseKey: "sb_publishable_oJe1X9aiPdKm6wqR1zvFhA_aIiej9-d"
-    )
     
+    // Use the global supabase instance defined in auth/Supabase.swift
     // Add to JobsService class
 
     // MARK: - Bookmarks
@@ -155,7 +152,7 @@ class JobsService {
         
         print("📦 JobsService: Received \(response.count) jobs")
         for job in response {
-            print("   - \(job.title) | Status: '\(job.status.rawValue)' | ID: \(job.id.uuidString.prefix(8))")
+            print("   - \(job.title ?? "Untitled") | Status: '\(job.status?.rawValue ?? "nil")' | ID: \(job.id.uuidString.prefix(8))")
         }
         
         return response

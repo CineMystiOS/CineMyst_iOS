@@ -225,7 +225,7 @@ class PostedJobsDashboardViewController: UIViewController {
                 
                 print("✅ Found \(jobs.count) jobs for \(sectionName)")
                 for job in jobs {
-                    print("   - \(job.title) | Status: \(job.status.rawValue) | ID: \(job.id.uuidString.prefix(8))")
+                    print("   - \(job.title ?? "Untitled") | Status: \(job.status?.rawValue ?? "nil") | ID: \(job.id.uuidString.prefix(8))")
                 }
                 
                 await MainActor.run {

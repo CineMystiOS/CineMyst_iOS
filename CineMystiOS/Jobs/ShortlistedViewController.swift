@@ -207,11 +207,6 @@ final class ShortlistedViewController: UIViewController {
         lbl.translatesAutoresizingMaskIntoConstraints = false
         return lbl
     }()
-    
-    private let supabase = SupabaseClient(
-        supabaseURL: URL(string: "https://kyhyunyobgouumgwcigk.supabase.co")!,
-        supabaseKey: "sb_publishable_oJe1X9aiPdKm6wqR1zvFhA_aIiej9-d"
-    )
 
     override func viewDidLoad() {
         super.viewDidLoad()

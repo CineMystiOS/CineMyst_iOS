@@ -16,7 +16,9 @@ class SignUpViewController: UIViewController {
     @IBOutlet weak var passwordTextField: UITextField!
     @IBOutlet weak var signUpButton: UIButton!
     @IBOutlet weak var signInButton: UIButton!
-    
+
+    // Programmatically added — mirrors the style of passwordTextField
+    private let confirmPasswordTextField = UITextField()
     private var activityIndicator: UIActivityIndicatorView!
     private var gradientLayer: CAGradientLayer?
     
@@ -63,9 +65,58 @@ class SignUpViewController: UIViewController {
         passwordTextField.isSecureTextEntry = true
         emailTextField.autocapitalizationType = .none
         usernameTextField.autocapitalizationType = .none
-        
+
+        addEyeToggle(to: passwordTextField)
+        setupConfirmPasswordField()
+
         let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
         view.addGestureRecognizer(tap)
+    }
+
+    private func setupConfirmPasswordField() {
+        guard let pwField = passwordTextField else { return }
+
+        // Mirror the visual style of the password field
+        confirmPasswordTextField.isSecureTextEntry = true
+        confirmPasswordTextField.placeholder = "Confirm Password"
+        confirmPasswordTextField.borderStyle = pwField.borderStyle
+        confirmPasswordTextField.backgroundColor = pwField.backgroundColor
+        confirmPasswordTextField.font = pwField.font
+        confirmPasswordTextField.textColor = pwField.textColor
+        confirmPasswordTextField.layer.cornerRadius = pwField.layer.cornerRadius
+        confirmPasswordTextField.layer.borderWidth = pwField.layer.borderWidth
+        confirmPasswordTextField.layer.borderColor = pwField.layer.borderColor
+        confirmPasswordTextField.autocapitalizationType = .none
+        confirmPasswordTextField.translatesAutoresizingMaskIntoConstraints = false
+        confirmPasswordTextField.returnKeyType = .done
+        confirmPasswordTextField.delegate = self
+        addEyeToggle(to: confirmPasswordTextField)
+
+        // Insert confirm field directly below the password field
+        view.addSubview(confirmPasswordTextField)
+        NSLayoutConstraint.activate([
+            confirmPasswordTextField.topAnchor.constraint(equalTo: pwField.bottomAnchor, constant: 12),
+            confirmPasswordTextField.leadingAnchor.constraint(equalTo: pwField.leadingAnchor),
+            confirmPasswordTextField.trailingAnchor.constraint(equalTo: pwField.trailingAnchor),
+            confirmPasswordTextField.heightAnchor.constraint(equalTo: pwField.heightAnchor),
+        ])
+    }
+
+    private func addEyeToggle(to field: UITextField) {
+        let btn = UIButton(type: .custom)
+        btn.setImage(UIImage(systemName: "eye.slash"), for: .normal)
+        btn.setImage(UIImage(systemName: "eye"), for: .selected)
+        btn.tintColor = .gray
+        btn.frame = CGRect(x: 0, y: 0, width: 40, height: 40)
+        btn.tag = field.tag
+        // Store the field reference via closure
+        btn.addAction(UIAction { [weak btn, weak field] _ in
+            guard let btn, let field else { return }
+            field.isSecureTextEntry.toggle()
+            btn.isSelected = !field.isSecureTextEntry
+        }, for: .touchUpInside)
+        field.rightView = btn
+        field.rightViewMode = .always
     }
     
     private func setupActivityIndicator() {
@@ -90,7 +141,6 @@ class SignUpViewController: UIViewController {
             return
         }
 
-        // Validate username format
         guard isValidUsername(username) else {
             showAlert(message: "Username must be 3-20 characters, only letters, numbers, and underscores allowed")
             return
@@ -100,9 +150,24 @@ class SignUpViewController: UIViewController {
             showAlert(message: "Enter a valid email")
             return
         }
-        
+
         guard password.count >= 6 else {
             showAlert(message: "Password must be at least 6 characters")
+            return
+        }
+
+        // ✅ Confirm password check — prevents mistyped passwords
+        let confirm = confirmPasswordTextField.text ?? ""
+        guard !confirm.isEmpty else {
+            showAlert(message: "Please confirm your password")
+            confirmPasswordTextField.becomeFirstResponder()
+            return
+        }
+        guard password == confirm else {
+            showAlert(message: "Passwords do not match. Please re-enter them carefully.")
+            passwordTextField.text = ""
+            confirmPasswordTextField.text = ""
+            passwordTextField.becomeFirstResponder()
             return
         }
 
@@ -279,3 +344,15 @@ class SignUpViewController: UIViewController {
         present(alert, animated: true)
     }
 }
+
+// MARK: - UITextFieldDelegate
+extension SignUpViewController: UITextFieldDelegate {
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        if textField == confirmPasswordTextField {
+            textField.resignFirstResponder()
+            signUpButtonTapped(signUpButton as Any)
+        }
+        return true
+    }
+}
+

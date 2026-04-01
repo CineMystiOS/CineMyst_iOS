@@ -6,10 +6,6 @@ class ApplicationStartedViewController: UIViewController {
     // MARK: - Properties
     var job: Job?
     private let backgroundGradient = CAGradientLayer()
-    private let supabase = SupabaseClient(
-        supabaseURL: URL(string: "https://kyhyunyobgouumgwcigk.supabase.co")!,
-        supabaseKey: "sb_publishable_oJe1X9aiPdKm6wqR1zvFhA_aIiej9-d"
-    )
     
     // MARK: - Modern UI Components
     

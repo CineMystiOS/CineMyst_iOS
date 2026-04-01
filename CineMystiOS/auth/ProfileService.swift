@@ -64,7 +64,7 @@ class ProfileService {
                 bannerUrl: profileResponse.banner_url,
                 location: formatLocation(city: profileResponse.location_city, state: profileResponse.location_state),
                 isVerified: profileResponse.is_verified ?? false,
-                connectionCount: profileResponse.connection_count ?? 0,
+                connectionCount: await fetchConnectionCount(userId: userId),
                 email: profileResponse.email,
                 phoneNumber: profileResponse.phone_number
             )
@@ -152,7 +152,27 @@ class ProfileService {
             return count
         } catch {
             print("❌ Error fetching project count: \(error)")
-            return 0 // Return 0 instead of throwing to avoid breaking profile load
+            return 0
+        }
+    }
+
+    /// Count accepted connections for a user from the connections table
+    private func fetchConnectionCount(userId: UUID) async -> Int {
+        do {
+            // Count rows where user is requester OR receiver and status is accepted
+            let uid = userId.uuidString
+            let result = try await supabase
+                .from("connections")
+                .select("id", head: true, count: .exact)
+                .eq("status", value: "accepted")
+                .or("requester_id.eq.\(uid),receiver_id.eq.\(uid)")
+                .execute()
+            let count = result.count ?? 0
+            print("🔗 Connection count for \(uid.prefix(8)): \(count)")
+            return count
+        } catch {
+            print("⚠️ Failed to fetch connection count: \(error)")
+            return 0
         }
     }
     
@@ -207,17 +227,45 @@ class ProfileService {
     /// Returns true if the user has at least one portfolio row (regardless of items)
     func hasPortfolio(userId: UUID) async -> Bool {
         do {
+            // Check new actor_portfolios table first
             let result = try await supabase
+                .from("actor_portfolios")
+                .select("id", head: true, count: .exact)
+                .eq("user_id", value: userId.uuidString)
+                .execute()
+            if (result.count ?? 0) > 0 { return true }
+
+            // Fall back to legacy portfolios table
+            let result2 = try await supabase
                 .from("portfolios")
                 .select("id", head: true, count: .exact)
                 .eq("user_id", value: userId.uuidString)
                 .execute()
-            let count = result.count ?? 0
-            print("📋 Portfolio check: \(count) portfolio(s) found for user")
-            return count > 0
+            return (result2.count ?? 0) > 0
         } catch {
             print("⚠️ Portfolio existence check failed: \(error)")
             return false
+        }
+    }
+
+    /// Returns "none", "pending", or "connected" between two users
+    func connectionState(requesterId: UUID, receiverId: UUID) async -> String {
+        do {
+            struct ConnRow: Codable { let status: String }
+            let rows: [ConnRow] = try await supabase
+                .from("connections")
+                .select("status")
+                .or("and(requester_id.eq.\(requesterId.uuidString),receiver_id.eq.\(receiverId.uuidString)),and(requester_id.eq.\(receiverId.uuidString),receiver_id.eq.\(requesterId.uuidString))")
+                .limit(1)
+                .execute()
+                .value
+            if let row = rows.first {
+                return row.status == "accepted" ? "connected" : "pending"
+            }
+            return "none"
+        } catch {
+            print("⚠️ Connection state check failed: \(error)")
+            return "none"
         }
     }
 

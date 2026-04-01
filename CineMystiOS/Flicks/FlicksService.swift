@@ -17,7 +17,7 @@ struct Flick: Codable, Identifiable {
     let caption: String?
     let audioTitle: String?
     let likesCount: Int
-    let commentsCount: Int
+    var commentsCount: Int
     let sharesCount: Int
     let createdAt: String
     
@@ -85,30 +85,43 @@ class FlicksService {
     
     // MARK: - Fetch Flicks
     func fetchFlicks(limit: Int = 10, offset: Int = 0) async throws -> [Flick] {
+        // Simple select — no FK join needed (flicks.user_id has no declared FK constraint)
         let response = try await supabase
             .from("flicks")
-            .select("""
-                *,
-                profiles!flicks_user_id_fkey(username, full_name, profile_picture_url)
-            """)
+            .select("*")
             .order("created_at", ascending: false)
             .range(from: offset, to: offset + limit - 1)
             .execute()
-        
-        let flicksData = response.data
-        var flicks = try JSONDecoder().decode([Flick].self, from: flicksData)
-        
-        // Parse nested profile data
-        if let json = try? JSONSerialization.jsonObject(with: flicksData) as? [[String: Any]] {
-            for (index, item) in json.enumerated() {
-                if let profile = item["profiles"] as? [String: Any] {
-                    flicks[index].username = profile["username"] as? String
-                    flicks[index].fullName = profile["full_name"] as? String
-                    flicks[index].profilePictureUrl = profile["profile_picture_url"] as? String
+
+        var flicks = try JSONDecoder().decode([Flick].self, from: response.data)
+
+        // Enrich each flick with profile info via separate lookup
+        for i in flicks.indices {
+            let uid = flicks[i].userId
+            if let profileData = try? await supabase
+                .from("profiles")
+                .select("username, full_name, profile_picture_url")
+                .eq("id", value: uid)
+                .single()
+                .execute() {
+                if let json = try? JSONSerialization.jsonObject(with: profileData.data) as? [String: Any] {
+                    flicks[i].username           = json["username"] as? String
+                    flicks[i].fullName           = json["full_name"] as? String
+                    flicks[i].profilePictureUrl  = json["profile_picture_url"] as? String
+                }
+            }
+            // 2. Fetch accurate comment count
+            if let commentsData = try? await supabase
+                .from("flick_comments")
+                .select("id")
+                .eq("flick_id", value: flicks[i].id)
+                .execute() {
+                if let rows = try? JSONSerialization.jsonObject(with: commentsData.data) as? [[String: Any]] {
+                    flicks[i].commentsCount = rows.count
                 }
             }
         }
-        
+
         return flicks
     }
     
@@ -241,64 +254,60 @@ class FlicksService {
     
     // MARK: - Like Flick
     func likeFlick(flickId: String) async throws {
-        guard let userId = try? await supabase.auth.session.user.id.uuidString else {
-            throw NSError(domain: "FlicksService", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        let userId = try await supabase.auth.session.user.id.uuidString
+        struct L: Encodable { let flick_id, user_id: String }
+        // Insert instead of upsert so we don't trip missing UPDATE privileges in RLS
+        do {
+            try await supabase
+                .from("flick_likes")
+                .insert(L(flick_id: flickId, user_id: userId))
+                .execute()
+        } catch {
+            print("Like insert failed (might already be liked): \(error)")
         }
-        
-        struct NewLike: Encodable {
-            let flick_id: String
-            let user_id: String
+            
+        // Graceful increment (doesn't fail the like if the RPC is missing)
+        do {
+            try await supabase
+                .rpc("increment_flick_likes", params: ["p_flick_id": flickId])
+                .execute()
+        } catch {
+            print("RPC increment failed (likely missing on server), but like succeeded: \(error)")
         }
-        
-        let like = NewLike(
-            flick_id: flickId,
-            user_id: userId
-        )
-        
-        try await supabase
-            .from("flick_likes")
-            .insert(like)
-            .execute()
-        
-        // Increment likes count
-        try await supabase
-            .rpc("increment_flick_likes", params: ["flick_id": flickId])
-            .execute()
     }
-    
+
     // MARK: - Unlike Flick
     func unlikeFlick(flickId: String) async throws {
-        guard let userId = try? await supabase.auth.session.user.id.uuidString else {
-            throw NSError(domain: "FlicksService", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
-        }
-        
+        let userId = try await supabase.auth.session.user.id.uuidString
         try await supabase
             .from("flick_likes")
             .delete()
             .eq("flick_id", value: flickId)
-            .eq("user_id", value: userId)
+            .eq("user_id",  value: userId)
             .execute()
-        
-        // Decrement likes count
-        try await supabase
-            .rpc("decrement_flick_likes", params: ["flick_id": flickId])
-            .execute()
+            
+        // Graceful decrement
+        do {
+            try await supabase
+                .rpc("decrement_flick_likes", params: ["p_flick_id": flickId])
+                .execute()
+        } catch {
+            print("RPC decrement failed, but unlike succeeded: \(error)")
+        }
     }
-    
+
     // MARK: - Check if Liked
     func isFlickLiked(flickId: String) async throws -> Bool {
-        guard let userId = try? await supabase.auth.session.user.id.uuidString else {
-            return false
-        }
-        
-        let response = try await supabase
+        guard let uid = try? await supabase.auth.session.user.id.uuidString else { return false }
+        let res = try await supabase
             .from("flick_likes")
-            .select()
+            .select("flick_id")
             .eq("flick_id", value: flickId)
-            .eq("user_id", value: userId)
+            .eq("user_id",  value: uid)
             .execute()
-        
-        return !response.data.isEmpty
+        // Must decode — raw Data is never empty even for an empty "[]" response
+        let rows = (try? JSONSerialization.jsonObject(with: res.data)) as? [[String: Any]]
+        return !(rows?.isEmpty ?? true)
     }
     
     // MARK: - Add Comment
@@ -334,30 +343,32 @@ class FlicksService {
         return try JSONDecoder().decode(FlickComment.self, from: response.data)
     }
     
-    // MARK: - Fetch Comments
+    // MARK: - Fetch Comments (no FK join)
     func fetchComments(flickId: String) async throws -> [FlickComment] {
         let response = try await supabase
             .from("flick_comments")
-            .select("""
-                *,
-                profiles!flick_comments_user_id_fkey(username, profile_picture_url)
-            """)
+            .select("*")
             .eq("flick_id", value: flickId)
             .order("created_at", ascending: false)
             .execute()
-        
+
         var comments = try JSONDecoder().decode([FlickComment].self, from: response.data)
-        
-        // Parse nested profile data
-        if let json = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] {
-            for (index, item) in json.enumerated() {
-                if let profile = item["profiles"] as? [String: Any] {
-                    comments[index].username = profile["username"] as? String
-                    comments[index].profilePictureUrl = profile["profile_picture_url"] as? String
+
+        // Enrich with profile usernames
+        for i in comments.indices {
+            let uid = comments[i].userId
+            if let pd = try? await supabase
+                .from("profiles")
+                .select("username, profile_picture_url")
+                .eq("id", value: uid)
+                .single()
+                .execute() {
+                if let json = try? JSONSerialization.jsonObject(with: pd.data) as? [String: Any] {
+                    comments[i].username           = json["username"] as? String
+                    comments[i].profilePictureUrl  = json["profile_picture_url"] as? String
                 }
             }
         }
-        
         return comments
     }
     

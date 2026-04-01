@@ -281,13 +281,13 @@ extension SearchViewController: UITableViewDelegate, UITableViewDataSource {
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        
+
         guard indexPath.row < searchResults.count else { return }
-        
+
         let result = searchResults[indexPath.row]
-        
-        // Navigate to other user's profile
-        let profileVC = ActorProfileViewController()
+
+        // Navigate to the tapped user's profile using the designated init
+        let profileVC = ActorProfileViewController(userId: UUID(uuidString: result.id))
         navigationController?.pushViewController(profileVC, animated: true)
     }
 }

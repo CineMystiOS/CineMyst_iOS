@@ -125,12 +125,12 @@ class SavedPostViewController: UIViewController {
 
             card.configure(
                 image: UIImage(named: "rani2"),
-                title: job.title,
-                company: job.companyName,
-                location: job.location,
-                salary: "₹ \(job.ratePerDay)/day",
+                title: job.title ?? "Untitled Job",
+                company: job.companyName ?? "CineMyst Production",
+                location: job.location ?? "Remote",
+                salary: "₹ \(job.ratePerDay ?? 0)/day",
                 daysLeft: job.daysLeftText,
-                tag: job.jobType,
+                tag: job.jobType ?? "Film",
                 appliedCount: "0 applied"
             )
             
@@ -169,7 +169,7 @@ class SavedPostViewController: UIViewController {
                 Task {
                     do {
                         try await JobsService.shared.toggleBookmark(jobId: job.id)
-                        print("✅ Bookmark removed from backend for job: \(job.title)")
+                        print("✅ Bookmark removed from backend for job: \(job.title ?? "Untitled")")
                     } catch {
                         print("❌ Failed to sync bookmark removal: \(error)")
                     }

@@ -756,9 +756,9 @@ extension ApplicationsViewController: UITableViewDelegate, UITableViewDataSource
                 .execute()
                 .value
             
-            print("📋 Current job status: '\(currentJob.status.rawValue)'")
-            print("   Job title: \(currentJob.title)")
-            print("   Job director_id: \(currentJob.directorId.uuidString)")
+            print("📋 Current job status: '\(currentJob.status?.rawValue ?? "nil")'")
+            print("   Job title: \(currentJob.title ?? "Untitled")")
+            print("   Job director_id: \(currentJob.directorId?.uuidString ?? "nil")")
             print("   Is active? \(currentJob.status == .active)")
             
             // Only update if job is currently active
@@ -803,7 +803,7 @@ extension ApplicationsViewController: UITableViewDelegate, UITableViewDataSource
                     print("✅ Job \(jobId.uuidString.prefix(8)) status updated via direct UPDATE")
                 }
             } else {
-                print("ℹ️ Job \(jobId.uuidString.prefix(8)) already has status: '\(currentJob.status.rawValue)', not updating")
+                print("ℹ️ Job \(jobId.uuidString.prefix(8)) already has status: '\(currentJob.status?.rawValue ?? "nil")', not updating")
             }
         } catch {
             print("❌ Error updating job status: \(error)")

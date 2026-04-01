@@ -4,11 +4,6 @@ import Supabase
 class MyApplicationsViewController: UIViewController {
 
     // MARK: - Properties
-    private let supabase = SupabaseClient(
-        supabaseURL: URL(string: "https://kyhyunyobgouumgwcigk.supabase.co")!,
-        supabaseKey: "sb_publishable_oJe1X9aiPdKm6wqR1zvFhA_aIiej9-d"
-    )
-    
     private var applications: [Application] = []
     private var jobs: [Job] = []
     private let backgroundGradient = CAGradientLayer()
@@ -162,49 +157,73 @@ class MyApplicationsViewController: UIViewController {
         Task {
             do {
                 guard let currentUser = supabase.auth.currentUser else {
+                    print("❌ No current user found for applications")
                     return
                 }
                 
                 let actorId = currentUser.id.uuidString
+                print("📋 Fetching applications for actor: \(actorId)")
                 
                 // Fetch applications for current user
-                applications = try await supabase
+                let apps: [Application] = try await supabase
                     .from("applications")
                     .select()
                     .eq("actor_id", value: actorId)
                     .execute()
                     .value
                 
+                print("✅ Fetched \(apps.count) applications")
+                self.applications = apps
+                
                 // Fetch all jobs
-                jobs = try await supabase
+                print("📋 Fetching all jobs for matching...")
+                let fetchedJobs: [Job] = try await supabase
                     .from("jobs")
                     .select()
                     .execute()
                     .value
                 
-                // Load first segment
-                loadCardsFor(segment: 0)
+                print("✅ Fetched \(fetchedJobs.count) jobs total")
+                self.jobs = fetchedJobs
+                
+                // Load first segment on main actor
+                await MainActor.run {
+                    loadCardsFor(segment: segmentedControl.selectedSegmentIndex)
+                }
             } catch {
-                print("Error loading applications: \(error)")
+                print("❌ Error loading applications/jobs: \(error)")
+                // Fallback: try to show applications even if status mapping fails
+                await MainActor.run {
+                    loadCardsFor(segment: segmentedControl.selectedSegmentIndex)
+                }
             }
         }
     }
 
     // MARK: - Load Cards by Status
+    @MainActor
     private func loadCardsFor(segment: Int) {
+        print("🎴 Loading cards for segment: \(segment)")
         stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
         
         switch segment {
-        case 0: loadActiveCards()
-        case 1: loadPendingCards()
-        case 2: loadCompletedCards()
+        case 0: 
+            print("🔍 Active segment: Status contains .portfolioSubmitted")
+            loadActiveCards()
+        case 1: 
+            print("🔍 Pending segment: Status contains .taskSubmitted")
+            loadPendingCards()
+        case 2: 
+            print("🔍 Completed segment: Status contains .selected or .shortlisted")
+            loadCompletedCards()
         default: break
         }
     }
 
     // MARK: - Cards by Status
     private func loadActiveCards() {
-        let activeApps = applications.filter { $0.status == .portfolioSubmitted }
+        // Including portfolioSubmitted and shortlisted in Active
+        let activeApps = applications.filter { $0.status == .portfolioSubmitted || $0.status == .shortlisted }
         
         if activeApps.isEmpty {
             let emptyLabel = UILabel()
@@ -258,7 +277,8 @@ class MyApplicationsViewController: UIViewController {
     }
     
     private func loadCompletedCards() {
-        let completedApps = applications.filter { $0.status == .selected }
+        // Including shortlisted in completed/successful bucket for now to ensure visibility
+        let completedApps = applications.filter { $0.status == .selected || $0.status == .shortlisted }
         
         if completedApps.isEmpty {
             let emptyLabel = UILabel()
@@ -296,12 +316,12 @@ class MyApplicationsViewController: UIViewController {
         card.layer.shadowRadius = 6
         
         let title = UILabel()
-        title.text = job.title
+        title.text = job.title ?? "Untitled Job"
         title.numberOfLines = 2
         title.font = UIFont.boldSystemFont(ofSize: 16)
         
         let company = UILabel()
-        company.text = job.companyName
+        company.text = job.companyName ?? "CineMyst Production"
         company.font = UIFont.systemFont(ofSize: 14)
         company.textColor = .gray
         
@@ -310,14 +330,14 @@ class MyApplicationsViewController: UIViewController {
         locationIcon.widthAnchor.constraint(equalToConstant: 16).isActive = true
         
         let locationLabel = UILabel()
-        locationLabel.text = job.location
+        locationLabel.text = job.location ?? "Remote"
         locationLabel.font = UIFont.systemFont(ofSize: 14)
         
         let payLabel = UILabel()
-        payLabel.text = "₹\(job.ratePerDay)/day"
+        payLabel.text = "₹\(job.ratePerDay ?? 0)/day"
         payLabel.font = UIFont.systemFont(ofSize: 14)
 
-        let tag1 = makeTag(job.jobType)
+        let tag1 = makeTag(job.jobType ?? "Project")
         let statusTag = makeTag(application.status.rawValue.replacingOccurrences(of: "_", with: " ").capitalized)
 
         let appliedLabel = UILabel()

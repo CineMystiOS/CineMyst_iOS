@@ -132,10 +132,10 @@ extension JobDetailsViewController {
         // Debug: Check if job data is available
         if let job = job {
             print("📋 JobDetailsViewController - Job data available:")
-            print("   Title: \(job.title)")
+            print("   Title: \(job.title ?? "nil")")
             print("   Description: \(job.description ?? "nil")")
             print("   Requirements: \(job.requirements ?? "nil")")
-            print("   Rate: ₹\(job.ratePerDay)/day")
+            print("   Rate: ₹\(job.ratePerDay ?? 0)/day")
         } else {
             print("⚠️ JobDetailsViewController - No job data available, using fallback")
         }
@@ -165,7 +165,7 @@ extension JobDetailsViewController {
         if let job = job {
             // Job Title and Description
             cardStack.addArrangedSubview(makeCard(
-                title: job.title,
+                title: job.title ?? "Untitled Job",
                 body: job.description ?? "No description available."
             ))
             
@@ -177,7 +177,7 @@ extension JobDetailsViewController {
             // Compensation
             cardStack.addArrangedSubview(makeCard(
                 title: "Compensation",
-                body: "₹\(job.ratePerDay)/day"
+                body: "₹\(job.ratePerDay ?? 0)/day"
             ))
             
             // Deadline
