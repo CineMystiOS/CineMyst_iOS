@@ -14,6 +14,7 @@ struct FloatingMenuButton: View {
     var didTapCamera: (() -> Void)? = nil
     var didTapGallery: (() -> Void)? = nil
     var didTapAI: (() -> Void)? = nil
+    var onExpansionChanged: ((Bool) -> Void)? = nil
     
     @State private var isExpanded = false
     @State private var buttonScale: CGFloat = 1.0
@@ -69,6 +70,7 @@ struct FloatingMenuButton: View {
                     isExpanded.toggle()
                     buttonScale = isExpanded ? 1.1 : 1.0
                     rotationAngle = isExpanded ? 45 : 0
+                    onExpansionChanged?(isExpanded)
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     withAnimation(.spring(response: 0.5, dampingFraction: 0.65)) {
@@ -117,6 +119,7 @@ struct FloatingMenuButton: View {
             isExpanded = false
             rotationAngle = 0
             buttonScale = 1.0
+            onExpansionChanged?(false)
         }
         print("🎬 Menu item tapped, executing action...")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {

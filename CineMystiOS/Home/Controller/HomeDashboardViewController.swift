@@ -128,6 +128,7 @@ final class HomeDashboardViewController: UIViewController {
     private let backgroundGradient = CAGradientLayer()
     private let ambientGlowTop = UIView()
     private let ambientGlowBottom = UIView()
+    private let floatingMenuDimView = UIView()
     private weak var chatBadgeLabel: UILabel?
     private var unreadMessagesSubscription: MessagesRealtimeSubscription?
     private var unreadMessagesCount = 0
@@ -205,6 +206,18 @@ final class HomeDashboardViewController: UIViewController {
             ambientGlowBottom.heightAnchor.constraint(equalToConstant: 240),
             ambientGlowBottom.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: -80),
             ambientGlowBottom.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: 40)
+        ])
+
+        floatingMenuDimView.backgroundColor = UIColor.black.withAlphaComponent(0.14)
+        floatingMenuDimView.alpha = 0
+        floatingMenuDimView.isUserInteractionEnabled = false
+        floatingMenuDimView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(floatingMenuDimView)
+        NSLayoutConstraint.activate([
+            floatingMenuDimView.topAnchor.constraint(equalTo: view.topAnchor),
+            floatingMenuDimView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            floatingMenuDimView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            floatingMenuDimView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
     }
 
@@ -428,10 +441,14 @@ final class HomeDashboardViewController: UIViewController {
     }
 
     private func setupFloatingMenu() {
+        view.bringSubviewToFront(floatingMenuDimView)
         let sv = FloatingMenuButton(
             didTapCamera:  { [weak self] in self?.openCameraForPost() },
             didTapGallery: { [weak self] in self?.openGalleryForPost() },
-            didTapAI: { [weak self] in self?.openAIAssistant() })
+            didTapAI: { [weak self] in self?.openAIAssistant() },
+            onExpansionChanged: { [weak self] isExpanded in
+                self?.setFloatingMenuDimmed(isExpanded)
+            })
         let host = UIHostingController(rootView: sv)
         host.view.backgroundColor = .clear; host.view.isOpaque = false
         addChild(host); view.addSubview(host.view)
@@ -443,6 +460,12 @@ final class HomeDashboardViewController: UIViewController {
             host.view.heightAnchor.constraint(equalToConstant: 320)
         ])
         host.didMove(toParent: self)
+    }
+
+    private func setFloatingMenuDimmed(_ isDimmed: Bool) {
+        UIView.animate(withDuration: 0.22, delay: 0, options: [.curveEaseInOut]) {
+            self.floatingMenuDimView.alpha = isDimmed ? 1 : 0
+        }
     }
 
     // MARK: - Data
