@@ -290,20 +290,27 @@ final class MentorCell: UICollectionViewCell {
 
         if let money = mentor.moneyString, !money.isEmpty {
             if let numericMoney = numericPrice(from: money), numericMoney <= 1, let metadataMinPrice {
-                return "From ₹\(metadataMinPrice)"
+                return formatPrice(metadataMinPrice)
             }
-            return money
+            if let numericMoney = numericPrice(from: money), numericMoney > 0 {
+                return formatPrice(Int(numericMoney.rounded()))
+            }
+            return money.replacingOccurrences(of: "From ", with: "")
         }
 
         if let cents = mentor.priceCents, cents > 0 {
-            return "From ₹\(cents / 100)"
+            return formatPrice(cents / 100)
         }
 
         if let metadataMinPrice {
-            return "From ₹\(metadataMinPrice)"
+            return formatPrice(metadataMinPrice)
         }
 
         return nil
+    }
+
+    private static func formatPrice(_ value: Int) -> String {
+        return "₹ \(value)"
     }
 
     private static func minimumPrice(from metadataJson: String?) -> Int? {
