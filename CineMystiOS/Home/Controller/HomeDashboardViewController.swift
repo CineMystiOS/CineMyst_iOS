@@ -365,16 +365,17 @@ final class HomeDashboardViewController: UIViewController {
     private func setupFloatingMenu() {
         let sv = FloatingMenuButton(
             didTapCamera:  { [weak self] in self?.openCameraForPost() },
-            didTapGallery: { [weak self] in self?.openGalleryForPost() })
+            didTapGallery: { [weak self] in self?.openGalleryForPost() },
+            didTapAI: { [weak self] in self?.openAIAssistant() })
         let host = UIHostingController(rootView: sv)
         host.view.backgroundColor = .clear; host.view.isOpaque = false
         addChild(host); view.addSubview(host.view)
         host.view.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             host.view.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            host.view.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: 8), // Overlaps or sits just above tab bar
-            host.view.widthAnchor.constraint(equalToConstant: 280),
-            host.view.heightAnchor.constraint(equalToConstant: 280)
+            host.view.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -6),
+            host.view.widthAnchor.constraint(equalToConstant: 300),
+            host.view.heightAnchor.constraint(equalToConstant: 320)
         ])
         host.didMove(toParent: self)
     }
@@ -449,6 +450,17 @@ final class HomeDashboardViewController: UIViewController {
         present(vc, animated: true)
     }
     private func openCameraForPost() { let vc = CameraViewController(); vc.modalPresentationStyle = .fullScreen; present(vc, animated: true) }
+    private func openAIAssistant() {
+        let vc = AIAssistantViewController()
+        vc.hidesBottomBarWhenPushed = true
+        if let navigationController {
+            navigationController.pushViewController(vc, animated: true)
+        } else {
+            let nav = UINavigationController(rootViewController: vc)
+            nav.modalPresentationStyle = .fullScreen
+            present(nav, animated: true)
+        }
+    }
     private func openGalleryForPost() {
         var c = PHPickerConfiguration(); c.selectionLimit = 10; c.filter = .any(of: [.images, .videos])
         let p = PHPickerViewController(configuration: c); p.delegate = self; present(p, animated: true)

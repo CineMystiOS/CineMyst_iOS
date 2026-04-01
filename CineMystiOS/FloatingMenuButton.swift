@@ -11,8 +11,9 @@ import UIKit
 struct FloatingMenuButton: View {
     
     // MARK: - Public Action Closures
-    var didTapCamera: (() -> Void)?
-    var didTapGallery: (() -> Void)?
+    var didTapCamera: (() -> Void)? = nil
+    var didTapGallery: (() -> Void)? = nil
+    var didTapAI: (() -> Void)? = nil
     
     @State private var isExpanded = false
     @State private var buttonScale: CGFloat = 1.0
@@ -20,13 +21,25 @@ struct FloatingMenuButton: View {
     
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
+            if isExpanded {
+                MenuActionButton(
+                    icon: "brain.head.profile",
+                    label: "Ask AI",
+                    isVisible: isExpanded,
+                    offset: CGSize(width: -102, height: -102)
+                ) {
+                    collapseAndExecute(didTapAI)
+                }
+                .transition(.scale.combined(with: .opacity))
+            }
+
             // Camera Button (Top, 45°)
             if isExpanded {
                 MenuActionButton(
                     icon: "camera.fill",
                     label: "Camera",
                     isVisible: isExpanded,
-                    offset: calculateOffset(angle: 45, radius: 120)
+                    offset: CGSize(width: -54, height: -138)
                 ) {
                     collapseAndExecute(didTapCamera)
                 }
@@ -39,7 +52,7 @@ struct FloatingMenuButton: View {
                     icon: "photo.on.rectangle",
                     label: "Gallery",
                     isVisible: isExpanded,
-                    offset: calculateOffset(angle: 90, radius: 110)
+                    offset: CGSize(width: -8, height: -102)
                 ) {
                     collapseAndExecute(didTapGallery)
                 }
@@ -90,18 +103,9 @@ struct FloatingMenuButton: View {
                 .shadow(color: Color(red: 0.25, green: 0.07, blue: 0.15).opacity(0.35), radius: 18, x: 0, y: 12)
             }
             .scaleEffect(buttonScale)
-            .padding(24)
+            .padding(20)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-    }
-    
-    // MARK: - Helper Methods
-    private func calculateOffset(angle: Double, radius: Double) -> CGSize {
-        let radians = angle * .pi / 180
-        return CGSize(
-            width: -cos(radians) * radius,
-            height: -sin(radians) * radius
-        )
     }
     
     private func collapseAndExecute(_ action: (() -> Void)?) {
@@ -130,7 +134,7 @@ struct MenuActionButton: View {
         Button(action: {
             action()
         }) {
-            VStack(spacing: 8) {
+            VStack(spacing: 5) {
                 ZStack {
                     Circle()
                         .fill(
@@ -147,20 +151,31 @@ struct MenuActionButton: View {
                             Circle()
                                 .stroke(Color.white.opacity(0.22), lineWidth: 1.1)
                         )
-                        .frame(width: 56, height: 56)
+                        .frame(width: 50, height: 50)
                     Image(systemName: icon)
-                        .font(.system(size: 19, weight: .semibold))
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundColor(.white)
                 }
                 .shadow(color: Color(red: 0.25, green: 0.07, blue: 0.15).opacity(0.28), radius: 16, x: 0, y: 10)
                 
                 Text(label)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 9, weight: .semibold))
                     .foregroundColor(Color(red: 0.30, green: 0.12, blue: 0.21))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule()
+                            .fill(Color.white.opacity(0.82))
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.white.opacity(0.45), lineWidth: 0.8)
+                    )
             }
         }
         .buttonStyle(.plain)
         .contentShape(Circle())
+        .frame(width: 68)
         .offset(offset)
         .opacity(isVisible ? 1 : 0)
         .scaleEffect(isVisible ? 1 : 0.1)
