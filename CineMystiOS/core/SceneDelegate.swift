@@ -116,11 +116,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
     }
 
-    // MARK: - Navigation Helpers
     @MainActor
     private func showLoginScreen() {
-        let loginVC = LoginViewController(nibName: "LoginViewController", bundle: nil)
-        let nav = UINavigationController(rootViewController: loginVC)
+        // Now redirects to the new Launch Welcome Screen instead of directly to Login
+        let welcomeVC = LaunchWelcomeViewController()
+        let nav = UINavigationController(rootViewController: welcomeVC)
         nav.setNavigationBarHidden(true, animated: false)
         window?.rootViewController = nav
         window?.makeKeyAndVisible()

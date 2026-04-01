@@ -10,29 +10,34 @@ import Supabase
 
 class SignUpViewController: UIViewController {
     
-    @IBOutlet weak var usernameTextField: UITextField!
-    @IBOutlet weak var fullNameTextField: UITextField!
-    @IBOutlet weak var emailTextField: UITextField!
-    @IBOutlet weak var passwordTextField: UITextField!
-    @IBOutlet weak var signUpButton: UIButton!
-    @IBOutlet weak var signInButton: UIButton!
-
-    // Programmatically added — mirrors the style of passwordTextField
-    private let confirmPasswordTextField = UITextField()
+    // PROGRAMMATIC UI ELEMENTS
+    let usernameTextField    = UITextField()
+    let fullNameTextField    = UITextField()
+    let emailTextField       = UITextField()
+    let passwordTextField    = UITextField()
+    let confirmPasswordTextField = UITextField()
+    let signUpButton         = UIButton(type: .system)
+    let signInButton         = UIButton(type: .system)
+    
+    let cardView             = UIView()
+    let termsCheckbox        = UIButton(type: .custom)
+    let termsLabel           = UILabel()
+    
     private var activityIndicator: UIActivityIndicatorView!
     private var gradientLayer: CAGradientLayer?
     
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        applyGradientBackground()
-        setupUI()
+        view.backgroundColor = .clear 
+        // applyGradientBackground() // Removed to allow clear background
+        setupProgrammaticUI()
         setupActivityIndicator()
     }
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        updateGradientFrame()
+        // updateGradientFrame()
     }
     
     // MARK: - Gradient Background
@@ -60,47 +65,200 @@ class SignUpViewController: UIViewController {
         gradientLayer?.frame = view.bounds
     }
     
-    // MARK: - UI Setup
-    private func setupUI() {
-        passwordTextField.isSecureTextEntry = true
-        emailTextField.autocapitalizationType = .none
+    private func setupProgrammaticUI() {
+        // 1. Card View setup 
+        cardView.backgroundColor = .white
+        cardView.layer.cornerRadius = 32
+        cardView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        cardView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(cardView)
+        
+        // 2. Element Style helpers
+        func applyLabelStyle(_ l: UILabel, text: String) {
+            l.text = text
+            l.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+            l.textColor = UIColor(red: 0.35, green: 0.4, blue: 0.5, alpha: 1.0)
+            l.translatesAutoresizingMaskIntoConstraints = false
+        }
+        
+        func applyFieldStyle(_ f: UITextField, placeholder: String) {
+            f.placeholder = placeholder
+            f.backgroundColor = UIColor(red: 0.96, green: 0.97, blue: 0.98, alpha: 1.0)
+            f.layer.cornerRadius = 14
+            f.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 16, height: 0))
+            f.leftViewMode = .always
+            f.font = UIFont.systemFont(ofSize: 16)
+            f.translatesAutoresizingMaskIntoConstraints = false
+            f.heightAnchor.constraint(equalToConstant: 52).isActive = true
+            f.delegate = self
+            f.autocorrectionType = .no
+        }
+        
+        // 3. Setup Elements
+        let userLabel = UILabel(); applyLabelStyle(userLabel, text: "Username/Stage Name")
+        applyFieldStyle(usernameTextField, placeholder: "ashina_mehra")
         usernameTextField.autocapitalizationType = .none
-
+        
+        let nameLabel = UILabel(); applyLabelStyle(nameLabel, text: "Full Name")
+        applyFieldStyle(fullNameTextField, placeholder: "Enter your name")
+        
+        let mailLabel = UILabel(); applyLabelStyle(mailLabel, text: "Email")
+        applyFieldStyle(emailTextField, placeholder: "eg: sam67@gmail.com")
+        emailTextField.autocapitalizationType = .none
+        
+        let passLabel = UILabel(); applyLabelStyle(passLabel, text: "Password")
+        applyFieldStyle(passwordTextField, placeholder: "********")
+        passwordTextField.isSecureTextEntry = true
         addEyeToggle(to: passwordTextField)
-        setupConfirmPasswordField()
-
+        
+        let confirmLabel = UILabel(); applyLabelStyle(confirmLabel, text: "Confirm Password")
+        applyFieldStyle(confirmPasswordTextField, placeholder: "********")
+        confirmPasswordTextField.isSecureTextEntry = true
+        addEyeToggle(to: confirmPasswordTextField)
+        
+        // Terms Checkbox
+        termsCheckbox.setImage(UIImage(systemName: "square"), for: .normal)
+        termsCheckbox.setImage(UIImage(systemName: "checkmark.square.fill"), for: .selected)
+        termsCheckbox.tintColor = .black
+        termsCheckbox.isSelected = true 
+        termsCheckbox.translatesAutoresizingMaskIntoConstraints = false
+        termsCheckbox.addTarget(self, action: #selector(toggleTerms), for: .touchUpInside)
+        
+        termsLabel.text = "I agree to the Terms & Privacy Policy"
+        termsLabel.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        termsLabel.textColor = .black
+        termsLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        signUpButton.setTitle("Sign Up", for: .normal)
+        signUpButton.setTitleColor(.white, for: .normal)
+        signUpButton.backgroundColor = UIColor(red: 0.2, green: 0.08, blue: 0.18, alpha: 1.0)
+        signUpButton.layer.cornerRadius = 20
+        signUpButton.titleLabel?.font = UIFont.systemFont(ofSize: 18, weight: .bold)
+        signUpButton.addTarget(self, action: #selector(confirmSignUpTapped), for: .touchUpInside)
+        signUpButton.translatesAutoresizingMaskIntoConstraints = false
+        
+        let bottomStack = UIStackView()
+        bottomStack.axis = .horizontal
+        bottomStack.spacing = 4
+        bottomStack.alignment = .center
+        bottomStack.translatesAutoresizingMaskIntoConstraints = false
+        
+        let noteLabel = UILabel()
+        noteLabel.text = "Already have an account?"
+        noteLabel.font = UIFont.systemFont(ofSize: 15)
+        noteLabel.textColor = .gray
+        
+        signInButton.setTitle("Sign In", for: .normal)
+        signInButton.setTitleColor(UIColor(red: 0.2, green: 0.08, blue: 0.18, alpha: 1.0), for: .normal)
+        signInButton.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .bold)
+        signInButton.addTarget(self, action: #selector(backToSignInTapped), for: .touchUpInside)
+        
+        bottomStack.addArrangedSubview(noteLabel)
+        bottomStack.addArrangedSubview(signInButton)
+        
+        // 4. Content Scroll View (for accessibility)
+        let scrollView = UIScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.showsVerticalScrollIndicator = false
+        cardView.addSubview(scrollView)
+        
+        let contentView = UIView()
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(contentView)
+        
+        // Add to contentView
+        contentView.addSubview(userLabel)
+        contentView.addSubview(usernameTextField)
+        contentView.addSubview(nameLabel)
+        contentView.addSubview(fullNameTextField)
+        contentView.addSubview(mailLabel)
+        contentView.addSubview(emailTextField)
+        contentView.addSubview(passLabel)
+        contentView.addSubview(passwordTextField)
+        contentView.addSubview(confirmLabel)
+        contentView.addSubview(confirmPasswordTextField)
+        contentView.addSubview(termsCheckbox)
+        contentView.addSubview(termsLabel)
+        contentView.addSubview(signUpButton)
+        contentView.addSubview(bottomStack)
+        
+        NSLayoutConstraint.activate([
+            cardView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            cardView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            cardView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            cardView.topAnchor.constraint(equalTo: view.topAnchor),
+            
+            scrollView.topAnchor.constraint(equalTo: cardView.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: cardView.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: cardView.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: cardView.bottomAnchor),
+            
+            contentView.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
+            contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+            
+            userLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 30),
+            userLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+            
+            usernameTextField.topAnchor.constraint(equalTo: userLabel.bottomAnchor, constant: 10),
+            usernameTextField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+            usernameTextField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
+            
+            nameLabel.topAnchor.constraint(equalTo: usernameTextField.bottomAnchor, constant: 18),
+            nameLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+            
+            fullNameTextField.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 10),
+            fullNameTextField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+            fullNameTextField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
+            
+            mailLabel.topAnchor.constraint(equalTo: fullNameTextField.bottomAnchor, constant: 18),
+            mailLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+            
+            emailTextField.topAnchor.constraint(equalTo: mailLabel.bottomAnchor, constant: 10),
+            emailTextField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+            emailTextField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
+            
+            passLabel.topAnchor.constraint(equalTo: emailTextField.bottomAnchor, constant: 18),
+            passLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+            
+            passwordTextField.topAnchor.constraint(equalTo: passLabel.bottomAnchor, constant: 10),
+            passwordTextField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+            passwordTextField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
+            
+            confirmLabel.topAnchor.constraint(equalTo: passwordTextField.bottomAnchor, constant: 18),
+            confirmLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+            
+            confirmPasswordTextField.topAnchor.constraint(equalTo: confirmLabel.bottomAnchor, constant: 10),
+            confirmPasswordTextField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+            confirmPasswordTextField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
+            
+            termsCheckbox.topAnchor.constraint(equalTo: confirmPasswordTextField.bottomAnchor, constant: 20),
+            termsCheckbox.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+            termsCheckbox.widthAnchor.constraint(equalToConstant: 24),
+            termsCheckbox.heightAnchor.constraint(equalToConstant: 24),
+            
+            termsLabel.centerYAnchor.constraint(equalTo: termsCheckbox.centerYAnchor),
+            termsLabel.leadingAnchor.constraint(equalTo: termsCheckbox.trailingAnchor, constant: 8),
+            
+            signUpButton.topAnchor.constraint(equalTo: termsCheckbox.bottomAnchor, constant: 30),
+            signUpButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+            signUpButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
+            signUpButton.heightAnchor.constraint(equalToConstant: 58),
+            
+            bottomStack.topAnchor.constraint(equalTo: signUpButton.bottomAnchor, constant: 24),
+            bottomStack.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            bottomStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40)
+        ])
+        
         let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
         view.addGestureRecognizer(tap)
     }
-
-    private func setupConfirmPasswordField() {
-        guard let pwField = passwordTextField else { return }
-
-        // Mirror the visual style of the password field
-        confirmPasswordTextField.isSecureTextEntry = true
-        confirmPasswordTextField.placeholder = "Confirm Password"
-        confirmPasswordTextField.borderStyle = pwField.borderStyle
-        confirmPasswordTextField.backgroundColor = pwField.backgroundColor
-        confirmPasswordTextField.font = pwField.font
-        confirmPasswordTextField.textColor = pwField.textColor
-        confirmPasswordTextField.layer.cornerRadius = pwField.layer.cornerRadius
-        confirmPasswordTextField.layer.borderWidth = pwField.layer.borderWidth
-        confirmPasswordTextField.layer.borderColor = pwField.layer.borderColor
-        confirmPasswordTextField.autocapitalizationType = .none
-        confirmPasswordTextField.translatesAutoresizingMaskIntoConstraints = false
-        confirmPasswordTextField.returnKeyType = .done
-        confirmPasswordTextField.delegate = self
-        addEyeToggle(to: confirmPasswordTextField)
-
-        // Insert confirm field directly below the password field
-        view.addSubview(confirmPasswordTextField)
-        NSLayoutConstraint.activate([
-            confirmPasswordTextField.topAnchor.constraint(equalTo: pwField.bottomAnchor, constant: 12),
-            confirmPasswordTextField.leadingAnchor.constraint(equalTo: pwField.leadingAnchor),
-            confirmPasswordTextField.trailingAnchor.constraint(equalTo: pwField.trailingAnchor),
-            confirmPasswordTextField.heightAnchor.constraint(equalTo: pwField.heightAnchor),
-        ])
-    }
+    
+    @objc private func toggleTerms() { termsCheckbox.isSelected.toggle() }
+    @objc private func confirmSignUpTapped() { signUpButtonTapped(signUpButton) }
+    @objc private func backToSignInTapped() { signInButtonTapped(signInButton) }
 
     private func addEyeToggle(to field: UITextField) {
         let btn = UIButton(type: .custom)
@@ -121,10 +279,15 @@ class SignUpViewController: UIViewController {
     
     private func setupActivityIndicator() {
         activityIndicator = UIActivityIndicatorView(style: .large)
-        activityIndicator.color = .white
-        activityIndicator.center = view.center
+        activityIndicator.color = .gray
         activityIndicator.hidesWhenStopped = true
+        activityIndicator.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(activityIndicator)
+        
+        NSLayoutConstraint.activate([
+            activityIndicator.centerXAnchor.constraint(equalTo: cardView.centerXAnchor),
+            activityIndicator.centerYAnchor.constraint(equalTo: cardView.centerYAnchor)
+        ])
     }
     
     @objc private func dismissKeyboard() {
