@@ -347,6 +347,7 @@ struct PortfolioResponse: Codable {
     let id: String
     let user_id: String
     let stage_name: String?
+    let full_name: String?   // Safe alias for actor_portfolios
     let is_primary: Bool?
     let is_public: Bool?
     let instagram_url: String?

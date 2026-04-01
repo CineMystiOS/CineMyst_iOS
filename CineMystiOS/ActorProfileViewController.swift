@@ -157,8 +157,8 @@ class ActorProfileCardView: UIView {
         buttonStack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(buttonStack)
 
-        // ── Edit Portfolio button (own profile) ──────────────────────────────
-        editPortfolioButton.setTitle("Edit Portfolio", for: .normal)
+        // ── Portfolio Button (initially "Create Portfolio") ─────────────────
+        editPortfolioButton.setTitle("Create Portfolio", for: .normal)
         editPortfolioButton.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
         editPortfolioButton.setTitleColor(.white, for: .normal)
         editPortfolioButton.layer.cornerRadius = 22
@@ -755,7 +755,10 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
                 card.editProfileButton.addTarget(self, action: #selector(editProfileTapped), for: .touchUpInside)
                 card.editPortfolioButton.removeTarget(nil, action: nil, for: .allEvents)
                 card.editPortfolioButton.addTarget(self, action: #selector(editPortfolioTapped), for: .touchUpInside)
-                card.editPortfolioButton.setTitle(hasPortfolio ? "Edit Portfolio" : "Create Portfolio", for: .normal)
+                
+                // Toggle text based on existence
+                let btnTitle = hasPortfolio ? "Edit Portfolio" : "Create Portfolio"
+                card.editPortfolioButton.setTitle(btnTitle, for: .normal)
             } else {
                 card.connectButton.removeTarget(nil, action: nil, for: .allEvents)
                 card.connectButton.addTarget(self, action: #selector(connectTapped), for: .touchUpInside)

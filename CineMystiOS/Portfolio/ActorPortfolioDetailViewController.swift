@@ -260,28 +260,35 @@ class ActorPortfolioDetailViewController: UIViewController {
         Task {
             do {
                 let uid: String
-                if let targetUserId {
+                if let targetUserId = self.targetUserId {
                     uid = targetUserId.uuidString
                 } else {
                     guard let session = try await AuthManager.shared.currentSession() else { return }
                     uid = session.user.id.uuidString
                 }
 
+                print("📍 Fetching detailed actor portfolio for user: \(uid)")
                 let response = try await supabase
                     .from("actor_portfolios")
                     .select()
                     .eq("user_id", value: uid)
-                    .single()
                     .execute()
 
                 let decoder = JSONDecoder()
-                let p = try decoder.decode(ActorPortfolio.self, from: response.data)
+                let portfolios = try decoder.decode([ActorPortfolio].self, from: response.data)
+                
+                guard let p = portfolios.first else {
+                    print("⚠️ No portfolio row found in 'actor_portfolios' for user \(uid)")
+                    throw NSError(domain: "Portfolio", code: 404)
+                }
+
                 await MainActor.run {
                     self.portfolio = p
                     self.loader.stopAnimating()
                     self.buildUI()
                 }
             } catch {
+                print("❌ Detail fetch failed: \(error)")
                 await MainActor.run {
                     self.loader.stopAnimating()
                     self.showEmpty()
