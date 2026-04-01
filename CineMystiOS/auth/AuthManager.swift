@@ -9,10 +9,11 @@ import Foundation
 import Supabase
 import UIKit
 import SafariServices
+import AuthenticationServices
 
-final class AuthManager {
+final class AuthManager: NSObject {
     static let shared = AuthManager()
-    private init() {}
+    private override init() {}
 
     private var client: SupabaseClient { supabase }
 
@@ -532,38 +533,84 @@ struct ProfileRecord: Codable {
 extension AuthManager {
     func signInWithGoogle(from viewController: UIViewController) {
         print("➡️ Starting Google Sign-In")
+        let redirectURL = "cinemyst://auth-callback"
         
         Task {
             do {
                 // Get the OAuth URL from Supabase
                 let url = try await client.auth.getOAuthSignInURL(
                     provider: .google,
-                    redirectTo: URL(string: "cinemyst://auth-callback")
+                    redirectTo: URL(string: redirectURL)
                 )
                 
-                print("🌐 Got OAuth URL: \(url)")
+                print("🌐 Got OAuth URL: \(url.absoluteString)")
                 
-                // Open Safari on main thread
+                // Use ASWebAuthenticationSession for better redirect handling
                 await MainActor.run {
-                    let safari = SFSafariViewController(url: url)
-                    safari.modalPresentationStyle = .overFullScreen
-                    viewController.present(safari, animated: true)
-                    print("✅ Safari presented")
+                    let session = ASWebAuthenticationSession(
+                        url: url,
+                        callbackURLScheme: "cinemyst"
+                    ) { callbackURL, error in
+                        if let error = error {
+                            print("❌ WebAuth Session error: \(error.localizedDescription)")
+                            // Ignore user cancellation
+                            if (error as NSError).code != ASWebAuthenticationSessionError.canceledLogin.rawValue {
+                                self.handleAuthErrorInVC(viewController, error: error)
+                            }
+                            return
+                        }
+                        
+                        guard let callbackURL = callbackURL else {
+                            print("❌ No callback URL received")
+                            return
+                        }
+                        
+                        print("✅ Received callback URL: \(callbackURL.absoluteString)")
+                        
+                        // Handle the callback
+                        Task {
+                            do {
+                                try await self.client.auth.handle(callbackURL)
+                                print("✅ OAuth handled successfully")
+                            } catch {
+                                print("❌ Error handling OAuth: \(error.localizedDescription)")
+                                self.handleAuthErrorInVC(viewController, error: error)
+                            }
+                        }
+                    }
+                    
+                    session.presentationContextProvider = viewController as? ASWebAuthenticationPresentationContextProviding ?? self
+                    session.start()
+                    print("🚀 ASWebAuthenticationSession started")
                 }
                 
             } catch {
-                print("❌ Error getting OAuth URL: \(error)")
-                await MainActor.run {
-                    let alert = UIAlertController(
-                        title: "Sign In Error",
-                        message: error.localizedDescription,
-                        preferredStyle: .alert
-                    )
-                    alert.addAction(UIAlertAction(title: "OK", style: .default))
-                    viewController.present(alert, animated: true)
-                }
+                print("❌ Error getting OAuth URL: \(error.localizedDescription)")
+                handleAuthErrorInVC(viewController, error: error)
             }
         }
+    }
+    
+    private func handleAuthErrorInVC(_ vc: UIViewController, error: Error) {
+        Task { @MainActor in
+            let alert = UIAlertController(
+                title: "Sign In Error",
+                message: error.localizedDescription,
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            vc.present(alert, animated: true)
+        }
+    }
+}
+
+extension AuthManager: ASWebAuthenticationPresentationContextProviding {
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        return UIApplication.shared.connectedScenes
+            .filter({ $0.activationState == .foregroundActive })
+            .compactMap({ $0 as? UIWindowScene })
+            .first?.windows
+            .filter({ $0.isKeyWindow }).first ?? ASPresentationAnchor()
     }
 }
 
