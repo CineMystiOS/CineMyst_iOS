@@ -227,14 +227,21 @@ class ProfileService {
     /// Returns true if the user has at least one portfolio row (regardless of items)
     func hasPortfolio(userId: UUID) async -> Bool {
         do {
+            // Check new actor_portfolios table first
             let result = try await supabase
+                .from("actor_portfolios")
+                .select("id", head: true, count: .exact)
+                .eq("user_id", value: userId.uuidString)
+                .execute()
+            if (result.count ?? 0) > 0 { return true }
+
+            // Fall back to legacy portfolios table
+            let result2 = try await supabase
                 .from("portfolios")
                 .select("id", head: true, count: .exact)
                 .eq("user_id", value: userId.uuidString)
                 .execute()
-            let count = result.count ?? 0
-            print("📋 Portfolio check: \(count) portfolio(s) found for user")
-            return count > 0
+            return (result2.count ?? 0) > 0
         } catch {
             print("⚠️ Portfolio existence check failed: \(error)")
             return false

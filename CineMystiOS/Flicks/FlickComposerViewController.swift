@@ -209,70 +209,81 @@ class FlickComposerViewController: UIViewController {
     
     @objc private func uploadFlick() {
         guard !isUploading else { return }
-        
         view.endEditing(true)
         isUploading = true
-        
-        // Show loading
+
         uploadButton.isEnabled = false
         cancelButton.isEnabled = false
         loadingIndicator.startAnimating()
         progressLabel.isHidden = false
-        
+
+        let videoURL   = self.videoURL
+        let caption    = captionTextField.text?.isEmpty == false ? captionTextField.text : nil
+        let audioTitle = audioTitleTextField.text?.isEmpty == false ? audioTitleTextField.text : "Original Audio"
+
         Task {
             do {
-                // Get user ID
-                guard let userId = try? await supabase.auth.session.user.id.uuidString else {
-                    throw NSError(domain: "FlickComposer", code: 401, userInfo: [NSLocalizedDescriptionKey: "Not authenticated"])
-                }
-                
-                // Load video data
-                progressLabel.text = "Preparing video..."
-                let videoData = try Data(contentsOf: videoURL)
-                
-                // Upload video
-                progressLabel.text = "Uploading video..."
-                let videoUrl = try await FlicksService.shared.uploadFlickVideo(videoData, userId: userId)
-                
-                // Generate and upload thumbnail
-                progressLabel.text = "Creating thumbnail..."
-                var thumbnailUrl: String?
-                if let thumbnail = generateThumbnail(from: videoURL) {
-                    if let thumbnailData = thumbnail.jpegData(compressionQuality: 0.7) {
-                        thumbnailUrl = try await FlicksService.shared.uploadThumbnail(thumbnailData, userId: userId)
+                // ── Auth ──────────────────────────────────────────────────────
+                let session = try await supabase.auth.session
+                let userId  = session.user.id.uuidString
+
+                // ── Read video via memory-mapped I/O (does NOT load all bytes into RAM) ──
+                self.progressLabel.text = "Preparing video..."
+                let videoData: Data = try await withCheckedThrowingContinuation { cont in
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        do {
+                            // .mappedIfSafe = memory-mapped — safe for large video files
+                            let data = try Data(contentsOf: videoURL, options: .mappedIfSafe)
+                            cont.resume(returning: data)
+                        } catch {
+                            cont.resume(throwing: error)
+                        }
                     }
                 }
-                
-                // Create flick record
-                progressLabel.text = "Finalizing..."
-                let caption = captionTextField.text?.isEmpty == false ? captionTextField.text : nil
-                let audioTitle = audioTitleTextField.text?.isEmpty == false ? audioTitleTextField.text : "Original Audio"
-                
-                let _ = try await FlicksService.shared.createFlick(
-                    videoUrl: videoUrl,
+
+                // ── Upload video ──────────────────────────────────────────────
+                self.progressLabel.text = "Uploading video..."
+                let videoUrlStr = try await FlicksService.shared.uploadFlickVideo(videoData, userId: userId)
+
+                // ── Thumbnail on background queue (AVAsset is thread-safe) ────
+                self.progressLabel.text = "Creating thumbnail..."
+                var thumbnailUrl: String?
+                let thumbnail: UIImage? = await withCheckedContinuation { cont in
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        let asset  = AVAsset(url: videoURL)
+                        let gen    = AVAssetImageGenerator(asset: asset)
+                        gen.appliesPreferredTrackTransform = true
+                        gen.maximumSize = CGSize(width: 720, height: 1280)
+                        let time   = CMTime(seconds: 0.5, preferredTimescale: 600)
+                        let img    = (try? gen.copyCGImage(at: time, actualTime: nil)).map { UIImage(cgImage: $0) }
+                        cont.resume(returning: img)
+                    }
+                }
+                if let thumbnail, let jpegData = thumbnail.jpegData(compressionQuality: 0.7) {
+                    thumbnailUrl = try await FlicksService.shared.uploadThumbnail(jpegData, userId: userId)
+                }
+
+                // ── Insert DB record ──────────────────────────────────────────
+                self.progressLabel.text = "Finalizing..."
+                _ = try await FlicksService.shared.createFlick(
+                    videoUrl: videoUrlStr,
                     thumbnailUrl: thumbnailUrl,
                     caption: caption,
                     audioTitle: audioTitle
                 )
-                
-                // Success
-                await MainActor.run {
-                    loadingIndicator.stopAnimating()
-                    progressLabel.isHidden = true
-                    
-                    showSuccessAndDismiss()
-                }
-                
+
+                // ── Done ──────────────────────────────────────────────────────
+                self.loadingIndicator.stopAnimating()
+                self.progressLabel.isHidden = true
+                self.showSuccessAndDismiss()
+
             } catch {
-                await MainActor.run {
-                    loadingIndicator.stopAnimating()
-                    progressLabel.isHidden = true
-                    uploadButton.isEnabled = true
-                    cancelButton.isEnabled = true
-                    isUploading = false
-                    
-                    showError(message: "Failed to upload: \(error.localizedDescription)")
-                }
+                self.loadingIndicator.stopAnimating()
+                self.progressLabel.isHidden = true
+                self.uploadButton.isEnabled = true
+                self.cancelButton.isEnabled = true
+                self.isUploading = false
+                self.showError(message: "Upload failed: \(error.localizedDescription)")
             }
         }
     }

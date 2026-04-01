@@ -64,10 +64,10 @@ final class ReelsViewController: UIViewController {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        // Refresh flicks when returning to the screen
-        Task {
-            await fetchReelsFromSupabase()
-        }
+        // Full refresh every time we return to the screen
+        reels = []
+        collectionView.reloadData()
+        Task { await fetchReelsFromSupabase() }
     }
     
     override func viewDidAppear(_ animated: Bool) {
@@ -152,12 +152,18 @@ final class ReelsViewController: UIViewController {
         } catch {
             print("❌ Failed to fetch flicks: \(error)")
             await MainActor.run {
-                // Show error or fallback to sample data if needed
                 if self.reels.isEmpty {
                     self.showEmptyState()
                 }
             }
         }
+    }
+
+    // Call this to force a fresh reload (e.g. after posting)
+    func refreshFlicks() {
+        reels = []
+        collectionView.reloadData()
+        Task { await fetchReelsFromSupabase() }
     }
     
     private func checkLikesForReels() async {

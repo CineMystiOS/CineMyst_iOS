@@ -85,30 +85,33 @@ class FlicksService {
     
     // MARK: - Fetch Flicks
     func fetchFlicks(limit: Int = 10, offset: Int = 0) async throws -> [Flick] {
+        // Simple select — no FK join needed (flicks.user_id has no declared FK constraint)
         let response = try await supabase
             .from("flicks")
-            .select("""
-                *,
-                profiles!flicks_user_id_fkey(username, full_name, profile_picture_url)
-            """)
+            .select("*")
             .order("created_at", ascending: false)
             .range(from: offset, to: offset + limit - 1)
             .execute()
-        
-        let flicksData = response.data
-        var flicks = try JSONDecoder().decode([Flick].self, from: flicksData)
-        
-        // Parse nested profile data
-        if let json = try? JSONSerialization.jsonObject(with: flicksData) as? [[String: Any]] {
-            for (index, item) in json.enumerated() {
-                if let profile = item["profiles"] as? [String: Any] {
-                    flicks[index].username = profile["username"] as? String
-                    flicks[index].fullName = profile["full_name"] as? String
-                    flicks[index].profilePictureUrl = profile["profile_picture_url"] as? String
+
+        var flicks = try JSONDecoder().decode([Flick].self, from: response.data)
+
+        // Enrich each flick with profile info via separate lookup
+        for i in flicks.indices {
+            let uid = flicks[i].userId
+            if let profileData = try? await supabase
+                .from("profiles")
+                .select("username, full_name, profile_picture_url")
+                .eq("id", value: uid)
+                .single()
+                .execute() {
+                if let json = try? JSONSerialization.jsonObject(with: profileData.data) as? [String: Any] {
+                    flicks[i].username           = json["username"] as? String
+                    flicks[i].fullName           = json["full_name"] as? String
+                    flicks[i].profilePictureUrl  = json["profile_picture_url"] as? String
                 }
             }
         }
-        
+
         return flicks
     }
     

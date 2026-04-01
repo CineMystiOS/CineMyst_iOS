@@ -2,20 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleIdentifier</key>
-	<string>com.cinemyst.app</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
-	<key>CFBundleVersion</key>
-	<string>1</string>
-	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.cinemyst.app</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
-	<key>UILaunchStoryboardName</key>
-	<string>LaunchScreen</string>
-	<key>UIMainStoryboardFile</key>
-	<string>Main</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -30,14 +24,22 @@
 		</dict>
 		<dict/>
 	</array>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>CineMyst needs access to your microphone to record audio for videos and flicks.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CineMyst needs access to your photo library to select videos and photos for Flicks and your actor portfolio.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>CineMyst would like to save photos and videos to your library.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>CineMyst needs camera access to record videos for Flicks.</string>
 	<key>SUPABASE_HOST</key>
 	<string>bdyybncnvczebsaojwge.supabase.co</string>
 	<key>SUPABASE_KEY</key>
 	<string>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkeXlibmNudmN6ZWJzYW9qd2dlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NDY5MTQsImV4cCI6MjA5MDQyMjkxNH0.L1kdlOG0S2xpQcR8j1Wd1FWXeL-kTk2A5TJAWyrP0ig</string>
 	<key>SUPABASE_URL</key>
 	<string>https://bdyybncnvczebsaojwge.supabase.co</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>CineMyst needs access to your microphone to record audio for videos and flicks.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -57,5 +59,9 @@
 			</array>
 		</dict>
 	</dict>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
 </dict>
 </plist>

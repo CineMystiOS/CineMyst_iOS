@@ -910,7 +910,7 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
 
     @objc private func editPortfolioTapped() {
         if hasPortfolio {
-            let vc = PortfolioViewController()
+            let vc = ActorPortfolioDetailViewController()
             vc.isOwnProfile = true
             let nav = UINavigationController(rootViewController: vc)
             nav.modalPresentationStyle = .fullScreen
