@@ -9,19 +9,19 @@ import UIKit
 
 struct Job: Codable, Identifiable {
     let id: UUID
-    let directorId: UUID
-    let title: String
-    let companyName: String
-    let location: String
-    let ratePerDay: Int
-    let jobType: String
+    let directorId: UUID?
+    let title: String?
+    let companyName: String?
+    let location: String?
+    let ratePerDay: Int?
+    let jobType: String?
     let description: String?
     let requirements: String?
     let referenceMaterialUrl: String?
-    let status: JobStatus
+    let status: JobStatus?
     let applicationDeadline: Date?
-    let createdAt: Date
-    let updatedAt: Date
+    let createdAt: Date?
+    let updatedAt: Date?
     
     enum JobStatus: String, Codable {
         case active, pending, completed, closed
@@ -61,15 +61,18 @@ extension Job {
         case .closed:
             statusText = "Closed"
             statusColor = .systemRed
+        default:
+            statusText = "Active"
+            statusColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1)
         }
         
         return JobCardModel(
             id: id,
-            title: title,
-            company: companyName,
-            location: location,
-            rate: "₹\(ratePerDay)/day",
-            type: jobType,
+            title: title ?? "Untitled Job",
+            company: companyName ?? "CineMyst Production",
+            location: location ?? "Remote/TBD",
+            rate: "₹\(ratePerDay ?? 0)/day",
+            type: jobType ?? "Project",
             statusText: statusText,
             statusColor: statusColor,
             applicationsCount: applicationsCount

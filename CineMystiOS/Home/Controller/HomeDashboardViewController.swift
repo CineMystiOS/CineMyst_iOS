@@ -1744,15 +1744,19 @@ final class CastingFeedCell: UITableViewCell {
     }
 
     func configure(with job: Job) {
-        avatarLabel.text = String(job.companyName.prefix(3)).uppercased()
-        posterName.text = job.companyName; roleMeta.text = job.jobType; timeMeta.text = "2h"
-        captionLabel.text = "CASTING CALL: \(job.title). \(job.description)"
-        jobTitleLabel.text = job.title; locationLabel.text = "📍 \(job.location)"
+        avatarLabel.text = String((job.companyName ?? "CM").prefix(3)).uppercased()
+        posterName.text = job.companyName ?? "CineMyst Production"
+        roleMeta.text = job.jobType ?? "Project"
+        timeMeta.text = "2h"
+        captionLabel.text = "CASTING CALL: \(job.title ?? "Untitled"). \(job.description ?? "")"
+        jobTitleLabel.text = job.title ?? "Untitled Job"
+        locationLabel.text = "📍 \(job.location ?? "Remote")"
         if let d = job.applicationDeadline {
             let f = DateFormatter(); f.dateFormat = "MMM dd, yyyy"
             deadlineLabel.text = "Deadline: \(f.string(from: d))"
         }
-        rateLabel.text = "₹\(job.ratePerDay * 8 / 1000)K – ₹\(job.ratePerDay * 12 / 1000)K"
+        let rate = job.ratePerDay ?? 0
+        rateLabel.text = "₹\(rate * 8 / 1000)K – ₹\(rate * 12 / 1000)K"
     }
 
     @objc private func applyTapped() {
