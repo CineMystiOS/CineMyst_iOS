@@ -2,134 +2,103 @@
 //  ReelCell.swift
 //  CineMystApp
 //
-//  Updated to match Instagram Reels design
-//  Second pass: fixed bottom alignment and safe-area issues
-//  Third pass: removed the top-right share icon that overlapped the "Snaps" title
-//  Fourth pass: wired the "more" (ellipsis) button to notify the delegate so the
-//  containing view controller can present an action sheet with Save / Interested / Not Interested / Report
-//
+//  Cinematic redesign — deep plum + rose gradient aesthetic, spring animations
 
 import UIKit
 import AVFoundation
 
-// MARK: - Delegate Protocol
+// MARK: - Delegate
+
 protocol ReelCellDelegate: AnyObject {
     func didTapComment(on cell: ReelCell)
     func didTapShare(on cell: ReelCell)
-    /// Called when the user taps the "more" (ellipsis) button. The sourceView can be used
-    /// by the presenter for popover anchoring on iPad.
     func didTapMore(on cell: ReelCell, sourceView: UIView)
     func didTapProfile(on cell: ReelCell, userId: String)
 }
 
+// MARK: - ReelCell
+
 final class ReelCell: UICollectionViewCell {
-    
+
     static let identifier = "ReelCell"
-    
-    // Delegates for button actions
     weak var delegate: ReelCellDelegate?
-    
-    // State
-    private var isLiked = false
+
+    // MARK: State
+    private var isLiked        = false
+    private var currentLikes   = 0
     private var currentFlickId: String?
-    private var currentUserId: String?
-    
-    // Video player
-    private var playerLayer: AVPlayerLayer?
+    private var currentUserId:  String?
+    private var isFollowing     = false
+    private var isOwnContent    = false
+
+    // MARK: Player
+    private var playerLayer:  AVPlayerLayer?
     private var playerLooper: AVPlayerLooper?
-    private var queuePlayer: AVQueuePlayer?
-    
-    // Small layout tune constants
-    private enum Layout {
-        static let rightStackBottom: CGFloat = -20   // move icons up from safe area
-        static let bottomInfoBottom: CGFloat = -20    // bottom-left info baseline above tab bar
-        static let musicDiscBottom: CGFloat = -90
-        static let horizontalMargin: CGFloat = 12
+    private var queuePlayer:  AVQueuePlayer?
+
+    // MARK: - Design tokens
+    private enum DS {
+        static let plum  = UIColor(red: 0.26, green: 0.09, blue: 0.19, alpha: 1)
+        static let rose  = UIColor(red: 0.80, green: 0.45, blue: 0.66, alpha: 1)
+        static let red   = UIColor(red: 1, green: 0.27, blue: 0.36, alpha: 1)
     }
-    
-    // UI Elements
+
+    // MARK: - Video Layer
+    // inserted at 0 in contentView.layer
+
+    // MARK: - Gradient Overlay (bottom)
+    private let gradientLayer: CAGradientLayer = {
+        let g = CAGradientLayer()
+        g.colors = [
+            UIColor.clear.cgColor,
+            UIColor.black.withAlphaComponent(0.15).cgColor,
+            UIColor.black.withAlphaComponent(0.65).cgColor,
+            UIColor.black.withAlphaComponent(0.88).cgColor,
+        ]
+        g.locations = [0, 0.4, 0.75, 1]
+        return g
+    }()
+
+    // MARK: - Play Icon
     private let playIconView: UIImageView = {
         let iv = UIImageView()
-        let cfg = UIImage.SymbolConfiguration(pointSize: 120, weight: .ultraLight)
+        let cfg = UIImage.SymbolConfiguration(pointSize: 64, weight: .ultraLight)
         iv.image = UIImage(systemName: "play.fill", withConfiguration: cfg)
-        iv.tintColor = UIColor(white: 1, alpha: 0.85)
+        iv.tintColor = UIColor.white.withAlphaComponent(0.85)
         iv.contentMode = .center
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        iv.isHidden = true
-        return iv
-    }()
-    
-    // Top bar
-    private let topBar: UIView = {
-        let v = UIView()
-        v.translatesAutoresizingMaskIntoConstraints = false
-        return v
-    }()
-    
-    private let snapsLabel: UILabel = {
-        let l = UILabel()
-        l.text = "Snaps"
-        l.font = .systemFont(ofSize: 18, weight: .semibold)
-        l.textColor = .white
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
-    }()
-    
-    private let dropdownIcon: UIImageView = {
-        let iv = UIImageView()
-        iv.image = UIImage(systemName: "chevron.down")
-        iv.tintColor = .white
-        iv.contentMode = .scaleAspectFit
+        iv.alpha = 0
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
-    
-    // Right action stack
+
+    // MARK: - Right Action Stack
     private let actionStack: UIStackView = {
         let sv = UIStackView()
-        sv.axis = .vertical
-        sv.alignment = .trailing
-        sv.spacing = 20
+        sv.axis      = .vertical
+        sv.alignment = .center
+        sv.spacing   = 18
         sv.translatesAutoresizingMaskIntoConstraints = false
         return sv
     }()
-    
-    private let likeButton = ReelCell.actionButton(systemName: "heart.fill", value: "253K")
-    private let commentButton = ReelCell.actionButton(systemName: "message", value: "1,139")
-    private let shareButton = ReelCell.actionButton(systemName: "paperplane", value: "29")
-    private let moreButton = ReelCell.actionButton(systemName: "ellipsis", value: "")
-    
-    // Music disc at bottom of action stack
-    private let musicDiscView: UIImageView = {
+
+    private lazy var likeStack      = makeActionItem(icon: "heart",        tint: .white)
+    private lazy var commentStack   = makeActionItem(icon: "bubble.right", tint: .white)
+    private lazy var shareStack     = makeActionItem(icon: "paperplane",   tint: .white, hideLabel: true)
+
+    // MARK: - Bottom Info
+    private let avatarView: UIImageView = {
         let iv = UIImageView()
         iv.layer.cornerRadius = 20
         iv.layer.masksToBounds = true
-        iv.translatesAutoresizingMaskIntoConstraints = false
+        iv.layer.borderWidth  = 1.5
+        iv.layer.borderColor  = UIColor.white.cgColor
         iv.contentMode = .scaleAspectFill
-        iv.backgroundColor = .darkGray
-        return iv
-    }()
-    
-    // Bottom info section
-    private let bottomInfoContainer: UIView = {
-        let v = UIView()
-        v.translatesAutoresizingMaskIntoConstraints = false
-        return v
-    }()
-    
-    private let avatarImageView: UIImageView = {
-        let iv = UIImageView()
-        iv.layer.cornerRadius = 18
-        iv.layer.masksToBounds = true
-        iv.layer.borderWidth = 1.5
-        iv.layer.borderColor = UIColor.white.cgColor
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        iv.contentMode = .scaleAspectFill
-        iv.backgroundColor = .darkGray
+        iv.backgroundColor = UIColor(white: 0.3, alpha: 1)
         iv.isUserInteractionEnabled = true
+        iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
-    
+
     private let nameLabel: UILabel = {
         let l = UILabel()
         l.font = .systemFont(ofSize: 15, weight: .bold)
@@ -138,21 +107,20 @@ final class ReelCell: UICollectionViewCell {
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
-    
-    private let connectButton: UIButton = {
+
+    private let followButton: UIButton = {
         let b = UIButton(type: .system)
         b.setTitle("Follow", for: .normal)
         b.setTitleColor(.white, for: .normal)
-        b.backgroundColor = .clear
-        b.titleLabel?.font = .systemFont(ofSize: 14, weight: .bold)
-        b.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
-        b.layer.cornerRadius = 6
-        b.layer.borderWidth = 1.5
-        b.layer.borderColor = UIColor.white.cgColor
+        b.titleLabel?.font = .systemFont(ofSize: 13, weight: .bold)
+        b.layer.cornerRadius = 14
+        b.layer.borderWidth  = 1.5
+        b.layer.borderColor  = UIColor.white.cgColor
+        b.contentEdgeInsets  = UIEdgeInsets(top: 5, left: 14, bottom: 5, right: 14)
         b.translatesAutoresizingMaskIntoConstraints = false
         return b
     }()
-    
+
     private let captionLabel: UILabel = {
         let l = UILabel()
         l.font = .systemFont(ofSize: 14, weight: .regular)
@@ -161,32 +129,31 @@ final class ReelCell: UICollectionViewCell {
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
-    
-    private let likedByLabel: UILabel = {
+
+    private let likeCountLabel: UILabel = {
         let l = UILabel()
         l.font = .systemFont(ofSize: 12, weight: .regular)
-        l.textColor = .white
+        l.textColor = UIColor.white.withAlphaComponent(0.85)
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
-    
-    private let audioContainer: UIView = {
+
+    private let audioRow: UIView = {
         let v = UIView()
-        v.backgroundColor = UIColor(white: 0, alpha: 0.3)
-        v.layer.cornerRadius = 4
+        v.backgroundColor = UIColor.black.withAlphaComponent(0.35)
+        v.layer.cornerRadius = 16
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
-    
+
     private let audioIcon: UIImageView = {
-        let iv = UIImageView()
-        iv.image = UIImage(systemName: "music.note")
+        let iv = UIImageView(image: UIImage(systemName: "music.note"))
         iv.tintColor = .white
         iv.contentMode = .scaleAspectFit
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
-    
+
     private let audioLabel: UILabel = {
         let l = UILabel()
         l.font = .systemFont(ofSize: 12, weight: .semibold)
@@ -194,483 +161,457 @@ final class ReelCell: UICollectionViewCell {
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
-    
-    private let giftIcon: UIImageView = {
-        let iv = UIImageView()
-        iv.image = UIImage(systemName: "gift")
-        iv.tintColor = .white
+
+    // MARK: - Double-tap heart burst
+    private let heartBurst: UIImageView = {
+        let iv = UIImageView(image: UIImage(systemName: "heart.fill"))
+        iv.tintColor = UIColor(red: 1, green: 0.27, blue: 0.36, alpha: 1)
         iv.contentMode = .scaleAspectFit
+        iv.alpha = 0
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
-    
-    private let sendGiftLabel: UILabel = {
-        let l = UILabel()
-        l.text = "Send gift"
-        l.font = .systemFont(ofSize: 12, weight: .semibold)
-        l.textColor = .white
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
-    }()
-    
-    private let musicThumb: UIImageView = {
-        let iv = UIImageView()
-        iv.layer.cornerRadius = 5
-        iv.layer.masksToBounds = true
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        iv.contentMode = .scaleAspectFill
-        iv.backgroundColor = .darkGray
-        return iv
-    }()
-    
+
     // MARK: - Init
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupViews()
-        setupTapGesture()
+        setupGestures()
     }
-    
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-    
+    required init?(coder: NSCoder) { fatalError() }
+
     override func layoutSubviews() {
         super.layoutSubviews()
-        // Use contentView bounds for full coverage
-        playerLayer?.frame = contentView.bounds
+        playerLayer?.frame  = contentView.bounds
+        gradientLayer.frame = contentView.bounds
     }
-    
-    // MARK: - Setup
+
+    // MARK: - Setup Views
+
     private func setupViews() {
         contentView.backgroundColor = .black
-        
-        // Play icon
+        contentView.layer.addSublayer(gradientLayer)
+
         contentView.addSubview(playIconView)
-        
-        // Top bar
-        contentView.addSubview(topBar)
-        topBar.addSubview(snapsLabel)
-        topBar.addSubview(dropdownIcon)
-        // NOTE: removed the top-right share icon to prevent overlap with other UI elements
-        
-        // Action stack
+        contentView.addSubview(heartBurst)
         contentView.addSubview(actionStack)
-        actionStack.addArrangedSubview(likeButton)
-        actionStack.addArrangedSubview(commentButton)
-        actionStack.addArrangedSubview(shareButton)
-        actionStack.addArrangedSubview(moreButton)
+
+        // Action stack — 2 buttons (Like, Comment)
+        actionStack.addArrangedSubview(likeStack)
+        actionStack.addArrangedSubview(commentStack)
         
-        // Bottom info
-        contentView.addSubview(bottomInfoContainer)
-        bottomInfoContainer.addSubview(avatarImageView)
-        bottomInfoContainer.addSubview(nameLabel)
-        bottomInfoContainer.addSubview(connectButton)
-        bottomInfoContainer.addSubview(captionLabel)
-        bottomInfoContainer.addSubview(likedByLabel)
-        bottomInfoContainer.addSubview(audioContainer)
-        
-        audioContainer.addSubview(audioIcon)
-        audioContainer.addSubview(audioLabel)
-        audioContainer.addSubview(giftIcon)
-        audioContainer.addSubview(sendGiftLabel)
-        audioContainer.addSubview(musicThumb)
-        
-        setupConstraints()
-    }
-    
-    private func setupConstraints() {
-        // ensure autoresizing masks are off
-        [playIconView, topBar, snapsLabel, dropdownIcon, actionStack, musicDiscView,
-         bottomInfoContainer, avatarImageView, nameLabel, connectButton, captionLabel, likedByLabel,
-         audioContainer, audioIcon, audioLabel, giftIcon, sendGiftLabel, musicThumb]
-            .forEach { $0.translatesAutoresizingMaskIntoConstraints = false }
-        
+        // Share stack stands alone now
+        contentView.addSubview(shareStack)
+
+        contentView.addSubview(avatarView)
+        contentView.addSubview(nameLabel)
+        contentView.addSubview(followButton)
+        contentView.addSubview(captionLabel)
+        contentView.addSubview(likeCountLabel)
+        contentView.addSubview(audioRow)
+        audioRow.addSubview(audioIcon)
+        audioRow.addSubview(audioLabel)
+
+        // Tab bar ≈ 83pt (49 bar + 34 safe area on Face ID) + buffer = 130
+        let tabOffset: CGFloat = 96
+
         NSLayoutConstraint.activate([
-            // Play icon
+            // Play icon — centred
             playIconView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             playIconView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            playIconView.widthAnchor.constraint(equalToConstant: 150),
-            playIconView.heightAnchor.constraint(equalToConstant: 150),
-            
-            // Top bar - now that we respect safe area, reduce the offset
-            topBar.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 16),
-            topBar.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            topBar.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            topBar.heightAnchor.constraint(equalToConstant: 44),
-            
-            snapsLabel.leadingAnchor.constraint(equalTo: topBar.leadingAnchor),
-            snapsLabel.centerYAnchor.constraint(equalTo: topBar.centerYAnchor),
-            
-            dropdownIcon.leadingAnchor.constraint(equalTo: snapsLabel.trailingAnchor, constant: 8),
-            dropdownIcon.centerYAnchor.constraint(equalTo: topBar.centerYAnchor),
-            dropdownIcon.widthAnchor.constraint(equalToConstant: 16),
-            dropdownIcon.heightAnchor.constraint(equalToConstant: 16),
-            
-            // Action stack pinned to bottom-right (flush with right edge)
-            actionStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            actionStack.bottomAnchor.constraint(equalTo: contentView.safeAreaLayoutGuide.bottomAnchor, constant: -30),
-            
-            // Bottom info container pinned to bottom-left and raised above the tab bar
-            bottomInfoContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Layout.horizontalMargin),
-            bottomInfoContainer.trailingAnchor.constraint(equalTo: actionStack.leadingAnchor, constant: -12),
-            bottomInfoContainer.bottomAnchor.constraint(equalTo: contentView.safeAreaLayoutGuide.bottomAnchor, constant: Layout.bottomInfoBottom),
-            
-            // Avatar & name
-            avatarImageView.leadingAnchor.constraint(equalTo: bottomInfoContainer.leadingAnchor),
-            avatarImageView.topAnchor.constraint(equalTo: bottomInfoContainer.topAnchor),
-            avatarImageView.widthAnchor.constraint(equalToConstant: 32),
-            avatarImageView.heightAnchor.constraint(equalToConstant: 32),
-            
-            nameLabel.leadingAnchor.constraint(equalTo: avatarImageView.trailingAnchor, constant: 8),
-            nameLabel.centerYAnchor.constraint(equalTo: avatarImageView.centerYAnchor),
-            
-            // connect button should not push out of container: allow it to compress if needed
-            connectButton.leadingAnchor.constraint(equalTo: nameLabel.trailingAnchor, constant: 8),
-            connectButton.centerYAnchor.constraint(equalTo: avatarImageView.centerYAnchor),
-            connectButton.heightAnchor.constraint(equalToConstant: 26),
-            connectButton.trailingAnchor.constraint(lessThanOrEqualTo: bottomInfoContainer.trailingAnchor),
-            
-            // Caption
-            captionLabel.leadingAnchor.constraint(equalTo: bottomInfoContainer.leadingAnchor),
-            captionLabel.trailingAnchor.constraint(equalTo: bottomInfoContainer.trailingAnchor),
-            captionLabel.topAnchor.constraint(equalTo: avatarImageView.bottomAnchor, constant: 8),
-            
-            // Liked by
-            likedByLabel.leadingAnchor.constraint(equalTo: bottomInfoContainer.leadingAnchor),
-            likedByLabel.trailingAnchor.constraint(equalTo: bottomInfoContainer.trailingAnchor),
-            likedByLabel.topAnchor.constraint(equalTo: captionLabel.bottomAnchor, constant: 6),
-            
-            // Audio container
-            audioContainer.leadingAnchor.constraint(equalTo: bottomInfoContainer.leadingAnchor),
-            audioContainer.trailingAnchor.constraint(lessThanOrEqualTo: bottomInfoContainer.trailingAnchor),
-            audioContainer.topAnchor.constraint(equalTo: likedByLabel.bottomAnchor, constant: 8),
-            audioContainer.bottomAnchor.constraint(equalTo: bottomInfoContainer.bottomAnchor),
-            audioContainer.heightAnchor.constraint(equalToConstant: 40),
-            
-            // Audio icon
-            audioIcon.leadingAnchor.constraint(equalTo: audioContainer.leadingAnchor, constant: 10),
-            audioIcon.centerYAnchor.constraint(equalTo: audioContainer.centerYAnchor),
-            audioIcon.widthAnchor.constraint(equalToConstant: 16),
-            audioIcon.heightAnchor.constraint(equalToConstant: 16),
-            
-            // Audio label
+            playIconView.widthAnchor.constraint(equalToConstant: 100),
+            playIconView.heightAnchor.constraint(equalToConstant: 100),
+
+            // Heart burst — centred
+            heartBurst.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            heartBurst.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            heartBurst.widthAnchor.constraint(equalToConstant: 90),
+            heartBurst.heightAnchor.constraint(equalToConstant: 90),
+
+            // Action stack pinned to right edge, above tab bar
+            actionStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            actionStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -(tabOffset + 95)),
+
+            // Share stack pinned to top right
+            shareStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            shareStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 100),
+
+            // Audio row — bottom left, above tab bar
+            audioRow.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
+            audioRow.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -tabOffset),
+            audioRow.heightAnchor.constraint(equalToConstant: 34),
+            audioRow.trailingAnchor.constraint(lessThanOrEqualTo: actionStack.leadingAnchor, constant: -16),
+
+            audioIcon.leadingAnchor.constraint(equalTo: audioRow.leadingAnchor, constant: 10),
+            audioIcon.centerYAnchor.constraint(equalTo: audioRow.centerYAnchor),
+            audioIcon.widthAnchor.constraint(equalToConstant: 14),
+            audioIcon.heightAnchor.constraint(equalToConstant: 14),
             audioLabel.leadingAnchor.constraint(equalTo: audioIcon.trailingAnchor, constant: 6),
-            audioLabel.centerYAnchor.constraint(equalTo: audioContainer.centerYAnchor),
-            
-            // Gift icon
-            giftIcon.leadingAnchor.constraint(equalTo: audioLabel.trailingAnchor, constant: 16),
-            giftIcon.centerYAnchor.constraint(equalTo: audioContainer.centerYAnchor),
-            giftIcon.widthAnchor.constraint(equalToConstant: 16),
-            giftIcon.heightAnchor.constraint(equalToConstant: 16),
-            
-            // Send gift label
-            sendGiftLabel.leadingAnchor.constraint(equalTo: giftIcon.trailingAnchor, constant: 6),
-            sendGiftLabel.centerYAnchor.constraint(equalTo: audioContainer.centerYAnchor),
-            
-            // Music thumb
-            musicThumb.leadingAnchor.constraint(equalTo: sendGiftLabel.trailingAnchor, constant: 12),
-            musicThumb.trailingAnchor.constraint(equalTo: audioContainer.trailingAnchor, constant: -8),
-            musicThumb.centerYAnchor.constraint(equalTo: audioContainer.centerYAnchor),
-            musicThumb.widthAnchor.constraint(equalToConstant: 28),
-            musicThumb.heightAnchor.constraint(equalToConstant: 28)
+            audioLabel.centerYAnchor.constraint(equalTo: audioRow.centerYAnchor),
+            audioLabel.trailingAnchor.constraint(equalTo: audioRow.trailingAnchor, constant: -10),
+
+            // Like count label
+            likeCountLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
+            likeCountLabel.bottomAnchor.constraint(equalTo: audioRow.topAnchor, constant: -8),
+            likeCountLabel.trailingAnchor.constraint(lessThanOrEqualTo: actionStack.leadingAnchor, constant: -16),
+
+            // Caption
+            captionLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
+            captionLabel.bottomAnchor.constraint(equalTo: likeCountLabel.topAnchor, constant: -6),
+            captionLabel.trailingAnchor.constraint(lessThanOrEqualTo: actionStack.leadingAnchor, constant: -16),
+
+            // Avatar
+            avatarView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
+            avatarView.bottomAnchor.constraint(equalTo: captionLabel.topAnchor, constant: -12),
+            avatarView.widthAnchor.constraint(equalToConstant: 40),
+            avatarView.heightAnchor.constraint(equalToConstant: 40),
+
+            // Name
+            nameLabel.leadingAnchor.constraint(equalTo: avatarView.trailingAnchor, constant: 10),
+            nameLabel.centerYAnchor.constraint(equalTo: avatarView.centerYAnchor),
+
+            // Follow button
+            followButton.leadingAnchor.constraint(equalTo: nameLabel.trailingAnchor, constant: 10),
+            followButton.centerYAnchor.constraint(equalTo: avatarView.centerYAnchor),
+            followButton.trailingAnchor.constraint(lessThanOrEqualTo: actionStack.leadingAnchor, constant: -16),
+            followButton.heightAnchor.constraint(equalToConstant: 30),
         ])
-        
-        // prevent "Connect" from growing past the available space
-        connectButton.setContentCompressionResistancePriority(.required, for: .vertical)
-        connectButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     }
-    
-    private func setupTapGesture() {
-        let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
-        contentView.addGestureRecognizer(tap)
-        
-        // Add tap gesture to name label for profile navigation
-        let nameTap = UITapGestureRecognizer(target: self, action: #selector(handleNameTap))
+
+
+    // MARK: - Gestures
+
+    private func setupGestures() {
+        // Double-tap to like
+        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap))
+        doubleTap.numberOfTapsRequired = 2
+        contentView.addGestureRecognizer(doubleTap)
+
+        // Single tap to play/pause
+        let singleTap = UITapGestureRecognizer(target: self, action: #selector(handleSingleTap))
+        singleTap.require(toFail: doubleTap)
+        contentView.addGestureRecognizer(singleTap)
+
+        let profileTap = UITapGestureRecognizer(target: self, action: #selector(handleProfileTap))
+        avatarView.addGestureRecognizer(profileTap)
+        let nameTap = UITapGestureRecognizer(target: self, action: #selector(handleProfileTap))
         nameLabel.addGestureRecognizer(nameTap)
-        
-        // Add tap gesture to avatar for profile navigation
-        let avatarTap = UITapGestureRecognizer(target: self, action: #selector(handleNameTap))
-        avatarImageView.addGestureRecognizer(avatarTap)
-        
-        // Add action to follow button
-        connectButton.addTarget(self, action: #selector(handleFollow), for: .touchUpInside)
-        
-        // Add button actions
-        if let likeBtn = likeButton.arrangedSubviews.first as? UIButton {
-            likeBtn.addTarget(self, action: #selector(handleLike), for: .touchUpInside)
-        }
-        if let commentBtn = commentButton.arrangedSubviews.first as? UIButton {
-            commentBtn.addTarget(self, action: #selector(handleComment), for: .touchUpInside)
-        }
-        if let shareBtn = shareButton.arrangedSubviews.first as? UIButton {
-            shareBtn.addTarget(self, action: #selector(handleShare), for: .touchUpInside)
-        }
-        // Wire the more (ellipsis) button to notify delegate so the VC can present an action sheet
-        if let moreBtn = moreButton.arrangedSubviews.first as? UIButton {
-            moreBtn.addTarget(self, action: #selector(handleMore(_:)), for: .touchUpInside)
-        }
+
+        followButton.addTarget(self, action: #selector(handleFollow), for: .touchUpInside)
+
+        // Wire action buttons
+        actionButton(in: likeStack)?.addTarget(self, action: #selector(handleLike), for: .touchUpInside)
+        actionButton(in: commentStack)?.addTarget(self, action: #selector(handleComment), for: .touchUpInside)
+        actionButton(in: shareStack)?.addTarget(self, action: #selector(handleShare), for: .touchUpInside)
     }
-    
-    @objc private func handleNameTap() {
-        guard let userId = currentUserId else { return }
-        delegate?.didTapProfile(on: self, userId: userId)
+
+    private func actionButton(in stack: UIStackView) -> UIButton? {
+        stack.arrangedSubviews.first as? UIButton
     }
-    
+    private func actionLabel(in stack: UIStackView) -> UILabel? {
+        stack.arrangedSubviews.last as? UILabel
+    }
+
+    // MARK: - Actions
+
+    @objc private func handleSingleTap() { togglePlayPause() }
+
+    @objc private func handleDoubleTap() {
+        if !isLiked { 
+            performLike()
+        }
+        showHeartBurst()
+    }
+
+    @objc private func handleProfileTap() {
+        guard let uid = currentUserId else { return }
+        delegate?.didTapProfile(on: self, userId: uid)
+    }
+
     @objc private func handleFollow() {
-        connectButton.setTitle("Request sent", for: .normal)
-        connectButton.isEnabled = false
-        connectButton.alpha = 0.7
+        guard !isOwnContent else { return }
+        isFollowing.toggle()
+        animateFollowButton()
+        persistFollowState()
     }
-    
-    @objc private func handleTap() {
-        togglePlayPause()
-    }
-    
+
     @objc private func handleLike() {
-        // Prevent double taps
-        guard let likeBtn = likeButton.arrangedSubviews.first as? UIButton else { return }
-        likeBtn.isEnabled = false
-        
-        // Optimistic UI update
+        performLike()
+    }
+
+    @objc private func handleComment() {
+        delegate?.didTapComment(on: self)
+    }
+
+    @objc private func handleShare() {
+        delegate?.didTapShare(on: self)
+    }
+
+    @objc private func handleMore(_ sender: UIButton) {
+        delegate?.didTapMore(on: self, sourceView: sender)
+    }
+
+    // MARK: - Like Logic
+
+    private func performLike() {
+        guard let flickId = currentFlickId else { return }
+        let btn = actionButton(in: likeStack)
+        btn?.isEnabled = false
+
         isLiked.toggle()
-        
-        // Animate
-        UIView.animate(withDuration: 0.1, animations: {
-            likeBtn.transform = CGAffineTransform(scaleX: 1.3, y: 1.3)
-        }) { _ in
-            UIView.animate(withDuration: 0.1) {
-                likeBtn.transform = .identity
-            }
-        }
-        
-        updateLikeButtonAppearance()
-        
-        // Update like count
-        if let likeLabel = likeButton.arrangedSubviews.last as? UILabel,
-           let currentCount = Int(likeLabel.text?.replacingOccurrences(of: "K", with: "000").replacingOccurrences(of: "M", with: "000000") ?? "0") {
-            let newCount = isLiked ? currentCount + 1 : max(0, currentCount - 1)
-            likeLabel.text = formatLikeCount(newCount)
-        }
-        
-        // Call API
+        currentLikes += isLiked ? 1 : -1
+        if currentLikes < 0 { currentLikes = 0 }
+
+        refreshLikeUI(animated: true)
+
         Task {
             do {
-                guard let flickId = currentFlickId else {
-                    likeBtn.isEnabled = true
-                    return
-                }
-                
                 if isLiked {
                     try await FlicksService.shared.likeFlick(flickId: flickId)
                 } else {
                     try await FlicksService.shared.unlikeFlick(flickId: flickId)
                 }
-                
-                await MainActor.run {
-                    likeBtn.isEnabled = true
+            } catch {
+                // Revert
+                self.isLiked.toggle()
+                self.currentLikes += self.isLiked ? 1 : -1
+                self.refreshLikeUI(animated: false)
+            }
+            btn?.isEnabled = true
+        }
+    }
+
+    private func refreshLikeUI(animated: Bool) {
+        let btn = actionButton(in: likeStack)
+        let lbl = actionLabel(in: likeStack)
+
+        let cfg   = UIImage.SymbolConfiguration(pointSize: 20, weight: isLiked ? .regular : .thin)
+        let name  = isLiked ? "heart.fill" : "heart"
+        let color = isLiked ? DS.red : UIColor.white
+
+        btn?.setImage(UIImage(systemName: name, withConfiguration: cfg), for: .normal)
+        lbl?.text = formatCount(currentLikes)
+
+        if animated {
+            UIView.animate(withDuration: 0.12, animations: {
+                btn?.transform = CGAffineTransform(scaleX: 1.35, y: 1.35)
+                btn?.tintColor = color
+            }) { _ in
+                UIView.animate(withDuration: 0.18, delay: 0, usingSpringWithDamping: 0.5, initialSpringVelocity: 8) {
+                    btn?.transform = .identity
+                }
+            }
+        } else {
+            btn?.tintColor = color
+        }
+
+        likeCountLabel.text = currentLikes == 0 ? "Be the first to like" : "❤️ \(formatCount(currentLikes)) likes"
+    }
+
+    // MARK: - Heart Burst Animation
+
+    private func showHeartBurst() {
+        heartBurst.transform = CGAffineTransform(scaleX: 0.1, y: 0.1)
+        heartBurst.alpha     = 0
+
+        UIView.animate(withDuration: 0.3, delay: 0,
+                       usingSpringWithDamping: 0.5, initialSpringVelocity: 10,
+                       options: .allowUserInteraction) {
+            self.heartBurst.transform = CGAffineTransform(scaleX: 1.2, y: 1.2)
+            self.heartBurst.alpha     = 1
+        } completion: { _ in
+            UIView.animate(withDuration: 0.25, delay: 0.3) {
+                self.heartBurst.alpha     = 0
+                self.heartBurst.transform = CGAffineTransform(scaleX: 1.8, y: 1.8)
+            }
+        }
+    }
+
+    // MARK: - Follow Logic
+
+    private func animateFollowButton() {
+        if isFollowing {
+            followButton.setTitle("Following", for: .normal)
+            followButton.backgroundColor = DS.plum
+            followButton.layer.borderColor = DS.plum.cgColor
+        } else {
+            followButton.setTitle("Follow", for: .normal)
+            followButton.backgroundColor = .clear
+            followButton.layer.borderColor = UIColor.white.cgColor
+        }
+
+        UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 8) {
+            self.followButton.transform = CGAffineTransform(scaleX: 0.92, y: 0.92)
+        } completion: { _ in
+            UIView.animate(withDuration: 0.2) {
+                self.followButton.transform = .identity
+            }
+        }
+    }
+
+    private func persistFollowState() {
+        guard let receiverId = currentUserId else { return }
+        Task {
+            do {
+                if isFollowing {
+                    try await ConnectionService.shared.sendRequest(to: receiverId)
+                } else {
+                    try await ConnectionService.shared.cancelRequest(to: receiverId)
                 }
             } catch {
-                print("❌ Failed to toggle like: \(error)")
-                // Revert on error
+                // Revert on failure
                 await MainActor.run {
-                    self.isLiked.toggle()
-                    self.updateLikeButtonAppearance()
-                    likeBtn.isEnabled = true
+                    self.isFollowing.toggle()
+                    self.animateFollowButton()
                 }
+                print("❌ Follow action failed: \(error)")
             }
         }
     }
-    
-    private func formatLikeCount(_ count: Int) -> String {
-        if count >= 1000000 {
-            return String(format: "%.1fM", Double(count) / 1000000.0)
-        } else if count >= 1000 {
-            return String(format: "%.1fK", Double(count) / 1000.0)
-        }
-        return "\(count)"
-    }
-    
-    @objc private func handleComment() {
-        delegate?.didTapComment(on: self)
-    }
-    
-    @objc private func handleShare() {
-        delegate?.didTapShare(on: self)
-    }
-    
-    @objc private func handleMore(_ sender: UIButton) {
-        // Forward to delegate. The delegate (usually the view controller) should present
-        // a UIAlertController.actionSheet anchored to `sender` for iPad compatibility.
-        delegate?.didTapMore(on: self, sourceView: sender)
-    }
-    
-    // MARK: - Configuration
+
+    // MARK: - Configure
+
     func configure(with reel: Reel) {
         currentFlickId = reel.id
-        currentUserId = reel.userId
-        nameLabel.text = reel.authorName
-        musicThumb.image = reel.authorAvatar
-        musicDiscView.image = reel.authorAvatar
+        currentUserId  = reel.userId
+        isLiked        = reel.isLiked
+        currentLikes   = Int(reel.likes) ?? 0
+
+        nameLabel.text  = reel.authorName
+        captionLabel.text = reel.caption?.isEmpty == false ? reel.caption : ""
         audioLabel.text = reel.audioTitle
-        captionLabel.text = reel.caption ?? "Check this out!"
-        isLiked = reel.isLiked
-        
-        // Load avatar from URL if available
-        if let avatarURL = reel.authorAvatarURL, let url = URL(string: avatarURL) {
-            Task {
-                do {
-                    let (data, _) = try await URLSession.shared.data(from: url)
-                    if let image = UIImage(data: data) {
-                        await MainActor.run {
-                            self.avatarImageView.image = image
-                            self.musicThumb.image = image
-                            self.musicDiscView.image = image
-                        }
-                    }
-                } catch {
-                    // Use placeholder if download fails
-                    self.avatarImageView.image = UIImage(systemName: "person.circle.fill")
+
+        actionLabel(in: commentStack)?.text = reel.comments
+        actionLabel(in: shareStack)?.text   = reel.shares
+
+        likeCountLabel.text = currentLikes == 0 ? "Be the first to like" : "❤️ \(reel.likes) likes"
+        refreshLikeUI(animated: false)
+
+        // Check if own content (hide follow button)
+        Task {
+            if let session = try? await supabase.auth.session {
+                let isMine = session.user.id.uuidString == reel.userId
+                await MainActor.run {
+                    self.isOwnContent = isMine
+                    self.followButton.isHidden = isMine
                 }
             }
-        } else {
-            avatarImageView.image = reel.authorAvatar ?? UIImage(systemName: "person.circle.fill")
         }
-        
-        // Show actual like count
-        if reel.likes == "0" {
-            likedByLabel.text = "Be the first to like this"
-        } else {
-            likedByLabel.text = "Liked by \(reel.likes) people"
+
+        // Avatar only — disc no longer shows profile photo
+        avatarView.image = UIImage(systemName: "person.circle.fill")
+        avatarView.tintColor = UIColor(white: 0.5, alpha: 1)
+
+        if let avatarURL = reel.authorAvatarURL, let url = URL(string: avatarURL) {
+            URLSession.shared.dataTask(with: url) { data, _, _ in
+                guard let data, let img = UIImage(data: data) else { return }
+                DispatchQueue.main.async {
+                    self.avatarView.image = img
+                }
+            }.resume()
         }
-        
-        if let likeLabel = likeButton.arrangedSubviews.last as? UILabel {
-            likeLabel.text = reel.likes
-        }
-        if let commentLabel = commentButton.arrangedSubviews.last as? UILabel {
-            commentLabel.text = reel.comments
-        }
-        if let shareLabel = shareButton.arrangedSubviews.last as? UILabel {
-            shareLabel.text = reel.shares
-        }
-        
-        // Update like button appearance
-        updateLikeButtonAppearance()
-        
+
         setupVideoPlayer(with: reel.videoURL)
     }
-    
-    // MARK: - Video Player
-    private func setupVideoPlayer(with videoString: String) {
-        cleanupPlayer()
-        
-        var videoURL: URL?
-        
-        // Check if it's a remote URL or local file
-        if videoString.hasPrefix("http") {
-            videoURL = URL(string: videoString)
-        } else {
-            videoURL = Bundle.main.url(forResource: videoString, withExtension: "mp4")
-        }
-        
-        guard let url = videoURL else {
-            print("❌ Video not found: \(videoString)")
-            return
-        }
-        
-        let asset = AVAsset(url: url)
-        let playerItem = AVPlayerItem(asset: asset)
-        
-        queuePlayer = AVQueuePlayer(playerItem: playerItem)
-        queuePlayer?.isMuted = false
-        queuePlayer?.volume = 1.0
-        
-        playerLooper = AVPlayerLooper(player: queuePlayer!, templateItem: playerItem)
-        
-        playerLayer = AVPlayerLayer(player: queuePlayer)
-        playerLayer?.videoGravity = .resizeAspectFill
-        playerLayer?.frame = contentView.bounds
-        
-        if let playerLayer = playerLayer {
-            contentView.layer.insertSublayer(playerLayer, at: 0)
-        }
-    }
-    
-    func play() {
-        queuePlayer?.play()
-        queuePlayer?.isMuted = false
-        queuePlayer?.volume = 1.0
-        playIconView.isHidden = true
-    }
-    
-    func pause() {
-        queuePlayer?.pause()
-        playIconView.isHidden = false
-    }
-    
+
     func updateLikeStatus(isLiked: Bool) {
         self.isLiked = isLiked
-        updateLikeButtonAppearance()
+        refreshLikeUI(animated: false)
     }
-    
-    private func updateLikeButtonAppearance() {
-        if let likeStackView = likeButton as? UIStackView,
-           let button = likeStackView.arrangedSubviews.first as? UIButton {
-            let config = UIImage.SymbolConfiguration(pointSize: 26, weight: .regular)
-            let imageName = isLiked ? "heart.fill" : "heart"
-            button.setImage(UIImage(systemName: imageName, withConfiguration: config), for: .normal)
-            button.tintColor = isLiked ? .systemRed : .white
+
+    // MARK: - Video
+
+    private func setupVideoPlayer(with videoString: String) {
+        cleanupPlayer()
+        guard let url = videoString.hasPrefix("http") ? URL(string: videoString)
+                        : Bundle.main.url(forResource: videoString, withExtension: "mp4")
+        else { return }
+
+        let item = AVPlayerItem(asset: AVAsset(url: url))
+        queuePlayer  = AVQueuePlayer(playerItem: item)
+        playerLooper = AVPlayerLooper(player: queuePlayer!, templateItem: item)
+        playerLayer  = AVPlayerLayer(player: queuePlayer)
+        playerLayer!.videoGravity = .resizeAspectFill
+        playerLayer!.frame = contentView.bounds
+        contentView.layer.insertSublayer(playerLayer!, at: 0)
+        // Re-add gradient on top of player
+        if gradientLayer.superlayer == nil {
+            contentView.layer.addSublayer(gradientLayer)
         }
     }
-    
+
+    func play() {
+        queuePlayer?.isMuted = false
+        queuePlayer?.volume  = 1
+        queuePlayer?.play()
+        UIView.animate(withDuration: 0.2) { self.playIconView.alpha = 0 }
+    }
+
+    func pause() {
+        queuePlayer?.pause()
+        UIView.animate(withDuration: 0.2) { self.playIconView.alpha = 1 }
+    }
+
     private func togglePlayPause() {
-        guard let player = queuePlayer else { return }
-        
-        if player.rate > 0 {
-            pause()
-        } else {
-            play()
-        }
+        guard let p = queuePlayer else { return }
+        if p.rate > 0 { pause() } else { play() }
     }
-    
+
     private func cleanupPlayer() {
         queuePlayer?.pause()
         playerLayer?.removeFromSuperlayer()
-        playerLayer = nil
-        queuePlayer = nil
+        playerLayer  = nil
+        queuePlayer  = nil
         playerLooper = nil
     }
-    
+
     override func prepareForReuse() {
         super.prepareForReuse()
         cleanupPlayer()
+        avatarView.image   = nil
+        nameLabel.text     = nil
+        captionLabel.text  = nil
+        isFollowing        = false
+        followButton.setTitle("Follow", for: .normal)
+        followButton.backgroundColor       = .clear
+        followButton.layer.borderColor     = UIColor.white.cgColor
+        followButton.isHidden = false
     }
-    
-    deinit {
-        cleanupPlayer()
+
+    deinit { cleanupPlayer() }
+
+    // MARK: - Helpers
+
+    private func formatCount(_ n: Int) -> String {
+        switch n {
+        case 0..<1000:    return "\(n)"
+        case 0..<1000000: return String(format: "%.1fK", Double(n)/1000)
+        default:           return String(format: "%.1fM", Double(n)/1_000_000)
+        }
     }
-    
-    // MARK: - Helper
-    private static func actionButton(systemName: String, value: String) -> UIStackView {
+
+    private func makeActionItem(icon: String, tint: UIColor, hideLabel: Bool = false) -> UIStackView {
         let btn = UIButton(type: .system)
-        let config = UIImage.SymbolConfiguration(pointSize: 26, weight: .thin)
-        btn.setImage(UIImage(systemName: systemName, withConfiguration: config), for: .normal)
-        btn.tintColor = .white
+        let cfg = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
+        btn.setImage(UIImage(systemName: icon, withConfiguration: cfg), for: .normal)
+        btn.tintColor = tint
         btn.translatesAutoresizingMaskIntoConstraints = false
-        btn.widthAnchor.constraint(equalToConstant: 40).isActive = true
-        btn.heightAnchor.constraint(equalToConstant: 40).isActive = true
-        
+        btn.widthAnchor.constraint(equalToConstant: 44).isActive  = true
+        btn.heightAnchor.constraint(equalToConstant: 44).isActive = true
+
         let lbl = UILabel()
-        lbl.text = value
-        lbl.font = .systemFont(ofSize: 12, weight: .semibold)
+        lbl.text      = "0"
+        lbl.font      = .systemFont(ofSize: 12, weight: .semibold)
         lbl.textColor = .white
         lbl.textAlignment = .center
-        lbl.translatesAutoresizingMaskIntoConstraints = false
-        
+        lbl.isHidden  = hideLabel
+
         let sv = UIStackView(arrangedSubviews: [btn, lbl])
-        sv.axis = .vertical
+        sv.axis      = .vertical
         sv.alignment = .center
-        sv.spacing = 2
+        sv.spacing   = 2
+        sv.translatesAutoresizingMaskIntoConstraints = false
         return sv
     }
 }
-
