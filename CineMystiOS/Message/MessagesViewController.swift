@@ -5,6 +5,25 @@
 import UIKit
 import Supabase
 
+private extension UITextField {
+    func applyCineMystSearchStyle(placeholderText: String) {
+        backgroundColor = UIColor.white.withAlphaComponent(0.82)
+        textColor = CineMystTheme.ink
+        tintColor = CineMystTheme.brandPlum
+        layer.cornerRadius = 18
+        layer.masksToBounds = true
+        layer.borderWidth = 1
+        layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.12).cgColor
+        attributedPlaceholder = NSAttributedString(
+            string: placeholderText,
+            attributes: [.foregroundColor: CineMystTheme.ink.withAlphaComponent(0.38)]
+        )
+        if let iconView = leftView as? UIImageView {
+            iconView.tintColor = CineMystTheme.brandPlum.withAlphaComponent(0.5)
+        }
+    }
+}
+
 // MARK: - View Models
 
 /// UI representation of a conversation
@@ -130,6 +149,23 @@ final class ConversationCell: UITableViewCell {
         nameLabel.text = model.name
         previewLabel.text = model.preview
         timeLabel.text = model.timeText
+        backgroundColor = .clear
+        contentView.backgroundColor = .clear
+        layer.cornerRadius = 22
+        layer.masksToBounds = true
+        let isUnread = model.unreadCount > 0
+        nameLabel.textColor = CineMystTheme.ink
+        nameLabel.font = .systemFont(ofSize: 16, weight: isUnread ? .bold : .semibold)
+        previewLabel.textColor = isUnread
+            ? CineMystTheme.ink.withAlphaComponent(0.92)
+            : CineMystTheme.brandPlum.withAlphaComponent(0.70)
+        previewLabel.font = .systemFont(ofSize: 14, weight: isUnread ? .semibold : .regular)
+        timeLabel.textColor = isUnread
+            ? CineMystTheme.brandPlum
+            : CineMystTheme.brandPlum.withAlphaComponent(0.52)
+        timeLabel.font = .systemFont(ofSize: 13, weight: isUnread ? .semibold : .regular)
+        chevron.tintColor = CineMystTheme.brandPlum.withAlphaComponent(0.55)
+        separator.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.08)
         
         // Load avatar from URL or use placeholder
         if let urlString = model.avatarUrl, let url = URL(string: urlString) {
@@ -213,12 +249,19 @@ final class MessagesViewController: UIViewController {
     
     // Loading state
     private var isLoading = false
+    private var conversationsSubscription: MessagesRealtimeSubscription?
 
     // UI
+    private let backgroundGradient = CAGradientLayer()
+    private let ambientGlowTop = UIView()
+    private let ambientGlowBottom = UIView()
+
     private let navLeftButton: UIButton = {
         let b = UIButton(type: .system)
         b.setImage(UIImage(systemName: "chevron.left"), for: .normal)
-        b.tintColor = .label
+        b.tintColor = CineMystTheme.ink.withAlphaComponent(0.82)
+        b.backgroundColor = UIColor.white.withAlphaComponent(0.82)
+        b.layer.cornerRadius = 18
         b.translatesAutoresizingMaskIntoConstraints = false
         return b
     }()
@@ -226,11 +269,15 @@ final class MessagesViewController: UIViewController {
     private let navRightStack: UIStackView = {
         let compose = UIButton(type: .system)
         compose.setImage(UIImage(systemName: "square.and.pencil"), for: .normal)
-        compose.tintColor = .systemBlue
+        compose.tintColor = CineMystTheme.brandPlum
+        compose.backgroundColor = UIColor.white.withAlphaComponent(0.84)
+        compose.layer.cornerRadius = 18
         compose.translatesAutoresizingMaskIntoConstraints = false
         let more = UIButton(type: .system)
         more.setImage(UIImage(systemName: "ellipsis.circle"), for: .normal)
-        more.tintColor = .systemBlue
+        more.tintColor = CineMystTheme.brandPlum
+        more.backgroundColor = UIColor.white.withAlphaComponent(0.84)
+        more.layer.cornerRadius = 18
         more.translatesAutoresizingMaskIntoConstraints = false
         let stack = UIStackView(arrangedSubviews: [more, compose])
         stack.spacing = 12
@@ -238,15 +285,6 @@ final class MessagesViewController: UIViewController {
         stack.alignment = .center
         stack.translatesAutoresizingMaskIntoConstraints = false
         return stack
-    }()
-
-    private let titleLabel: UILabel = {
-        let l = UILabel()
-        l.text = "Messages"
-        l.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
-        l.textAlignment = .center
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
     }()
 
     private let searchField: UISearchBar = {
@@ -308,7 +346,9 @@ final class MessagesViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = CineMystTheme.pinkPale
+        configureBackground()
+        configureNavigationBar()
         setupDummyStories()
         configureSubviews()
         configureConstraints()
@@ -320,6 +360,16 @@ final class MessagesViewController: UIViewController {
         
         // Load conversations from backend
         loadConversations()
+        startRealtimeConversationUpdates()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        backgroundGradient.frame = view.bounds
+        ambientGlowTop.frame = CGRect(x: view.bounds.width - 160, y: 24, width: 150, height: 150)
+        ambientGlowTop.layer.cornerRadius = 75
+        ambientGlowBottom.frame = CGRect(x: -30, y: view.bounds.height - 220, width: 170, height: 170)
+        ambientGlowBottom.layer.cornerRadius = 85
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -329,6 +379,10 @@ final class MessagesViewController: UIViewController {
         
         // Refresh conversations when view appears
         loadConversations()
+    }
+
+    deinit {
+        conversationsSubscription?.cancel()
     }
 
     // MARK: Setup
@@ -343,6 +397,24 @@ final class MessagesViewController: UIViewController {
             (image: placeholderAvatar, title: "Design"),
             (image: placeholderAvatar, title: "Friends")
         ]
+    }
+
+    private func configureBackground() {
+        backgroundGradient.colors = [
+            CineMystTheme.plumMist.cgColor,
+            UIColor.white.cgColor,
+            CineMystTheme.pinkPale.cgColor
+        ]
+        backgroundGradient.startPoint = CGPoint(x: 0, y: 0)
+        backgroundGradient.endPoint = CGPoint(x: 1, y: 1)
+        view.layer.insertSublayer(backgroundGradient, at: 0)
+
+        ambientGlowTop.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.08)
+        ambientGlowBottom.backgroundColor = CineMystTheme.deepPlumMid.withAlphaComponent(0.06)
+        ambientGlowTop.isUserInteractionEnabled = false
+        ambientGlowBottom.isUserInteractionEnabled = false
+        view.addSubview(ambientGlowTop)
+        view.addSubview(ambientGlowBottom)
     }
 
     private func setupDummyData() {
@@ -363,21 +435,33 @@ final class MessagesViewController: UIViewController {
         ]
     }
 
-    private func configureSubviews() {
-        // Top "nav" area — only add the left back button when needed
-        let shouldShowBack = shouldShowBackButton()
-        if shouldShowBack {
-            view.addSubview(navLeftButton)
+    private func configureNavigationBar() {
+        navigationItem.title = "Messages"
+        navigationController?.navigationBar.prefersLargeTitles = false
+        navigationController?.navigationBar.tintColor = CineMystTheme.ink
+
+        if shouldShowBackButton() {
+            navigationItem.leftBarButtonItem = UIBarButtonItem(customView: navLeftButton)
+        } else {
+            navigationItem.leftBarButtonItem = nil
         }
 
-        view.addSubview(titleLabel)
-        view.addSubview(navRightStack)
+        let arranged = navRightStack.arrangedSubviews.compactMap { $0 as? UIButton }
+        if arranged.count == 2 {
+            let moreItem = UIBarButtonItem(customView: arranged[0])
+            let composeItem = UIBarButtonItem(customView: arranged[1])
+            navigationItem.rightBarButtonItems = [composeItem, moreItem]
+        }
+    }
 
+    private func configureSubviews() {
         // Search
         view.addSubview(searchField)
+        searchField.searchTextField.applyCineMystSearchStyle(placeholderText: "Search")
 
         // Table
         view.addSubview(tableView)
+        tableView.backgroundColor = .clear
         
         // Loading indicator and empty state
         view.addSubview(loadingIndicator)
@@ -386,53 +470,15 @@ final class MessagesViewController: UIViewController {
 
     private func configureConstraints() {
         let safe = view.safeAreaLayoutGuide
-
-        // We'll build constraints conditionally depending on whether we added navLeftButton
-        let shouldShowBack = shouldShowBackButton()
-
-        var constraints: [NSLayoutConstraint] = []
-
-        if shouldShowBack {
-            // nav left button constraints
-            constraints += [
-                navLeftButton.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 12),
-                navLeftButton.topAnchor.constraint(equalTo: safe.topAnchor, constant: 8),
-                navLeftButton.widthAnchor.constraint(equalToConstant: 30),
-                navLeftButton.heightAnchor.constraint(equalToConstant: 30)
-            ]
-
-            // nav right stack vertically aligned with left button
-            constraints += [
-                navRightStack.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -12),
-                navRightStack.centerYAnchor.constraint(equalTo: navLeftButton.centerYAnchor)
-            ]
-
-            // title centered using the left button's centerY
-            constraints += [
-                titleLabel.centerXAnchor.constraint(equalTo: safe.centerXAnchor),
-                titleLabel.centerYAnchor.constraint(equalTo: navLeftButton.centerYAnchor)
-            ]
-        } else {
-            // No left nav button — center title at top safe area
-            constraints += [
-                titleLabel.centerXAnchor.constraint(equalTo: safe.centerXAnchor),
-                titleLabel.topAnchor.constraint(equalTo: safe.topAnchor, constant: 8),
-
-                navRightStack.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -12),
-                navRightStack.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor)
-            ]
-        }
-
-        // Common constraints for the rest of the UI
-        constraints += [
+        let constraints: [NSLayoutConstraint] = [
             // Search bar
-            searchField.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            searchField.topAnchor.constraint(equalTo: safe.topAnchor, constant: 8),
             searchField.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 12),
             searchField.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -12),
             searchField.heightAnchor.constraint(equalToConstant: 44),
 
             // Table view (directly below search field)
-            tableView.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: 12),
+            tableView.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: 8),
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             tableView.bottomAnchor.constraint(equalTo: safe.bottomAnchor),
@@ -507,6 +553,7 @@ final class MessagesViewController: UIViewController {
                     // Open chat view
                     let chatVC = ChatViewController()
                     chatVC.conversationId = conversation.id
+                    chatVC.otherUserName = userName
                     chatVC.title = userName
                     self.navigationController?.pushViewController(chatVC, animated: true)
                 }
@@ -589,6 +636,13 @@ final class MessagesViewController: UIViewController {
             }
         }
     }
+
+    private func startRealtimeConversationUpdates() {
+        conversationsSubscription?.cancel()
+        conversationsSubscription = MessagesService.shared.subscribeToConversationChanges { [weak self] in
+            self?.loadConversations()
+        }
+    }
     
     /// Format message time for display
     private func formatMessageTime(_ date: Date?) -> String {
@@ -669,6 +723,7 @@ extension MessagesViewController: UITableViewDataSource, UITableViewDelegate {
         // Create a chat detail view controller
         let chatVC = ChatViewController()
         chatVC.conversationId = conv.id
+        chatVC.otherUserName = conv.name
         chatVC.title = conv.name
         navigationController?.pushViewController(chatVC, animated: true)
     }
@@ -750,17 +805,18 @@ final class ChatMessageCell: UITableViewCell {
         timeLabel.text = formatter.string(from: message.createdAt)
         
         if isFromCurrentUser {
-            // Sent messages - blue bubble on right
-            bubbleView.backgroundColor = UIColor.systemBlue
+            bubbleView.backgroundColor = CineMystTheme.brandPlum
+            bubbleView.layer.borderWidth = 0
             messageLabel.textColor = .white
             leadingConstraint.isActive = false
             trailingConstraint.isActive = true
             timeLabel.textAlignment = .right
             timeLabel.trailingAnchor.constraint(equalTo: bubbleView.trailingAnchor).isActive = true
         } else {
-            // Received messages - gray bubble on left
-            bubbleView.backgroundColor = UIColor.systemGray5
-            messageLabel.textColor = .label
+            bubbleView.backgroundColor = UIColor.white.withAlphaComponent(0.84)
+            bubbleView.layer.borderWidth = 1
+            bubbleView.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.10).cgColor
+            messageLabel.textColor = CineMystTheme.ink
             trailingConstraint.isActive = false
             leadingConstraint.isActive = true
             timeLabel.textAlignment = .left
@@ -775,19 +831,35 @@ final class ChatViewController: UIViewController {
     var conversationId: UUID?
     var otherUserName: String?
     
+    private let backgroundGradient = CAGradientLayer()
     private let tableView = UITableView()
     private var messages: [Message] = []
     private let messageInputField = UITextField()
     private let sendButton = UIButton(type: .system)
     private var currentUserId: UUID?
+    private var messagesSubscription: MessagesRealtimeSubscription?
+    private var liveRefreshTask: Task<Void, Never>?
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = CineMystTheme.pinkPale
         title = otherUserName ?? "Chat"
         currentUserId = supabase.auth.currentUser?.id
+        configureBackground()
         setupUI()
         loadMessages()
+        startRealtimeMessages()
+        startLiveRefreshLoop()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        backgroundGradient.frame = view.bounds
+    }
+
+    deinit {
+        messagesSubscription?.cancel()
+        liveRefreshTask?.cancel()
     }
     
     private func setupUI() {
@@ -797,25 +869,27 @@ final class ChatViewController: UIViewController {
         tableView.delegate = self
         tableView.dataSource = self
         tableView.register(ChatMessageCell.self, forCellReuseIdentifier: ChatMessageCell.reuseID)
-        tableView.backgroundColor = .systemBackground
+        tableView.backgroundColor = .clear
         tableView.keyboardDismissMode = .interactive
         view.addSubview(tableView)
         
         // Input container
         let inputContainer = UIView()
-        inputContainer.backgroundColor = .systemBackground
-        inputContainer.layer.borderColor = UIColor.separator.cgColor
-        inputContainer.layer.borderWidth = 0.5
+        inputContainer.backgroundColor = UIColor.white.withAlphaComponent(0.80)
+        inputContainer.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.10).cgColor
+        inputContainer.layer.borderWidth = 1
+        inputContainer.layer.cornerRadius = 22
         inputContainer.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(inputContainer)
         
         // Message input field
         messageInputField.placeholder = "Type a message..."
-        messageInputField.borderStyle = .roundedRect
-        messageInputField.backgroundColor = .systemGray6
+        messageInputField.borderStyle = .none
+        messageInputField.backgroundColor = CineMystTheme.plumMist.withAlphaComponent(0.90)
         messageInputField.layer.cornerRadius = 20
         messageInputField.layer.masksToBounds = true
         messageInputField.font = .systemFont(ofSize: 16)
+        messageInputField.textColor = CineMystTheme.ink
         messageInputField.translatesAutoresizingMaskIntoConstraints = false
         
         // Add padding to text field
@@ -828,6 +902,7 @@ final class ChatViewController: UIViewController {
         // Send button
         sendButton.setTitle("Send", for: .normal)
         sendButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
+        sendButton.setTitleColor(CineMystTheme.brandPlum, for: .normal)
         sendButton.translatesAutoresizingMaskIntoConstraints = false
         sendButton.addTarget(self, action: #selector(sendMessage), for: .touchUpInside)
         inputContainer.addSubview(sendButton)
@@ -835,9 +910,9 @@ final class ChatViewController: UIViewController {
         // Constraints
         let safe = view.safeAreaLayoutGuide
         NSLayoutConstraint.activate([
-            inputContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            inputContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            inputContainer.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor),
+            inputContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+            inputContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+            inputContainer.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -8),
             inputContainer.heightAnchor.constraint(equalToConstant: 64),
             
             messageInputField.leadingAnchor.constraint(equalTo: inputContainer.leadingAnchor, constant: 12),
@@ -855,6 +930,17 @@ final class ChatViewController: UIViewController {
             tableView.bottomAnchor.constraint(equalTo: inputContainer.topAnchor)
         ])
     }
+
+    private func configureBackground() {
+        backgroundGradient.colors = [
+            CineMystTheme.plumMist.cgColor,
+            UIColor.white.cgColor,
+            CineMystTheme.pinkPale.cgColor
+        ]
+        backgroundGradient.startPoint = CGPoint(x: 0, y: 0)
+        backgroundGradient.endPoint = CGPoint(x: 1, y: 1)
+        view.layer.insertSublayer(backgroundGradient, at: 0)
+    }
     
     private func loadMessages() {
         guard let conversationId = conversationId else { return }
@@ -863,14 +949,67 @@ final class ChatViewController: UIViewController {
             do {
                 let fetchedMessages = try await MessagesService.shared.fetchMessages(conversationId: conversationId)
                 await MainActor.run {
-                    self.messages = fetchedMessages
-                    self.tableView.reloadData()
-                    self.scrollToBottom(animated: false)
+                    self.replaceMessagesIfNeeded(fetchedMessages, animated: false)
                 }
+                try? await MessagesService.shared.markMessagesAsRead(conversationId: conversationId)
             } catch {
                 print("❌ Failed to load messages: \(error)")
             }
         }
+    }
+
+    private func startLiveRefreshLoop() {
+        guard let conversationId = conversationId else { return }
+        liveRefreshTask?.cancel()
+        liveRefreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                do {
+                    let fetchedMessages = try await MessagesService.shared.fetchMessages(conversationId: conversationId)
+                    await MainActor.run {
+                        self?.replaceMessagesIfNeeded(fetchedMessages, animated: true)
+                    }
+                    try? await MessagesService.shared.markMessagesAsRead(conversationId: conversationId)
+                } catch {
+                    print("❌ Live refresh failed: \(error)")
+                }
+
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+            }
+        }
+    }
+
+    private func startRealtimeMessages() {
+        guard let conversationId = conversationId else { return }
+        messagesSubscription?.cancel()
+        messagesSubscription = MessagesService.shared.subscribeToMessages(conversationId: conversationId) { [weak self] message in
+            self?.appendIncomingMessage(message)
+        }
+    }
+
+    @MainActor
+    private func appendIncomingMessage(_ message: Message) {
+        guard !messages.contains(where: { $0.id == message.id }) else { return }
+        messages.append(message)
+        messages.sort { $0.createdAt < $1.createdAt }
+        tableView.reloadData()
+        scrollToBottom(animated: true)
+
+        if message.senderId != currentUserId, let conversationId {
+            Task {
+                try? await MessagesService.shared.markMessagesAsRead(conversationId: conversationId)
+            }
+        }
+    }
+
+    @MainActor
+    private func replaceMessagesIfNeeded(_ fetchedMessages: [Message], animated: Bool) {
+        let currentIds = messages.map(\.id)
+        let fetchedIds = fetchedMessages.map(\.id)
+        guard currentIds != fetchedIds || messages.count != fetchedMessages.count else { return }
+
+        messages = fetchedMessages
+        tableView.reloadData()
+        scrollToBottom(animated: animated)
     }
     
     private func scrollToBottom(animated: Bool) {
@@ -887,12 +1026,13 @@ final class ChatViewController: UIViewController {
         
         Task {
             do {
-                let _ = try await MessagesService.shared.sendMessage(
+                let sentMessage = try await MessagesService.shared.sendMessage(
                     conversationId: conversationId,
                     content: text
                 )
-                
-                loadMessages() // Reload to show new message
+                await MainActor.run {
+                    self.appendIncomingMessage(sentMessage)
+                }
             } catch {
                 print("❌ Failed to send message: \(error)")
             }
@@ -949,7 +1089,7 @@ final class UserSearchViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "New Message"
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = CineMystTheme.pinkPale
         
         // Navigation bar
         navigationItem.leftBarButtonItem = UIBarButtonItem(
@@ -962,6 +1102,7 @@ final class UserSearchViewController: UIViewController {
         searchBar.placeholder = "Search by name or username"
         searchBar.delegate = self
         searchBar.translatesAutoresizingMaskIntoConstraints = false
+        searchBar.searchTextField.applyCineMystSearchStyle(placeholderText: "Search by name or username")
         view.addSubview(searchBar)
         
         // Table view
@@ -969,6 +1110,9 @@ final class UserSearchViewController: UIViewController {
         tableView.delegate = self
         tableView.dataSource = self
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "UserCell")
+        tableView.rowHeight = 72
+        tableView.tableFooterView = UIView()
+        tableView.backgroundColor = .clear
         view.addSubview(tableView)
         
         // Activity indicator
@@ -1076,6 +1220,12 @@ extension UserSearchViewController: UITableViewDelegate, UITableViewDataSource {
         
         var config = cell.defaultContentConfiguration()
         config.text = user.fullName ?? user.username ?? "User"
+        config.image = UIImage(systemName: "person.crop.circle.fill")
+        config.imageProperties.maximumSize = CGSize(width: 44, height: 44)
+        config.imageProperties.cornerRadius = 22
+        config.imageToTextPadding = 12
+        config.textProperties.font = .systemFont(ofSize: 17, weight: .semibold)
+        config.secondaryTextProperties.font = .systemFont(ofSize: 14, weight: .regular)
         if let username = user.username {
             config.secondaryText = "@\(username)"
         } else if let bio = user.bio {
@@ -1089,6 +1239,8 @@ extension UserSearchViewController: UITableViewDelegate, UITableViewDataSource {
                     DispatchQueue.main.async {
                         var updatedConfig = config
                         updatedConfig.image = image
+                        updatedConfig.imageProperties.maximumSize = CGSize(width: 44, height: 44)
+                        updatedConfig.imageProperties.cornerRadius = 22
                         cell.contentConfiguration = updatedConfig
                     }
                 }
@@ -1097,6 +1249,7 @@ extension UserSearchViewController: UITableViewDelegate, UITableViewDataSource {
         
         cell.contentConfiguration = config
         cell.accessoryType = .disclosureIndicator
+        cell.selectionStyle = .none
         
         return cell
     }

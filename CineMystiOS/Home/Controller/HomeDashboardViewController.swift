@@ -128,6 +128,9 @@ final class HomeDashboardViewController: UIViewController {
     private let backgroundGradient = CAGradientLayer()
     private let ambientGlowTop = UIView()
     private let ambientGlowBottom = UIView()
+    private weak var chatBadgeLabel: UILabel?
+    private var unreadMessagesSubscription: MessagesRealtimeSubscription?
+    private var unreadMessagesCount = 0
     private var feedItems: [FeedItem] = []
     private var posts: [Post] = []
     private var jobs:  [Job]  = []
@@ -141,6 +144,7 @@ final class HomeDashboardViewController: UIViewController {
         setupTable()
         setupFloatingMenu()
         loadPosts()
+        startUnreadMessageUpdates()
         navigationItem.backButtonTitle = ""
     }
 
@@ -148,6 +152,7 @@ final class HomeDashboardViewController: UIViewController {
         super.viewWillAppear(animated)
         setupNavigationBar()
         loadPosts()
+        refreshUnreadMessageBadge()
     }
 
     override func viewDidLayoutSubviews() {
@@ -156,6 +161,10 @@ final class HomeDashboardViewController: UIViewController {
         ambientGlowTop.layer.cornerRadius = ambientGlowTop.bounds.width / 2
         ambientGlowBottom.layer.cornerRadius = ambientGlowBottom.bounds.width / 2
         updateTableHeaderLayoutIfNeeded()
+    }
+
+    deinit {
+        unreadMessagesSubscription?.cancel()
     }
 
     private func setupBackground() {
@@ -285,12 +294,17 @@ final class HomeDashboardViewController: UIViewController {
     }
     
     private func makeChatBarButton() -> UIBarButtonItem {
+        let container = UIView(frame: CGRect(x: 0, y: 0, width: 52, height: 46))
+        container.backgroundColor = .clear
+        container.clipsToBounds = false
+
         let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialLight))
-        blur.frame = CGRect(x: 0, y: 0, width: 38, height: 38)
+        blur.frame = CGRect(x: 4, y: 4, width: 38, height: 38)
         blur.layer.cornerRadius = 19
         blur.clipsToBounds = true
         blur.layer.borderWidth = 1
         blur.layer.borderColor = UIColor.white.withAlphaComponent(0.8).cgColor
+        container.addSubview(blur)
 
         let button = UIButton(type: .system)
         button.frame = blur.bounds
@@ -299,7 +313,58 @@ final class HomeDashboardViewController: UIViewController {
         button.tintColor = CineMystTheme.ink.withAlphaComponent(0.78)
         button.addTarget(self, action: #selector(chatTapped), for: .touchUpInside)
         blur.contentView.addSubview(button)
-        return UIBarButtonItem(customView: blur)
+
+        let badge = UILabel(frame: CGRect(x: 28, y: 1, width: 22, height: 22))
+        badge.backgroundColor = CineMystTheme.brandPlum
+        badge.textColor = .white
+        badge.font = .systemFont(ofSize: 11, weight: .bold)
+        badge.textAlignment = .center
+        badge.layer.cornerRadius = 11
+        badge.layer.masksToBounds = true
+        badge.layer.borderWidth = 2
+        badge.layer.borderColor = UIColor.white.withAlphaComponent(0.96).cgColor
+        badge.layer.shadowColor = CineMystTheme.deepPlumDark.cgColor
+        badge.layer.shadowOpacity = 0.16
+        badge.layer.shadowRadius = 6
+        badge.layer.shadowOffset = CGSize(width: 0, height: 2)
+        badge.isHidden = true
+        container.addSubview(badge)
+        chatBadgeLabel = badge
+        applyUnreadMessageBadge()
+        return UIBarButtonItem(customView: container)
+    }
+
+    private func startUnreadMessageUpdates() {
+        unreadMessagesSubscription?.cancel()
+        unreadMessagesSubscription = MessagesService.shared.subscribeToConversationChanges { [weak self] in
+            self?.refreshUnreadMessageBadge()
+        }
+        refreshUnreadMessageBadge()
+    }
+
+    private func refreshUnreadMessageBadge() {
+        Task {
+            let unreadCount = (try? await MessagesService.shared.fetchUnreadMessageCount()) ?? 0
+            await MainActor.run {
+                self.unreadMessagesCount = unreadCount
+                self.applyUnreadMessageBadge()
+            }
+        }
+    }
+
+    private func applyUnreadMessageBadge() {
+        guard let chatBadgeLabel else { return }
+        if unreadMessagesCount > 0 {
+            chatBadgeLabel.isHidden = false
+            chatBadgeLabel.text = unreadMessagesCount > 99 ? "99+" : "\(unreadMessagesCount)"
+            let text = chatBadgeLabel.text ?? ""
+            let width = max(22, text.size(withAttributes: [.font: chatBadgeLabel.font as Any]).width + 10)
+            chatBadgeLabel.frame = CGRect(x: 50 - width, y: 1, width: width, height: 22)
+            chatBadgeLabel.layer.cornerRadius = 11
+        } else {
+            chatBadgeLabel.isHidden = true
+            chatBadgeLabel.text = nil
+        }
     }
 
     private func makeBellBarButton() -> UIBarButtonItem {
