@@ -23,6 +23,8 @@ class LaunchWelcomeViewController: UIViewController {
     
     private let subtitleLabel       = UILabel()
     private let getStartedButton    = UIButton(type: .system)
+    private var glassBlurView: UIVisualEffectView?
+    private var btnGradientLayer: CAGradientLayer?
     
     // Constraint reference for animation
     private var iconCenterXConstraint: NSLayoutConstraint!
@@ -105,10 +107,18 @@ class LaunchWelcomeViewController: UIViewController {
         subtitleLabel.alpha = 0
         view.addSubview(subtitleLabel)
         
-        // Get Started Button - Premium iOS Aesthetic
+        // 1. Setup the Blur (Glass)
+        let blurEffect = UIBlurEffect(style: .systemUltraThinMaterialDark)
+        let blurView = UIVisualEffectView(effect: blurEffect)
+        blurView.isUserInteractionEnabled = false
+        blurView.translatesAutoresizingMaskIntoConstraints = false
+        blurView.layer.cornerRadius = 30
+        blurView.clipsToBounds = true
+        
+        // 2. Button Attributes
         var btnConfig = UIButton.Configuration.filled()
         btnConfig.title = "Get Started"
-        btnConfig.baseBackgroundColor = UIColor(red: 0.53, green: 0.22, blue: 0.38, alpha: 0.95) // Vibrant Deep Plum
+        btnConfig.baseBackgroundColor = UIColor(red: 0.53, green: 0.22, blue: 0.38, alpha: 0.35) // Low alpha for glass tint
         btnConfig.baseForegroundColor = .white
         btnConfig.cornerStyle = .capsule
         btnConfig.contentInsets = NSDirectionalEdgeInsets(top: 16, leading: 24, bottom: 16, trailing: 24)
@@ -117,18 +127,37 @@ class LaunchWelcomeViewController: UIViewController {
             outgoing.font = UIFont(name: "AvenirNext-Bold", size: 18) ?? UIFont.systemFont(ofSize: 18, weight: .bold)
             return outgoing
         }
-        getStartedButton.configuration = btnConfig
-        getStartedButton.layer.shadowColor = UIColor(red: 0.53, green: 0.22, blue: 0.38, alpha: 1.0).cgColor
-        getStartedButton.layer.shadowOffset = CGSize(width: 0, height: 8)
-        getStartedButton.layer.shadowRadius = 18
-        getStartedButton.layer.shadowOpacity = 0.5
-        getStartedButton.layer.masksToBounds = false
         
+        getStartedButton.configuration = btnConfig
         getStartedButton.translatesAutoresizingMaskIntoConstraints = false
         getStartedButton.alpha = 0
         getStartedButton.transform = CGAffineTransform(translationX: 0, y: 40)
+        
+        blurView.alpha = 0
+        blurView.transform = CGAffineTransform(translationX: 0, y: 40)
+        
         getStartedButton.addTarget(self, action: #selector(getStartedTapped), for: .touchUpInside)
+        
+        // 3. Add Blur behind the button
+        view.addSubview(blurView)
         view.addSubview(getStartedButton)
+        
+        NSLayoutConstraint.activate([
+            blurView.topAnchor.constraint(equalTo: getStartedButton.topAnchor),
+            blurView.bottomAnchor.constraint(equalTo: getStartedButton.bottomAnchor),
+            blurView.leadingAnchor.constraint(equalTo: getStartedButton.leadingAnchor),
+            blurView.trailingAnchor.constraint(equalTo: getStartedButton.trailingAnchor)
+        ])
+        
+        // Layering / Shadow
+        getStartedButton.layer.shadowColor = UIColor(red: 0.53, green: 0.22, blue: 0.38, alpha: 0.8).cgColor
+        getStartedButton.layer.shadowOffset = CGSize(width: 0, height: 12)
+        getStartedButton.layer.shadowRadius = 24
+        getStartedButton.layer.shadowOpacity = 0.4
+        getStartedButton.layer.masksToBounds = false
+        
+        // Store reference to animate both
+        self.glassBlurView = blurView
         
         // Setup initial animation states
         iconImageView.transform = CGAffineTransform(scaleX: 0.01, y: 0.01)
@@ -137,7 +166,23 @@ class LaunchWelcomeViewController: UIViewController {
         // We will store this constraint to animate it later
         iconCenterXConstraint = iconImageView.centerXAnchor.constraint(equalTo: view.centerXAnchor, constant: 10)
         
+        self.setupGetStartedGradient()
+        
         navigationItem.backButtonTitle = ""
+    }
+    
+    private func setupGetStartedGradient() {
+        let gradient = CAGradientLayer()
+        gradient.colors = [
+            UIColor(red: 0.31, green: 0.07, blue: 0.18, alpha: 0.85).cgColor, // Deep Plum (Left)
+            UIColor(red: 0.46, green: 0.11, blue: 0.28, alpha: 0.85).cgColor  // Lighter Plum (Right)
+        ]
+        gradient.startPoint = CGPoint(x: 0, y: 0.5)
+        gradient.endPoint = CGPoint(x: 1, y: 0.5)
+        
+        // We will apply this to the button's layer
+        getStartedButton.layer.insertSublayer(gradient, at: 0)
+        self.btnGradientLayer = gradient
     }
     
     private func setupLayout() {
@@ -193,6 +238,12 @@ class LaunchWelcomeViewController: UIViewController {
         
         reelImageView1.frame = CGRect(x: 0, y: 0, width: reelWidth, height: reelHeight)
         reelImageView2.frame = CGRect(x: 0, y: reelHeight, width: reelWidth, height: reelHeight)
+        
+        // Update button gradient frame
+        if let grad = btnGradientLayer {
+            grad.frame = getStartedButton.bounds
+            grad.cornerRadius = getStartedButton.bounds.height / 2
+        }
     }
     
     private func startAnimations() {
@@ -265,6 +316,8 @@ class LaunchWelcomeViewController: UIViewController {
         UIView.animate(withDuration: 0.8, delay: 3.1, options: .curveEaseOut, animations: {
             self.getStartedButton.alpha = 1
             self.getStartedButton.transform = .identity
+            self.glassBlurView?.alpha = 1
+            self.glassBlurView?.transform = .identity
         }, completion: nil)
     }
     
