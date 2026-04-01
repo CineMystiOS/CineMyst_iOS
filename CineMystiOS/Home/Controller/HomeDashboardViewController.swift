@@ -467,13 +467,10 @@ final class HomeDashboardViewController: UIViewController {
         if !posts.isEmpty {
             feedItems.append(.communityHeader)
         }
-        var adIdx = 0
-        for (i, post) in posts.enumerated() {
+        for post in posts {
             feedItems.append(.post(post))
-            if (i + 1) % 4 == 0, adIdx < ads.count { feedItems.append(.ad(ads[adIdx])); adIdx += 1 }
         }
         for job in jobs { feedItems.append(.job(job)) }
-        if posts.isEmpty { feedItems.append(.ad(ads[0])) }
     }
 
     private func loadDummyData() {
