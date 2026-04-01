@@ -557,6 +557,7 @@ final class HomeDashboardViewController: UIViewController {
 }
 
 private final class HomeEditorialHeaderView: UIView {
+    private let horizontalInset: CGFloat = 16
     private let contentColumn = UIView()
     private let panelView = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialLight))
     private let accentOrb = UIView()
@@ -596,7 +597,7 @@ private final class HomeEditorialHeaderView: UIView {
         introLabel.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.62)
         introLabel.textAlignment = .center
 
-        titleLabel.text = "Discover your next scene"
+        titleLabel.text = "Discover your next scene   "
         titleLabel.font = UIFont(name: "Georgia-Bold", size: 23) ?? .boldSystemFont(ofSize: 23)
         titleLabel.textColor = CineMystTheme.ink
         titleLabel.numberOfLines = 2
@@ -627,13 +628,13 @@ private final class HomeEditorialHeaderView: UIView {
             accentOrb.trailingAnchor.constraint(equalTo: trailingAnchor, constant: 34),
 
             panelView.topAnchor.constraint(equalTo: topAnchor, constant: 10),
-            panelView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: CineMystTheme.homeCardInset),
-            panelView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -CineMystTheme.homeCardInset),
+            panelView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            panelView.widthAnchor.constraint(equalTo: widthAnchor, constant: -(horizontalInset * 2)),
             panelView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -2),
 
             contentColumn.topAnchor.constraint(equalTo: panelView.contentView.topAnchor, constant: 12),
-            contentColumn.leadingAnchor.constraint(equalTo: panelView.contentView.leadingAnchor, constant: 18),
-            contentColumn.trailingAnchor.constraint(equalTo: panelView.contentView.trailingAnchor, constant: -18),
+            contentColumn.centerXAnchor.constraint(equalTo: panelView.contentView.centerXAnchor),
+            contentColumn.widthAnchor.constraint(equalTo: panelView.contentView.widthAnchor, constant: -36),
             contentColumn.bottomAnchor.constraint(equalTo: panelView.contentView.bottomAnchor, constant: -12)
         ])
 
