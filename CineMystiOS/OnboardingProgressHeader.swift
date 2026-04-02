@@ -11,8 +11,8 @@ class OnboardingProgressHeader: UIView {
     
     private let titleLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 28, weight: .bold)
-        label.textColor = .label
+        label.font = UIFont(name: "AvenirNext-Bold", size: 28) ?? .systemFont(ofSize: 28, weight: .bold)
+        label.textColor = .black
         label.numberOfLines = 2
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
@@ -20,7 +20,7 @@ class OnboardingProgressHeader: UIView {
     
     private let subtitleLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 15, weight: .regular)
+        label.font = UIFont(name: "AvenirNext-Regular", size: 15) ?? .systemFont(ofSize: 15)
         label.textColor = .secondaryLabel
         label.text = "This helps us personalize your experience"
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -97,7 +97,7 @@ class OnboardingProgressHeader: UIView {
         for (index, view) in progressStackView.arrangedSubviews.enumerated() {
             UIView.animate(withDuration: 0.4, delay: Double(index) * 0.05) {
                 if index < currentStep {
-                    view.backgroundColor = UIColor(red: 0.3, green: 0.1, blue: 0.2, alpha: 1.0)
+                    view.backgroundColor = UIColor(red: 0.46, green: 0.11, blue: 0.28, alpha: 1.0) // CineMyst Plum
                 } else {
                     view.backgroundColor = UIColor.systemGray5
                 }

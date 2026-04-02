@@ -16,32 +16,27 @@ class RoleSelectionViewController: UIViewController {
     
     var coordinator: OnboardingCoordinator?
     
+    private let backgroundImageView = UIImageView()
+    
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
-        setupUI()
+        view.backgroundColor = .black
+        setupPremiumUI()
         
         headerView.configure(title: "What brings you here?", currentStep: 2)
         navigationItem.hidesBackButton = false
-        setupBackButton()
     }
     
-    private func setupBackButton() {
-        let backButton = UIBarButtonItem(
-            image: UIImage(systemName: "chevron.left"),
-            style: .plain,
-            target: self,
-            action: #selector(backTapped)
-        )
-        backButton.tintColor = .label
-        navigationItem.leftBarButtonItem = backButton
-    }
-    
-    @objc private func backTapped() {
-        navigationController?.popViewController(animated: true)
-    }
-    
-    private func setupUI() {
+    private func setupPremiumUI() {
+        backgroundImageView.image = UIImage(named: "onboarding")
+        backgroundImageView.contentMode = .scaleAspectFill
+        backgroundImageView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(backgroundImageView)
+        
+        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialDark))
+        blur.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(blur)
+        
         headerView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(headerView)
         
@@ -72,11 +67,21 @@ class RoleSelectionViewController: UIViewController {
         roleCards.append(castingCard)
         
         NSLayoutConstraint.activate([
+            backgroundImageView.topAnchor.constraint(equalTo: view.topAnchor),
+            backgroundImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            backgroundImageView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            backgroundImageView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
+            blur.topAnchor.constraint(equalTo: view.topAnchor),
+            blur.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            blur.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            blur.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
             headerView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             headerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             headerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             
-            stackView.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 32),
+            stackView.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: 40),
             stackView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             stackView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20)
         ])
@@ -130,22 +135,22 @@ class RoleCardView: UIView {
     private let iconImageView: UIImageView = {
         let imageView = UIImageView()
         imageView.contentMode = .scaleAspectFit
-        imageView.tintColor = UIColor(red: 0.3, green: 0.1, blue: 0.2, alpha: 1.0)
+        imageView.tintColor = UIColor(red: 0.46, green: 0.11, blue: 0.28, alpha: 1.0)
         imageView.translatesAutoresizingMaskIntoConstraints = false
         return imageView
     }()
     
     private let titleLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 18, weight: .semibold)
-        label.textColor = .label
+        label.font = UIFont(name: "AvenirNext-Bold", size: 18) ?? .systemFont(ofSize: 18, weight: .bold)
+        label.textColor = .black
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
     
     private let descriptionLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 14, weight: .regular)
+        label.font = UIFont(name: "AvenirNext-Regular", size: 14) ?? .systemFont(ofSize: 14)
         label.textColor = .secondaryLabel
         label.numberOfLines = 2
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -155,7 +160,7 @@ class RoleCardView: UIView {
     private let checkmarkImageView: UIImageView = {
         let imageView = UIImageView(image: UIImage(systemName: "checkmark.circle.fill"))
         imageView.contentMode = .scaleAspectFit
-        imageView.tintColor = UIColor(red: 0.3, green: 0.1, blue: 0.2, alpha: 1.0)
+        imageView.tintColor = UIColor(red: 0.46, green: 0.11, blue: 0.28, alpha: 1.0)
         imageView.isHidden = true
         imageView.translatesAutoresizingMaskIntoConstraints = false
         return imageView
@@ -171,9 +176,9 @@ class RoleCardView: UIView {
     }
     
     private func setupUI() {
-        backgroundColor = .secondarySystemGroupedBackground
-        layer.cornerRadius = 16
-        layer.borderWidth = 2
+        backgroundColor = .white
+        layer.cornerRadius = 24
+        layer.borderWidth = 3
         layer.borderColor = UIColor.clear.cgColor
         
         addSubview(iconImageView)
@@ -211,12 +216,12 @@ class RoleCardView: UIView {
     func setSelected(_ selected: Bool) {
         UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5) {
             if selected {
-                self.backgroundColor = UIColor(red: 0.3, green: 0.1, blue: 0.2, alpha: 0.1)
-                self.layer.borderColor = UIColor(red: 0.3, green: 0.1, blue: 0.2, alpha: 1.0).cgColor
+                self.backgroundColor = UIColor(red: 0.46, green: 0.11, blue: 0.28, alpha: 0.05)
+                self.layer.borderColor = UIColor(red: 0.46, green: 0.11, blue: 0.28, alpha: 1.0).cgColor
                 self.checkmarkImageView.isHidden = false
                 self.transform = CGAffineTransform(scaleX: 0.98, y: 0.98)
             } else {
-                self.backgroundColor = .secondarySystemGroupedBackground
+                self.backgroundColor = .white
                 self.layer.borderColor = UIColor.clear.cgColor
                 self.checkmarkImageView.isHidden = true
                 self.transform = .identity

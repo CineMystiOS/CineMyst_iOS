@@ -101,15 +101,20 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     
     // MARK: - Check User Profile
     private func checkUserProfile(userId: UUID) async -> Bool {
+        struct ProfileCheck: Codable {
+            let onboarding_completed: Bool?
+        }
+        
         do {
-            let response = try await supabase
+            let profile: ProfileCheck = try await supabase
                 .from("profiles")
-                .select()
+                .select("onboarding_completed")
                 .eq("id", value: userId.uuidString)
                 .single()
                 .execute()
+                .value
             
-            return response.data.count > 0
+            return profile.onboarding_completed ?? false
         } catch {
             print("⚠️ Profile check error: \(error)")
             return false

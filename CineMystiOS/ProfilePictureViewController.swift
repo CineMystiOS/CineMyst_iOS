@@ -14,9 +14,9 @@ class ProfilePictureViewController: UIViewController, UIImagePickerControllerDel
     private let titleLabel: UILabel = {
         let label = UILabel()
         label.text = "Add your profile picture"
-        label.font = .systemFont(ofSize: 20, weight: .medium)
+        label.font = UIFont(name: "AvenirNext-DemiBold", size: 20) ?? .systemFont(ofSize: 20, weight: .medium)
         label.textAlignment = .center
-        label.textColor = .darkGray
+        label.textColor = .black
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
@@ -49,8 +49,8 @@ class ProfilePictureViewController: UIViewController, UIImagePickerControllerDel
     private let skipButton: UIButton = {
         let button = UIButton(type: .system)
         button.setTitle("Skip for now", for: .normal)
-        button.setTitleColor(.gray, for: .normal)
-        button.titleLabel?.font = .systemFont(ofSize: 16)
+        button.setTitleColor(.secondaryLabel, for: .normal)
+        button.titleLabel?.font = UIFont(name: "AvenirNext-Medium", size: 16) ?? .systemFont(ofSize: 16)
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
@@ -58,17 +58,22 @@ class ProfilePictureViewController: UIViewController, UIImagePickerControllerDel
     private let saveButton: UIButton = {
         let button = UIButton(type: .system)
         button.setTitle("Complete Profile", for: .normal)
-        button.backgroundColor = UIColor(red: 0.3, green: 0.1, blue: 0.2, alpha: 1.0)
         button.setTitleColor(.white, for: .normal)
-        button.titleLabel?.font = .systemFont(ofSize: 18, weight: .semibold)
-        button.layer.cornerRadius = 12
+        button.titleLabel?.font = UIFont(name: "AvenirNext-Bold", size: 18) ?? .systemFont(ofSize: 18, weight: .bold)
+        button.layer.cornerRadius = 20
+        button.clipsToBounds = true
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
     
+    private let backgroundImageView = UIImageView()
+    private let glassCard = UIView()
+    private var btnGradientLayer: CAGradientLayer?
+    
     private let activityIndicator: UIActivityIndicatorView = {
         let indicator = UIActivityIndicatorView(style: .large)
         indicator.hidesWhenStopped = true
+        indicator.color = .white
         indicator.translatesAutoresizingMaskIntoConstraints = false
         return indicator
     }()
@@ -77,58 +82,108 @@ class ProfilePictureViewController: UIViewController, UIImagePickerControllerDel
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .white
-        
-        headerView.configure(title: "Almost done!", currentStep: 5)
-        navigationItem.hidesBackButton = true
-        
-        setupUI()
+        view.backgroundColor = .black
+        setupPremiumUI()
         
         addPhotoButton.addTarget(self, action: #selector(selectPhoto), for: .touchUpInside)
         skipButton.addTarget(self, action: #selector(skipTapped), for: .touchUpInside)
         saveButton.addTarget(self, action: #selector(saveTapped), for: .touchUpInside)
     }
     
-    private func setupUI() {
+    private func setupPremiumUI() {
+        // 1. Background
+        backgroundImageView.image = UIImage(named: "onboarding")
+        backgroundImageView.contentMode = .scaleAspectFill
+        backgroundImageView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(backgroundImageView)
+        
+        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialDark))
+        blur.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(blur)
+        
+        // 2. Header
         headerView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(headerView)
-        view.addSubview(titleLabel)
-        view.addSubview(profileImageView)
-        view.addSubview(addPhotoButton)
-        view.addSubview(skipButton)
+        headerView.configure(title: "Almost done!", currentStep: 5)
+        
+        // 3. Card
+        glassCard.backgroundColor = .white
+        glassCard.layer.cornerRadius = 32
+        glassCard.clipsToBounds = true
+        glassCard.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(glassCard)
+        
+        // 4. Content
+        glassCard.addSubview(titleLabel)
+        glassCard.addSubview(profileImageView)
+        glassCard.addSubview(addPhotoButton)
+        glassCard.addSubview(skipButton)
+        
         view.addSubview(saveButton)
         view.addSubview(activityIndicator)
         
+        // Gradient
+        let grad = CAGradientLayer()
+        grad.colors = [
+            UIColor(red: 0.31, green: 0.07, blue: 0.18, alpha: 1.0).cgColor,
+            UIColor(red: 0.46, green: 0.11, blue: 0.28, alpha: 1.0).cgColor
+        ]
+        grad.startPoint = CGPoint(x: 0, y: 0.5)
+        grad.endPoint = CGPoint(x: 1, y: 0.5)
+        saveButton.layer.insertSublayer(grad, at: 0)
+        self.btnGradientLayer = grad
+        
         NSLayoutConstraint.activate([
+            backgroundImageView.topAnchor.constraint(equalTo: view.topAnchor),
+            backgroundImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            backgroundImageView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            backgroundImageView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
+            blur.topAnchor.constraint(equalTo: view.topAnchor),
+            blur.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            blur.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            blur.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
             headerView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             headerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             headerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             
-            skipButton.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 20),
-            skipButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
+            glassCard.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 16),
+            glassCard.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            glassCard.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            glassCard.bottomAnchor.constraint(equalTo: saveButton.topAnchor, constant: -20),
             
-            titleLabel.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 60),
-            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            skipButton.topAnchor.constraint(equalTo: glassCard.topAnchor, constant: 20),
+            skipButton.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -24),
             
-            profileImageView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            profileImageView.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -50),
-            profileImageView.widthAnchor.constraint(equalToConstant: 150),
-            profileImageView.heightAnchor.constraint(equalToConstant: 150),
+            titleLabel.topAnchor.constraint(equalTo: glassCard.topAnchor, constant: 80),
+            titleLabel.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: 20),
+            titleLabel.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -20),
             
-            addPhotoButton.trailingAnchor.constraint(equalTo: profileImageView.trailingAnchor, constant: 5),
-            addPhotoButton.bottomAnchor.constraint(equalTo: profileImageView.bottomAnchor, constant: 5),
-            addPhotoButton.widthAnchor.constraint(equalToConstant: 40),
-            addPhotoButton.heightAnchor.constraint(equalToConstant: 40),
+            profileImageView.centerXAnchor.constraint(equalTo: glassCard.centerXAnchor),
+            profileImageView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 40),
+            profileImageView.widthAnchor.constraint(equalToConstant: 160),
+            profileImageView.heightAnchor.constraint(equalToConstant: 160),
             
-            saveButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -40),
-            saveButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 40),
-            saveButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -40),
-            saveButton.heightAnchor.constraint(equalToConstant: 56),
+            addPhotoButton.trailingAnchor.constraint(equalTo: profileImageView.trailingAnchor, constant: -2),
+            addPhotoButton.bottomAnchor.constraint(equalTo: profileImageView.bottomAnchor, constant: -2),
+            addPhotoButton.widthAnchor.constraint(equalToConstant: 44),
+            addPhotoButton.heightAnchor.constraint(equalToConstant: 44),
+            
+            saveButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -30),
+            saveButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 32),
+            saveButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
+            saveButton.heightAnchor.constraint(equalToConstant: 60),
             
             activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+            activityIndicator.topAnchor.constraint(equalTo: saveButton.bottomAnchor, constant: 5)
         ])
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        btnGradientLayer?.frame = saveButton.bounds
+        btnGradientLayer?.cornerRadius = 20
     }
     
     @objc private func selectPhoto() {
