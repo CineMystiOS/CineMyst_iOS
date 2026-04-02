@@ -51,6 +51,20 @@ final class AuthManager: NSObject {
     func signOut() async throws {
         try await client.auth.signOut()
     }
+    
+    // MARK: - Delete Account
+    /// Permanently deletes the user and all their data using a secure RPC
+    func deleteAccount() async throws {
+        print("🗑️ Attempting to delete account...")
+        
+        // 1. Call the RPC function we created in Supabase
+        try await client.rpc("delete_own_user").execute()
+        
+        // 2. Sign out locally
+        try await signOut()
+        
+        print("✅ Account deleted and signed out successfully")
+    }
 
     // MARK: - Current user/session (read-only helpers)
     var currentUser: User? {

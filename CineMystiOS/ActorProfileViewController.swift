@@ -522,6 +522,7 @@ class GalleryHeaderView: UIView {
 final class ProfileSettingsViewController: UIViewController {
     var onEditProfile: (() -> Void)?
     var onLogout:      (() -> Void)?
+    var onDeleteAccount: (() -> Void)?
 
     private let titleLabel: UILabel = {
         let l = UILabel()
@@ -555,10 +556,15 @@ final class ProfileSettingsViewController: UIViewController {
 
         let editBtn   = makeRowButton(title: "Edit Profile", subtitle: "Update your profile details and information")
         let logoutBtn = makeRowButton(title: "Logout",       subtitle: "Sign out of your account")
+        let deleteBtn = makeRowButton(title: "Delete Account", subtitle: "Permanently remove all your data", isDestructive: true)
+        
         editBtn.addTarget(self,   action: #selector(editProfileTapped), for: .touchUpInside)
         logoutBtn.addTarget(self, action: #selector(logoutTapped),      for: .touchUpInside)
+        deleteBtn.addTarget(self, action: #selector(deleteTapped),      for: .touchUpInside)
+        
         stackView.addArrangedSubview(editBtn)
         stackView.addArrangedSubview(logoutBtn)
+        stackView.addArrangedSubview(deleteBtn)
 
         NSLayoutConstraint.activate([
             titleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
@@ -570,7 +576,7 @@ final class ProfileSettingsViewController: UIViewController {
         ])
     }
 
-    private func makeRowButton(title: String, subtitle: String) -> UIButton {
+    private func makeRowButton(title: String, subtitle: String, isDestructive: Bool = false) -> UIButton {
         var config = UIButton.Configuration.plain()
         config.title           = title
         config.subtitle        = subtitle
@@ -578,7 +584,7 @@ final class ProfileSettingsViewController: UIViewController {
         config.image           = UIImage(systemName: "chevron.right")
         config.imagePlacement  = .trailing
         config.imagePadding    = 8
-        config.baseForegroundColor = ActorProfileDS.deepPlum
+        config.baseForegroundColor = isDestructive ? .systemRed : ActorProfileDS.deepPlum
         config.contentInsets   = NSDirectionalEdgeInsets(top: 20, leading: 18, bottom: 20, trailing: 18)
         let b = UIButton(configuration: config)
         b.contentHorizontalAlignment = .fill
@@ -594,6 +600,7 @@ final class ProfileSettingsViewController: UIViewController {
     @objc private func backTapped()        { navigationController?.popViewController(animated: true) }
     @objc private func editProfileTapped() { navigationController?.popViewController(animated: false); onEditProfile?() }
     @objc private func logoutTapped()      { navigationController?.popViewController(animated: false); onLogout?() }
+    @objc private func deleteTapped()      { navigationController?.popViewController(animated: false); onDeleteAccount?() }
 }
 
 // MARK: - Gallery Collection View Data Source
@@ -1236,8 +1243,9 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
 
     @objc private func settingsTapped() {
         let vc = ProfileSettingsViewController()
-        vc.onEditProfile = { [weak self] in self?.editProfileTapped() }
-        vc.onLogout      = { [weak self] in self?.logoutTapped() }
+        vc.onEditProfile   = { [weak self] in self?.editProfileTapped() }
+        vc.onLogout        = { [weak self] in self?.logoutTapped() }
+        vc.onDeleteAccount = { [weak self] in self?.deleteAccountTapped() }
         navigationController?.pushViewController(vc, animated: true)
     }
 
@@ -1252,6 +1260,42 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
                 }
             } catch {
                 await MainActor.run { self.showErrorMessage("Failed to logout: \(error.localizedDescription)") }
+            }
+        }
+    }
+
+    private func deleteAccountTapped() {
+        let alert = UIAlertController(
+            title: "Delete Account?",
+            message: "This action is permanent and will delete all your profile data, credits, and reels. Are you sure?",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Delete Permanently", style: .destructive) { [weak self] _ in
+            self?.performAccountDeletion()
+        })
+        
+        present(alert, animated: true)
+    }
+
+    private func performAccountDeletion() {
+        loadingView.startAnimating()
+        Task {
+            do {
+                try await AuthManager.shared.deleteAccount()
+                await MainActor.run {
+                    self.loadingView.stopAnimating()
+                    let loginVC = LoginViewController()
+                    let nav = UINavigationController(rootViewController: loginVC)
+                    nav.modalPresentationStyle = .fullScreen
+                    self.present(nav, animated: true)
+                }
+            } catch {
+                await MainActor.run {
+                    self.loadingView.stopAnimating()
+                    self.showErrorMessage("Failed to delete account: \(error.localizedDescription)")
+                }
             }
         }
     }

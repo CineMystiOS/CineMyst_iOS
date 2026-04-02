@@ -35,45 +35,47 @@ class LocationViewController: UIViewController {
         "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
     ].sorted()
     
-    private let backgroundImageView = UIImageView()
-    private let glassCard = UIView()
-    private var btnGradientLayer: CAGradientLayer?
-    
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .black
-        setupPremiumUI()
+        view.backgroundColor = .systemGroupedBackground
+        
+        headerView.configure(title: "Where are you based?", currentStep: 4)
+        setupBackButton()
+        navigationItem.hidesBackButton = false
+        
+        setupUI()
         
         let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
         view.addGestureRecognizer(tap)
     }
     
-    private func setupPremiumUI() {
-        // 1. Background
-        backgroundImageView.image = UIImage(named: "onboarding")
-        backgroundImageView.contentMode = .scaleAspectFill
-        backgroundImageView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(backgroundImageView)
-        
-        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialDark))
-        blur.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(blur)
-        
-        // 2. Header
+    private func setupBackButton() {
+        let backButton = UIBarButtonItem(
+            image: UIImage(systemName: "chevron.left"),
+            style: .plain,
+            target: self,
+            action: #selector(backTapped)
+        )
+        backButton.tintColor = .label
+        navigationItem.leftBarButtonItem = backButton
+    }
+    
+    @objc private func backTapped() {
+        navigationController?.popViewController(animated: true)
+    }
+    
+    @objc private func dismissKeyboard() {
+        view.endEditing(true)
+    }
+    
+    private func setupUI() {
         headerView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(headerView)
-        headerView.configure(title: "Where are you based?", currentStep: 4)
-        
-        // 3. Card View (Using ScrollView inside it if needed, or making card scrollable)
-        glassCard.backgroundColor = .white
-        glassCard.layer.cornerRadius = 32
-        glassCard.clipsToBounds = true
-        glassCard.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(glassCard)
         
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         contentView.translatesAutoresizingMaskIntoConstraints = false
-        glassCard.addSubview(scrollView)
+        
+        view.addSubview(scrollView)
         scrollView.addSubview(contentView)
         
         let stackView = UIStackView()
@@ -82,68 +84,52 @@ class LocationViewController: UIViewController {
         stackView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(stackView)
         
-        // Elements
-        stackView.addArrangedSubview(createLabel(text: "State / Union Territory *", fontSize: 16, weight: .bold))
+        // State Dropdown
+        stackView.addArrangedSubview(createLabel(text: "State / Union Territory *", fontSize: 16, weight: .semibold))
         stateTextField = createDropdownField(placeholder: "Select your state")
         stackView.addArrangedSubview(stateTextField)
         
-        stackView.addArrangedSubview(createLabel(text: "Postal Code (Pincode) *", fontSize: 16, weight: .bold))
+        stackView.addArrangedSubview(createSpacer(height: 8))
+        
+        // Postal Code with verification
+        stackView.addArrangedSubview(createLabel(text: "Postal Code (Pincode) *", fontSize: 16, weight: .semibold))
         let pincodeContainer = createPincodeField()
         stackView.addArrangedSubview(pincodeContainer)
         
+        // District info (shown after verification)
         districtLabel = createLabel(text: "", fontSize: 14, weight: .regular, color: .secondaryLabel)
         districtLabel.isHidden = true
         stackView.addArrangedSubview(districtLabel)
         
-        stackView.addArrangedSubview(createLabel(text: "City / Area *", fontSize: 16, weight: .bold))
-        cityTextField = createTextField(placeholder: "Enter your city or area")
+        stackView.addArrangedSubview(createSpacer(height: 8))
+        
+        // City/Area
+        stackView.addArrangedSubview(createLabel(text: "City / Area *", fontSize: 16, weight: .semibold))
+        cityTextField = createTextField(placeholder: "Enter your city or locality")
         stackView.addArrangedSubview(cityTextField)
         
-        // Button
-        let nextButton = UIButton(type: .system)
-        nextButton.setTitle("Continue", for: .normal)
-        nextButton.setTitleColor(.white, for: .normal)
-        nextButton.titleLabel?.font = UIFont(name: "AvenirNext-Bold", size: 18) ?? .systemFont(ofSize: 18, weight: .bold)
-        nextButton.layer.cornerRadius = 20
-        nextButton.clipsToBounds = true
-        nextButton.translatesAutoresizingMaskIntoConstraints = false
-        nextButton.addTarget(self, action: #selector(nextTapped), for: .touchUpInside)
-        view.addSubview(nextButton)
+        stackView.addArrangedSubview(createSpacer(height: 24))
         
-        let grad = CAGradientLayer()
-        grad.colors = [
-            UIColor(red: 0.31, green: 0.07, blue: 0.18, alpha: 1.0).cgColor,
-            UIColor(red: 0.46, green: 0.11, blue: 0.28, alpha: 1.0).cgColor
-        ]
-        grad.startPoint = CGPoint(x: 0, y: 0.5)
-        grad.endPoint = CGPoint(x: 1, y: 0.5)
-        nextButton.layer.insertSublayer(grad, at: 0)
-        self.btnGradientLayer = grad
+        // Info text
+        let infoLabel = createLabel(text: "We use this to show you relevant nearby opportunities", fontSize: 13, weight: .regular, color: .secondaryLabel)
+        infoLabel.numberOfLines = 0
+        stackView.addArrangedSubview(infoLabel)
+        
+        stackView.addArrangedSubview(createSpacer(height: 8))
+        
+        // Next Button
+        let nextButton = createNextButton()
+        stackView.addArrangedSubview(nextButton)
         
         NSLayoutConstraint.activate([
-            backgroundImageView.topAnchor.constraint(equalTo: view.topAnchor),
-            backgroundImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            backgroundImageView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            backgroundImageView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            
-            blur.topAnchor.constraint(equalTo: view.topAnchor),
-            blur.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            blur.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            blur.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            
             headerView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             headerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             headerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             
-            glassCard.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 16),
-            glassCard.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            glassCard.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            glassCard.bottomAnchor.constraint(equalTo: nextButton.topAnchor, constant: -20),
-            
-            scrollView.topAnchor.constraint(equalTo: glassCard.topAnchor, constant: 20),
-            scrollView.leadingAnchor.constraint(equalTo: glassCard.leadingAnchor, constant: 24),
-            scrollView.trailingAnchor.constraint(equalTo: glassCard.trailingAnchor, constant: -24),
-            scrollView.bottomAnchor.constraint(equalTo: glassCard.bottomAnchor),
+            scrollView.topAnchor.constraint(equalTo: headerView.bottomAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
             contentView.topAnchor.constraint(equalTo: scrollView.topAnchor),
             contentView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
@@ -151,33 +137,17 @@ class LocationViewController: UIViewController {
             contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
             contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
             
-            stackView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            stackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            stackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-            
-            nextButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -30),
-            nextButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 32),
-            nextButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
-            nextButton.heightAnchor.constraint(equalToConstant: 60)
+            stackView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 24),
+            stackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            stackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40)
         ])
     }
     
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        btnGradientLayer?.frame = CGRect(x: 0, y: 0, width: view.bounds.width - 64, height: 60)
-        btnGradientLayer?.cornerRadius = 20
-    }
-    
-    @objc private func dismissKeyboard() {
-        view.endEditing(true)
-    }
-    
-    // Help label
-    private func createLabel(text: String, fontSize: CGFloat, weight: UIFont.Weight, color: UIColor = .black) -> UILabel {
+    private func createLabel(text: String, fontSize: CGFloat, weight: UIFont.Weight, color: UIColor = .label) -> UILabel {
         let label = UILabel()
         label.text = text
-        label.font = UIFont(name: "AvenirNext-Bold", size: fontSize) ?? .systemFont(ofSize: fontSize, weight: .bold)
+        label.font = .systemFont(ofSize: fontSize, weight: weight)
         label.textColor = color
         return label
     }
