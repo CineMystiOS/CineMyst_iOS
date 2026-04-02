@@ -555,14 +555,17 @@ final class ProfileSettingsViewController: UIViewController {
         view.addSubview(stackView)
 
         let editBtn   = makeRowButton(title: "Edit Profile", subtitle: "Update your profile details and information")
+        let termsBtn  = makeRowButton(title: "Terms & Conditions", subtitle: "Read CineMyst usage, creator, mentorship, and community guidelines")
         let logoutBtn = makeRowButton(title: "Logout",       subtitle: "Sign out of your account")
         let deleteBtn = makeRowButton(title: "Delete Account", subtitle: "Permanently remove all your data", isDestructive: true)
-        
+
         editBtn.addTarget(self,   action: #selector(editProfileTapped), for: .touchUpInside)
+        termsBtn.addTarget(self,  action: #selector(termsTapped),       for: .touchUpInside)
         logoutBtn.addTarget(self, action: #selector(logoutTapped),      for: .touchUpInside)
         deleteBtn.addTarget(self, action: #selector(deleteTapped),      for: .touchUpInside)
-        
+
         stackView.addArrangedSubview(editBtn)
+        stackView.addArrangedSubview(termsBtn)
         stackView.addArrangedSubview(logoutBtn)
         stackView.addArrangedSubview(deleteBtn)
 
@@ -599,8 +602,157 @@ final class ProfileSettingsViewController: UIViewController {
 
     @objc private func backTapped()        { navigationController?.popViewController(animated: true) }
     @objc private func editProfileTapped() { navigationController?.popViewController(animated: false); onEditProfile?() }
+    @objc private func termsTapped()       { navigationController?.pushViewController(TermsConditionsViewController(), animated: true) }
     @objc private func logoutTapped()      { navigationController?.popViewController(animated: false); onLogout?() }
     @objc private func deleteTapped()      { navigationController?.popViewController(animated: false); onDeleteAccount?() }
+}
+
+final class TermsConditionsViewController: UIViewController {
+    private let titleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "Terms & Conditions"
+        label.font = UIFont.systemFont(ofSize: 30, weight: .bold)
+        label.textColor = ActorProfileDS.deepPlum
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
+    private let scrollView: UIScrollView = {
+        let view = UIScrollView()
+        view.showsVerticalScrollIndicator = false
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let contentStack: UIStackView = {
+        let stack = UIStackView()
+        stack.axis = .vertical
+        stack.spacing = 16
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        return stack
+    }()
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = ActorProfileDS.bgLight
+        title = ""
+
+        let back = UIBarButtonItem(
+            image: UIImage(systemName: "chevron.left"),
+            style: .plain,
+            target: self,
+            action: #selector(backTapped)
+        )
+        back.tintColor = ActorProfileDS.deepPlum
+        navigationItem.leftBarButtonItem = back
+
+        view.addSubview(titleLabel)
+        view.addSubview(scrollView)
+        scrollView.addSubview(contentStack)
+
+        let introCard = makeInfoCard(
+            title: "Welcome to CineMyst",
+            body: "CineMyst is a creative network for filmmakers, actors, mentors, and studios. By using the app, you agree to use it responsibly, keep your account details accurate, and respect other creators on the platform."
+        )
+
+        let creatorCard = makeInfoCard(
+            title: "Creator Content",
+            body: "You are responsible for the posts, reels, portfolio items, and profile details you upload. Do not share copyrighted, abusive, misleading, or harmful content. CineMyst may remove content that violates platform safety or creator standards."
+        )
+
+        let jobsCard = makeInfoCard(
+            title: "Jobs & Casting",
+            body: "Casting calls, posted jobs, and applications must be genuine and lawful. Do not impersonate production houses, post misleading budgets, or misuse candidate information. Hiring decisions remain between users and recruiters."
+        )
+
+        let mentorshipCard = makeInfoCard(
+            title: "Mentorship Sessions",
+            body: "Mentors and mentees must engage professionally. Session fees, availability, and advice are shared by the mentor. CineMyst helps facilitate discovery and booking, but is not responsible for the individual outcome of sessions."
+        )
+
+        let conductCard = makeInfoCard(
+            title: "Community Conduct",
+            body: "Treat all creators with respect. Harassment, hate speech, scams, spam, and abusive behavior are not allowed. Repeated violations may result in content removal, account restrictions, or account deletion."
+        )
+
+        let privacyCard = makeInfoCard(
+            title: "Privacy & Account",
+            body: "Your profile, messages, and media are tied to your account. Keep your login secure. If you choose to delete your account, your access may be removed and connected data may be permanently erased according to app policy."
+        )
+
+        let updatesCard = makeInfoCard(
+            title: "Updates to Terms",
+            body: "CineMyst may improve or update these terms as the platform grows. Continued use of the app after updates means you accept the revised terms."
+        )
+
+        [introCard, creatorCard, jobsCard, mentorshipCard, conductCard, privacyCard, updatesCard].forEach {
+            contentStack.addArrangedSubview($0)
+        }
+
+        NSLayoutConstraint.activate([
+            titleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
+            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+
+            scrollView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 20),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+
+            contentStack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 4),
+            contentStack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: 16),
+            contentStack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -16),
+            contentStack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -24),
+            contentStack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -32)
+        ])
+    }
+
+    private func makeInfoCard(title: String, body: String) -> UIView {
+        let card = UIView()
+        card.backgroundColor = UIColor.white.withAlphaComponent(0.84)
+        card.layer.cornerRadius = 20
+        card.layer.shadowColor = UIColor.black.withAlphaComponent(0.05).cgColor
+        card.layer.shadowOpacity = 1
+        card.layer.shadowRadius = 14
+        card.layer.shadowOffset = CGSize(width: 0, height: 6)
+        card.layer.borderWidth = 1
+        card.layer.borderColor = ActorProfileDS.rosePink.withAlphaComponent(0.12).cgColor
+        card.translatesAutoresizingMaskIntoConstraints = false
+
+        let heading = UILabel()
+        heading.text = title
+        heading.font = UIFont.systemFont(ofSize: 18, weight: .bold)
+        heading.textColor = ActorProfileDS.deepPlum
+        heading.numberOfLines = 0
+        heading.translatesAutoresizingMaskIntoConstraints = false
+
+        let bodyLabel = UILabel()
+        bodyLabel.text = body
+        bodyLabel.font = UIFont.systemFont(ofSize: 15, weight: .regular)
+        bodyLabel.textColor = UIColor.darkGray
+        bodyLabel.numberOfLines = 0
+        bodyLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        card.addSubview(heading)
+        card.addSubview(bodyLabel)
+
+        NSLayoutConstraint.activate([
+            heading.topAnchor.constraint(equalTo: card.topAnchor, constant: 18),
+            heading.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 18),
+            heading.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -18),
+
+            bodyLabel.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 8),
+            bodyLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 18),
+            bodyLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -18),
+            bodyLabel.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -18)
+        ])
+
+        return card
+    }
+
+    @objc private func backTapped() {
+        navigationController?.popViewController(animated: true)
+    }
 }
 
 // MARK: - Gallery Collection View Data Source
