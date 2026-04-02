@@ -424,17 +424,23 @@ final class HomeDashboardViewController: UIViewController {
 
     private func makeTableHeader() -> UIView {
         let header = HomeEditorialHeaderView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 252))
-        header.translatesAutoresizingMaskIntoConstraints = false
+        let targetSize = CGSize(width: view.bounds.width, height: UIView.layoutFittingCompressedSize.height)
+        let height = header.systemLayoutSizeFitting(targetSize, withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel).height
         header.frame.size.width = view.bounds.width
+        header.frame.size.height = max(height, 280) // Add a little extra height to ensure no truncation
         header.layoutIfNeeded()
         return header
     }
 
     private func updateTableHeaderLayoutIfNeeded() {
         guard let header = tableView.tableHeaderView else { return }
+        let targetSize = CGSize(width: tableView.bounds.width, height: UIView.layoutFittingCompressedSize.height)
+        let defaultHeight = header.systemLayoutSizeFitting(targetSize, withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel).height
+        let finalHeight = max(defaultHeight, 280)
         var frame = header.frame
-        if abs(frame.width - tableView.bounds.width) > 0.5 {
+        if abs(frame.width - tableView.bounds.width) > 0.5 || abs(frame.height - finalHeight) > 0.5 {
             frame.size.width = tableView.bounds.width
+            frame.size.height = finalHeight
             header.frame = frame
             tableView.tableHeaderView = header
         }
@@ -557,7 +563,7 @@ final class HomeDashboardViewController: UIViewController {
 }
 
 private final class HomeEditorialHeaderView: UIView {
-    private let horizontalInset: CGFloat = 16
+    private let horizontalInset: CGFloat = CineMystTheme.homeCardInset
     private let contentColumn = UIView()
     private let panelView = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialLight))
     private let accentOrb = UIView()
@@ -597,7 +603,7 @@ private final class HomeEditorialHeaderView: UIView {
         introLabel.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.62)
         introLabel.textAlignment = .center
 
-        titleLabel.text = "Discover your next scene         "
+        titleLabel.text = "Discover your next scene"
         titleLabel.font = .systemFont(ofSize: 23, weight: .bold)
         titleLabel.textColor = CineMystTheme.ink
         titleLabel.numberOfLines = 2
@@ -628,13 +634,13 @@ private final class HomeEditorialHeaderView: UIView {
             accentOrb.trailingAnchor.constraint(equalTo: trailingAnchor, constant: 34),
 
             panelView.topAnchor.constraint(equalTo: topAnchor, constant: 10),
-            panelView.centerXAnchor.constraint(equalTo: centerXAnchor),
-            panelView.widthAnchor.constraint(equalTo: widthAnchor, constant: -(horizontalInset * 2)),
+            panelView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: horizontalInset),
+            panelView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -horizontalInset),
             panelView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -2),
 
             contentColumn.topAnchor.constraint(equalTo: panelView.contentView.topAnchor, constant: 12),
-            contentColumn.centerXAnchor.constraint(equalTo: panelView.contentView.centerXAnchor),
-            contentColumn.widthAnchor.constraint(equalTo: panelView.contentView.widthAnchor, constant: -36),
+            contentColumn.leadingAnchor.constraint(equalTo: panelView.contentView.leadingAnchor, constant: 18),
+            contentColumn.trailingAnchor.constraint(equalTo: panelView.contentView.trailingAnchor, constant: -18),
             contentColumn.bottomAnchor.constraint(equalTo: panelView.contentView.bottomAnchor, constant: -12)
         ])
 
@@ -1014,7 +1020,7 @@ final class PromoBannerCell: UITableViewCell, UIScrollViewDelegate {
     private var previousBounds: CGSize = .zero
 
     // ✅ MATCH HEADER SPACING
-    private let horizontalInset: CGFloat = 16
+    private let horizontalInset: CGFloat = CineMystTheme.homeCardInset
 
     // ✅ KEEP PEEK BUT HANDLE IT CORRECTLY
     private let cardPeek: CGFloat = 8
