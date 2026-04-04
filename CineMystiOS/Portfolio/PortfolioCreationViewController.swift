@@ -295,7 +295,7 @@ class PortfolioCreationViewController: UIViewController {
 
     private func makePersonalInfoStep() -> UIView {
         let v = makeContainer()
-        addSectionHeader(to: v, icon: "👤", title: "Personal Information", subtitle: "Basic details about you")
+        addSectionHeader(to: v, title: "Personal Information", subtitle: "Basic details about you")
 
         let fields: [(String, Int, UIKeyboardType)] = [
             ("Full Name *", 1000, .default),
@@ -361,7 +361,7 @@ class PortfolioCreationViewController: UIViewController {
 
     private func makeVitalStatsStep() -> UIView {
         let v = makeContainer()
-        addSectionHeader(to: v, icon: "📐", title: "Vital Statistics", subtitle: "Physical measurements")
+        addSectionHeader(to: v, title: "Vital Statistics", subtitle: "Physical measurements")
 
         let fields: [(String, Int)] = [
             ("Bust/Breast (inches)", 2000),
@@ -420,7 +420,7 @@ class PortfolioCreationViewController: UIViewController {
 
     private func makeShootPreferencesStep() -> UIView {
         let v = makeContainer()
-        addSectionHeader(to: v, icon: "🎬", title: "Shoot Preferences", subtitle: "Availability & comfort zone")
+        addSectionHeader(to: v, title: "Shoot Preferences", subtitle: "Availability & comfort zone")
 
         let pickers: [(String, Int, String?)] = [
             ("Interested for Outstation Shoot", 3000, formData.interestedOutstation),
@@ -455,7 +455,7 @@ class PortfolioCreationViewController: UIViewController {
 
     private func makeWorkInterestsStep() -> UIView {
         let v = makeContainer()
-        addSectionHeader(to: v, icon: "🌟", title: "Work Interests", subtitle: "Select Yes / No for each category")
+        addSectionHeader(to: v, title: "Work Interests", subtitle: "Select Yes / No for each category")
 
         let items: [(String, Int, String?)] = [
             ("Print Shoot / Catalog", 4000, formData.printShoot),
@@ -516,7 +516,7 @@ class PortfolioCreationViewController: UIViewController {
 
     private func makeExperienceStep() -> UIView {
         let v = makeContainer()
-        addSectionHeader(to: v, icon: "🎭", title: "Experience & Social", subtitle: "Your acting experience and online presence")
+        addSectionHeader(to: v, title: "Experience & Social", subtitle: "Your acting experience and online presence")
 
         let expTV = makeTextView(placeholder: "Describe your previous experience, roles, productions...", tag: 5000)
         expTV.text = formData.previousExperience
@@ -555,7 +555,7 @@ class PortfolioCreationViewController: UIViewController {
 
     private func makeMediaUploadStep() -> UIView {
         let v = makeContainer()
-        addSectionHeader(to: v, icon: "📸", title: "Photos & Videos", subtitle: "Add your portfolio media — shots, reels, BTS...")
+        addSectionHeader(to: v, title: "Photos & Videos", subtitle: "Add your portfolio media — shots, reels, BTS...")
 
         let addBtn = UIButton(type: .system)
         addBtn.setTitle("＋  Add Photos / Videos", for: .normal)
@@ -648,7 +648,7 @@ class PortfolioCreationViewController: UIViewController {
 
     private func makeReviewStep() -> UIView {
         let v = makeContainer()
-        addSectionHeader(to: v, icon: "✅", title: "Review Portfolio", subtitle: "Confirm before saving")
+        addSectionHeader(to: v, title: "Review Portfolio", subtitle: "Confirm before saving")
 
         let tv = UITextView()
         tv.text = buildReviewText()
@@ -679,12 +679,7 @@ class PortfolioCreationViewController: UIViewController {
         return v
     }
 
-    private func addSectionHeader(to view: UIView, icon: String, title: String, subtitle: String) {
-        let iconLabel = UILabel()
-        iconLabel.text = icon
-        iconLabel.font = .systemFont(ofSize: 36)
-        iconLabel.translatesAutoresizingMaskIntoConstraints = false
-
+    private func addSectionHeader(to view: UIView, title: String, subtitle: String) {
         let titleLabel = UILabel()
         titleLabel.text = title
         titleLabel.font = .systemFont(ofSize: 24, weight: .bold)
@@ -697,7 +692,7 @@ class PortfolioCreationViewController: UIViewController {
         subLabel.textColor = .secondaryLabel
         subLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        let stack = UIStackView(arrangedSubviews: [iconLabel, titleLabel, subLabel])
+        let stack = UIStackView(arrangedSubviews: [titleLabel, subLabel])
         stack.axis      = .vertical
         stack.spacing   = 4
         stack.alignment = .leading
@@ -933,7 +928,7 @@ class PortfolioCreationViewController: UIViewController {
     private func buildReviewText() -> String {
         var t = ""
         func yn(_ s: String?) -> String { s ?? "—" }
-        t += "👤 PERSONAL INFO\n"
+        t += "PERSONAL INFO\n"
         t += "Name: \(yn(formData.fullName))\nAge: \(yn(formData.age))  |  Sex: \(yn(formData.sex))\n"
         t += "Height: \(yn(formData.height))  |  Weight: \(yn(formData.weight))\n"
         t += "Education: \(yn(formData.education))\nMarital Status: \(yn(formData.maritalStatus))\n"
@@ -941,17 +936,17 @@ class PortfolioCreationViewController: UIViewController {
         t += "Email: \(yn(formData.email))\nAddress: \(yn(formData.currentAddress))\n"
         t += "Languages: \(yn(formData.languages))\nHobbies: \(yn(formData.hobbies))\nPassport: \(yn(formData.passport))\n\n"
 
-        t += "📐 VITAL STATS\n"
+        t += "VITAL STATS\n"
         t += "Bust/Waist/Hips: \(yn(formData.bust)) / \(yn(formData.waist)) / \(yn(formData.hips))\n"
         t += "Skin: \(yn(formData.skinTone))  Eye: \(yn(formData.eyeColor))  Hair: \(yn(formData.hairColor))\n"
         t += "Body Type: \(yn(formData.bodyType))  Shoe: \(yn(formData.shoeSize))\n"
         t += "Tattoo: \(yn(formData.anyTattoo))  Body Hair: \(yn(formData.bodyHair))\n\n"
 
-        t += "🎬 SHOOT PREFERENCES\n"
+        t += "SHOOT PREFERENCES\n"
         t += "Outstation: \(yn(formData.interestedOutstation))  |  Abroad: \(yn(formData.interestedOutOfCountry))\n"
         t += "All Timings: \(yn(formData.comfortableAllTimings))\nDresses: \(yn(formData.dressesComfortableWith))\n\n"
 
-        t += "🌟 WORK INTERESTS (Yes = ✓ / No = ✗)\n"
+        t += "WORK INTERESTS (Yes = ✓ / No = ✗)\n"
         let interests: [(String, String?)] = [
             ("Print/Catalog", formData.printShoot), ("Sarees", formData.sareesShoot),
             ("Lahanga", formData.lahungaShoot), ("Ramp", formData.rampShows),
@@ -973,7 +968,7 @@ class PortfolioCreationViewController: UIViewController {
             t += "  \(val == "Yes" ? "✓" : val == "No" ? "✗" : "·") \(name)\n"
         }
 
-        t += "\n🎭 EXPERIENCE\n\(yn(formData.previousExperience))\n"
+        t += "\nEXPERIENCE\n\(yn(formData.previousExperience))\n"
         return t
     }
 
