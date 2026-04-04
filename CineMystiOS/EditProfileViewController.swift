@@ -46,6 +46,7 @@ class EditProfileViewController: UIViewController {
         setupUI()
         setupLayout()
         populateFields()
+        prefillEmailFromSessionIfNeeded()
     }
     
     private func setupNavigationBar() {
@@ -218,6 +219,21 @@ class EditProfileViewController: UIViewController {
 
         if let experience = data.artistProfile?.yearsOfExperience {
             experienceField.text = "\(experience)"
+        }
+    }
+
+    private func prefillEmailFromSessionIfNeeded() {
+        Task {
+            guard emailField.text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true else { return }
+            guard let session = try? await AuthManager.shared.currentSession() else { return }
+            let email = session.user.email?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !email.isEmpty else { return }
+
+            await MainActor.run {
+                if self.emailField.text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
+                    self.emailField.text = email
+                }
+            }
         }
     }
     
