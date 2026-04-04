@@ -76,13 +76,13 @@ final class BecomeMentorViewController: UITableViewController {
         setupBackground()
         setupTheme()
 
-    // Prefill full name from user's profile if available
-    Task { await prefillFullNameFromProfile() }
+        // Prefill mentor form from the logged-in user's existing profile
+        Task { await prefillProfileFromUserAccount() }
 
         tableView = UITableView(frame: .zero, style: .insetGrouped)
         tableView.register(TextFieldCell.self, forCellReuseIdentifier: ID.textField)
         tableView.register(TextViewCell.self, forCellReuseIdentifier: ID.textView)
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: ID.button)
+        tableView.register(ActionRowCell.self, forCellReuseIdentifier: ID.button)
         tableView.register(PickerCell.self, forCellReuseIdentifier: ID.picker)
         tableView.register(AvatarCell.self, forCellReuseIdentifier: ID.avatar)
 
@@ -163,40 +163,6 @@ final class BecomeMentorViewController: UITableViewController {
         ])
     }
 
-    private func styleCardCell(_ cell: UITableViewCell, showChevron: Bool = false) {
-        let chevronTag = 88127
-        cell.backgroundColor = .clear
-        cell.contentView.backgroundColor = UIColor.white.withAlphaComponent(0.72)
-        cell.contentView.layer.cornerRadius = 16
-        cell.contentView.layer.borderWidth = 1
-        cell.contentView.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.10).cgColor
-        cell.contentView.layer.masksToBounds = true
-        cell.accessoryType = .none
-        cell.accessoryView = nil
-        cell.tintColor = CineMystTheme.brandPlum
-        let selected = UIView()
-        selected.backgroundColor = CineMystTheme.plumMist.withAlphaComponent(0.85)
-        cell.selectedBackgroundView = selected
-
-        if let existingChevron = cell.contentView.viewWithTag(chevronTag) {
-            existingChevron.removeFromSuperview()
-        }
-
-        if showChevron {
-            let chevron = UIImageView(image: UIImage(systemName: "chevron.right"))
-            chevron.tag = chevronTag
-            chevron.translatesAutoresizingMaskIntoConstraints = false
-            chevron.tintColor = CineMystTheme.brandPlum.withAlphaComponent(0.42)
-            chevron.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
-            cell.contentView.addSubview(chevron)
-
-            NSLayoutConstraint.activate([
-                chevron.centerYAnchor.constraint(equalTo: cell.contentView.centerYAnchor),
-                chevron.trailingAnchor.constraint(equalTo: cell.contentView.trailingAnchor, constant: -16)
-            ])
-        }
-    }
-
     // MARK: - Prefill helpers
     private func dictFrom(_ raw: Any?) -> [String: Any]? {
         guard let raw = raw else { return nil }
@@ -211,19 +177,14 @@ final class BecomeMentorViewController: UITableViewController {
     }
 
     @MainActor
-    private func prefillFullNameFromProfile() async {
-        // don't overwrite a name already entered
-        if let name = form.fullName, !name.trimmingCharacters(in: .whitespaces).isEmpty {
-            return
-        }
-
+    private func prefillProfileFromUserAccount() async {
         do {
             let session = try await supabase.auth.session
             let userId = session.user.id.uuidString
 
             let res = try await supabase
                 .from("profiles")
-                .select("full_name, username")
+                .select("full_name, username, profile_picture_url, avatar_url, location_city, location_state")
                 .eq("id", value: userId)
                 .single()
                 .execute()
@@ -231,6 +192,10 @@ final class BecomeMentorViewController: UITableViewController {
             if let dict = dictFrom(res.data) {
                 let fullName = (dict["full_name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
                 let username = (dict["username"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let profilePictureURL = (dict["profile_picture_url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let avatarURL = (dict["avatar_url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let locationCity = (dict["location_city"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let locationState = (dict["location_state"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
                 let emailPrefix = session.user.email?.split(separator: "@").first.map(String.init)?.trimmingCharacters(in: .whitespacesAndNewlines)
 
                 let candidates: [String?] = [fullName, username, emailPrefix]
@@ -239,14 +204,48 @@ final class BecomeMentorViewController: UITableViewController {
                     return candidate
                 }.first
 
-                if let resolvedName {
+                if let resolvedName,
+                   (form.fullName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) {
                     self.form.fullName = resolvedName
-                    let indexPath = IndexPath(row: 0, section: Section.basicInfo.rawValue)
-                    tableView.reloadRows(at: [indexPath], with: .automatic)
                 }
+
+                if (form.city?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true),
+                   let locationCity,
+                   !locationCity.isEmpty {
+                    self.form.city = locationCity
+                }
+
+                if (form.country?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true),
+                   let locationState,
+                   !locationState.isEmpty {
+                    self.form.country = locationState
+                }
+
+                if form.avatarImage == nil {
+                    let imageURLString = [profilePictureURL, avatarURL]
+                        .compactMap { value -> String? in
+                            guard let value, !value.isEmpty else { return nil }
+                            return value
+                        }
+                        .first
+
+                    if let imageURLString,
+                       let url = URL(string: imageURLString) {
+                        do {
+                            let (data, _) = try await URLSession.shared.data(from: url)
+                            if let image = UIImage(data: data) {
+                                self.form.avatarImage = image
+                            }
+                        } catch {
+                            print("[BecomeMentor] prefill avatar failed: \(error)")
+                        }
+                    }
+                }
+
+                tableView.reloadData()
             }
         } catch {
-            print("[BecomeMentor] prefill full name failed: \(error)")
+            print("[BecomeMentor] prefill profile failed: \(error)")
         }
     }
 
@@ -323,13 +322,14 @@ final class BecomeMentorViewController: UITableViewController {
             case 3:
                 let cell = tableView.dequeueReusableCell(
                     withIdentifier: ID.button,
-                    for: indexPath)
-                var config = cell.defaultContentConfiguration()
-                config.text = form.years ?? "Experience"
-                config.textProperties.color = CineMystTheme.brandPlum
-                config.textProperties.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
-                cell.contentConfiguration = config
-                styleCardCell(cell, showChevron: true)
+                    for: indexPath) as! ActionRowCell
+                cell.configure(
+                    title: form.years ?? "Experience",
+                    subtitle: nil,
+                    titleColor: CineMystTheme.brandPlum,
+                    subtitleColor: CineMystTheme.ink.withAlphaComponent(0.58),
+                    showChevron: true
+                )
                 return cell
 
             case 4:
@@ -374,17 +374,14 @@ final class BecomeMentorViewController: UITableViewController {
                 let cell = tableView.dequeueReusableCell(
                     withIdentifier: ID.button,
                     for: indexPath
+                ) as! ActionRowCell
+                cell.configure(
+                    title: "Select Mentorship Area(s)",
+                    subtitle: form.mentorshipAreas.isEmpty ? "No areas selected" : "\(form.mentorshipAreas.count) selected",
+                    titleColor: CineMystTheme.brandPlum,
+                    subtitleColor: CineMystTheme.ink.withAlphaComponent(0.58),
+                    showChevron: true
                 )
-                var config = cell.defaultContentConfiguration()
-                config.text = "Select Mentorship Area(s)"
-                config.secondaryText = form.mentorshipAreas.isEmpty
-                    ? "No areas selected"
-                    : "\(form.mentorshipAreas.count) selected"
-                config.textProperties.color = CineMystTheme.brandPlum
-                config.textProperties.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
-                config.secondaryTextProperties.color = CineMystTheme.ink.withAlphaComponent(0.58)
-                cell.contentConfiguration = config
-                styleCardCell(cell, showChevron: true)
                 return cell
             }
 
@@ -395,15 +392,14 @@ final class BecomeMentorViewController: UITableViewController {
             let cell = tableView.dequeueReusableCell(
                 withIdentifier: ID.button,
                 for: indexPath
+            ) as! ActionRowCell
+            cell.configure(
+                title: area,
+                subtitle: price,
+                titleColor: CineMystTheme.ink,
+                subtitleColor: CineMystTheme.brandPlum,
+                showChevron: true
             )
-            var config = cell.defaultContentConfiguration()
-            config.text = area
-            config.secondaryText = price
-            config.textProperties.color = CineMystTheme.ink
-            config.textProperties.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
-            config.secondaryTextProperties.color = CineMystTheme.brandPlum
-            cell.contentConfiguration = config
-            styleCardCell(cell, showChevron: true)
             return cell
 
         // ----------------------
@@ -415,13 +411,14 @@ final class BecomeMentorViewController: UITableViewController {
                 let cell = tableView.dequeueReusableCell(
                     withIdentifier: ID.button,
                     for: indexPath
+                ) as! ActionRowCell
+                cell.configure(
+                    title: "Add Slot",
+                    subtitle: nil,
+                    titleColor: CineMystTheme.brandPlum,
+                    subtitleColor: CineMystTheme.ink.withAlphaComponent(0.58),
+                    showChevron: true
                 )
-                var config = cell.defaultContentConfiguration()
-                config.text = "Add Slot"
-                config.textProperties.color = CineMystTheme.brandPlum
-                config.textProperties.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
-                cell.contentConfiguration = config
-                styleCardCell(cell, showChevron: true)
                 return cell
             }
 
@@ -431,15 +428,16 @@ final class BecomeMentorViewController: UITableViewController {
             let cell = tableView.dequeueReusableCell(
                 withIdentifier: ID.button,
                 for: indexPath
-            )
+            ) as! ActionRowCell
 
-            var config = cell.defaultContentConfiguration()
-            config.text = formattedSlot(slotDate)
-            config.textProperties.color = CineMystTheme.ink
-            config.textProperties.font = UIFont.systemFont(ofSize: 15, weight: .medium)
+            cell.configure(
+                title: formattedSlot(slotDate),
+                subtitle: nil,
+                titleColor: CineMystTheme.ink,
+                subtitleColor: CineMystTheme.ink.withAlphaComponent(0.58),
+                showChevron: false
+            )
             cell.selectionStyle = .none
-            cell.contentConfiguration = config
-            styleCardCell(cell)
             return cell
 
         // ----------------------
@@ -1705,7 +1703,114 @@ final class PickerCell: UITableViewCell {
     @objc private func valueChanged(_ dp: UIDatePicker) { handler?(dp.date) }
 }
 
+final class ActionRowCell: UITableViewCell {
+    private let cardView: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.backgroundColor = UIColor.white.withAlphaComponent(0.72)
+        view.layer.cornerRadius = 16
+        view.layer.borderWidth = 1
+        view.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.10).cgColor
+        view.layer.masksToBounds = true
+        return view
+    }()
+
+    private let titleLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+        label.numberOfLines = 1
+        return label
+    }()
+
+    private let subtitleLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = UIFont.systemFont(ofSize: 14, weight: .regular)
+        label.numberOfLines = 0
+        return label
+    }()
+
+    private let textStack: UIStackView = {
+        let stack = UIStackView()
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.axis = .vertical
+        stack.spacing = 4
+        stack.alignment = .fill
+        return stack
+    }()
+
+    private let chevronView: UIImageView = {
+        let view = UIImageView(image: UIImage(systemName: "chevron.right"))
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.tintColor = CineMystTheme.brandPlum.withAlphaComponent(0.42)
+        view.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
+        view.contentMode = .scaleAspectFit
+        return view
+    }()
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        backgroundColor = .clear
+        contentView.backgroundColor = .clear
+        selectionStyle = .default
+
+        let selected = UIView()
+        selected.backgroundColor = CineMystTheme.plumMist.withAlphaComponent(0.85)
+        selected.layer.cornerRadius = 16
+        selected.layer.masksToBounds = true
+        selectedBackgroundView = selected
+
+        contentView.addSubview(cardView)
+        cardView.addSubview(textStack)
+        cardView.addSubview(chevronView)
+        textStack.addArrangedSubview(titleLabel)
+        textStack.addArrangedSubview(subtitleLabel)
+
+        NSLayoutConstraint.activate([
+            cardView.leadingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.leadingAnchor),
+            cardView.trailingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.trailingAnchor),
+            cardView.topAnchor.constraint(equalTo: contentView.layoutMarginsGuide.topAnchor, constant: 6),
+            cardView.bottomAnchor.constraint(equalTo: contentView.layoutMarginsGuide.bottomAnchor, constant: -6),
+            cardView.heightAnchor.constraint(greaterThanOrEqualToConstant: 50),
+
+            chevronView.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
+            chevronView.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -16),
+            chevronView.widthAnchor.constraint(equalToConstant: 10),
+            chevronView.heightAnchor.constraint(equalToConstant: 16),
+
+            textStack.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 16),
+            textStack.trailingAnchor.constraint(equalTo: chevronView.leadingAnchor, constant: -12),
+            textStack.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 12),
+            textStack.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -12)
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func configure(title: String, subtitle: String?, titleColor: UIColor, subtitleColor: UIColor, showChevron: Bool) {
+        titleLabel.text = title
+        titleLabel.textColor = titleColor
+        subtitleLabel.text = subtitle
+        subtitleLabel.textColor = subtitleColor
+        subtitleLabel.isHidden = (subtitle?.isEmpty ?? true)
+        chevronView.isHidden = !showChevron
+        textStack.spacing = subtitleLabel.isHidden ? 0 : 4
+    }
+}
+
 final class AvatarCell: UITableViewCell {
+    private let cardView: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.backgroundColor = UIColor.white.withAlphaComponent(0.72)
+        view.layer.cornerRadius = 18
+        view.layer.borderWidth = 1
+        view.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.10).cgColor
+        view.layer.masksToBounds = true
+        return view
+    }()
+
     private let previewImageView: UIImageView = {
         let imageView = UIImageView()
         imageView.translatesAutoresizingMaskIntoConstraints = false
@@ -1732,34 +1837,51 @@ final class AvatarCell: UITableViewCell {
         return label
     }()
 
+    private let chevronView: UIImageView = {
+        let view = UIImageView(image: UIImage(systemName: "chevron.right"))
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.tintColor = CineMystTheme.brandPlum.withAlphaComponent(0.42)
+        view.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
+        view.contentMode = .scaleAspectFit
+        return view
+    }()
+
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: .default, reuseIdentifier: reuseIdentifier)
 
-        contentView.addSubview(previewImageView)
-        contentView.addSubview(titleLabelView)
-        contentView.addSubview(subtitleLabelView)
-        accessoryType = .disclosureIndicator
         backgroundColor = .clear
-        contentView.backgroundColor = UIColor.white.withAlphaComponent(0.72)
-        contentView.layer.cornerRadius = 18
-        contentView.layer.borderWidth = 1
-        contentView.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.10).cgColor
-        contentView.layer.masksToBounds = true
+        contentView.backgroundColor = .clear
+
+        contentView.addSubview(cardView)
+        cardView.addSubview(previewImageView)
+        cardView.addSubview(titleLabelView)
+        cardView.addSubview(subtitleLabelView)
+        cardView.addSubview(chevronView)
 
         NSLayoutConstraint.activate([
-            previewImageView.leadingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.leadingAnchor),
-            previewImageView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
-            previewImageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -10),
+            cardView.leadingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.leadingAnchor),
+            cardView.trailingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.trailingAnchor),
+            cardView.topAnchor.constraint(equalTo: contentView.layoutMarginsGuide.topAnchor, constant: 6),
+            cardView.bottomAnchor.constraint(equalTo: contentView.layoutMarginsGuide.bottomAnchor, constant: -6),
+
+            previewImageView.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 16),
+            previewImageView.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 10),
+            previewImageView.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -10),
             previewImageView.widthAnchor.constraint(equalToConstant: 60),
             previewImageView.heightAnchor.constraint(equalToConstant: 60),
 
             titleLabelView.leadingAnchor.constraint(equalTo: previewImageView.trailingAnchor, constant: 14),
-            titleLabelView.trailingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.trailingAnchor, constant: -24),
+            titleLabelView.trailingAnchor.constraint(equalTo: chevronView.leadingAnchor, constant: -12),
             titleLabelView.topAnchor.constraint(equalTo: previewImageView.topAnchor, constant: 6),
 
             subtitleLabelView.leadingAnchor.constraint(equalTo: titleLabelView.leadingAnchor),
             subtitleLabelView.trailingAnchor.constraint(equalTo: titleLabelView.trailingAnchor),
-            subtitleLabelView.topAnchor.constraint(equalTo: titleLabelView.bottomAnchor, constant: 4)
+            subtitleLabelView.topAnchor.constraint(equalTo: titleLabelView.bottomAnchor, constant: 4),
+
+            chevronView.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
+            chevronView.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -16),
+            chevronView.widthAnchor.constraint(equalToConstant: 10),
+            chevronView.heightAnchor.constraint(equalToConstant: 16)
         ])
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -1767,8 +1889,8 @@ final class AvatarCell: UITableViewCell {
         if let img = image {
             previewImageView.image = img
             previewImageView.tintColor = nil
-            titleLabelView.text = "Change photo"
-            subtitleLabelView.text = "Selected image will be uploaded to your mentor profile"
+            titleLabelView.text = "Using your profile photo"
+            subtitleLabelView.text = "Tap to replace it for your mentor profile"
         } else {
             previewImageView.image = UIImage(systemName: "person.crop.circle.fill")
             previewImageView.tintColor = CineMystTheme.brandPlum.withAlphaComponent(0.45)

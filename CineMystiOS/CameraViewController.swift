@@ -34,6 +34,7 @@ class CameraViewController: UIViewController {
     private let timerLabel = UILabel()
     private let flashButton = UIButton()
     private let galleryButton = UIButton()
+    private let closeButton = UIButton()
     private var progressRingShapeLayer = CAShapeLayer()
     
     // MARK: - Lifecycle
@@ -116,6 +117,20 @@ class CameraViewController: UIViewController {
 
     // MARK: - UI Setup
     private func setupUI() {
+        // Close / Back Button
+        closeButton.setImage(UIImage(systemName: "chevron.left"), for: .normal)
+        closeButton.tintColor = .white
+        closeButton.translatesAutoresizingMaskIntoConstraints = false
+        closeButton.addTarget(self, action: #selector(closeCamera), for: .touchUpInside)
+        view.addSubview(closeButton)
+
+        NSLayoutConstraint.activate([
+            closeButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            closeButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
+            closeButton.widthAnchor.constraint(equalToConstant: 28),
+            closeButton.heightAnchor.constraint(equalToConstant: 28)
+        ])
+
         // Mode Selector
         modeSegmentControl.selectedSegmentIndex = 0
         modeSegmentControl.addTarget(self, action: #selector(modeDidChange(_:)), for: .valueChanged)
@@ -136,7 +151,7 @@ class CameraViewController: UIViewController {
         view.addSubview(flashButton)
 
         NSLayoutConstraint.activate([
-            flashButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            flashButton.leadingAnchor.constraint(equalTo: closeButton.trailingAnchor, constant: 18),
             flashButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16)
         ])
         
@@ -225,6 +240,10 @@ class CameraViewController: UIViewController {
         try? device.lockForConfiguration()
         device.torchMode = device.torchMode == .on ? .off : .on
         device.unlockForConfiguration()
+    }
+
+    @objc private func closeCamera() {
+        dismiss(animated: true)
     }
     
     @objc private func openGallery() {
