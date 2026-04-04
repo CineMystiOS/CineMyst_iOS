@@ -12,6 +12,202 @@ struct ApplicationCard {
     var isConnected: Bool
     var hasSubmittedTask: Bool
     var isShortlisted: Bool
+    var aiMatchScore: Int?
+    var aiScoreExplanation: String?
+    var aiScoreBreakdown: ApplicantAIScoreBreakdown?
+}
+
+struct ApplicantAIScoreBreakdown {
+    let skill: Int
+    let experience: Int
+    let location: Int
+    let portfolio: Int
+    let reliability: Int
+}
+
+struct ApplicantAIMatch {
+    let score: Int
+    let explanation: String
+    let breakdown: ApplicantAIScoreBreakdown
+}
+
+private struct AIApplicantContext: Encodable {
+    let application_id: String
+    let actor_id: String
+    let name: String
+    let role: String
+    let location: String
+    let bio: String
+    let skills: [String]
+    let years_of_experience: Int
+    let portfolio_project_count: Int
+    let has_portfolio: Bool
+    let has_submitted_task: Bool
+    let connection_count: Int
+    let current_status: String
+}
+
+private struct AIApplicantMatchResult: Decodable {
+    let actor_id: String
+    let match_score: Int
+    let explanation: String?
+    let breakdown: AIApplicantBreakdown?
+}
+
+private struct AIApplicantBreakdown: Decodable {
+    let skill_match: Int?
+    let experience_match: Int?
+    let location_match: Int?
+    let portfolio_quality: Int?
+    let activity_reliability: Int?
+}
+
+private struct AIApplicantMatchEnvelope: Decodable {
+    let matches: [AIApplicantMatchResult]
+}
+
+private struct AIChatRequestBody: Encodable {
+    let user_id: String
+    let message: String
+    let conversation_id: String
+}
+
+private struct AIChatResponseBody: Decodable {
+    let answer: String
+}
+
+private final class ApplicantAIScoringService {
+    private let session: URLSession
+    private let baseURL: URL
+
+    init(session: URLSession = .shared) {
+        self.session = session
+        if let configuredBaseURL = Bundle.main.object(forInfoDictionaryKey: "AI_CHATBOT_BASE_URL") as? String,
+           let configuredURL = URL(string: configuredBaseURL),
+           !configuredBaseURL.isEmpty {
+            self.baseURL = configuredURL
+        } else {
+            self.baseURL = URL(string: "http://127.0.0.1:8000")!
+        }
+    }
+
+    func scoreApplicants(userId: String, job: Job, applicants: [AIApplicantContext]) async throws -> [AIApplicantMatchResult] {
+        let prompt = makePrompt(job: job, applicants: applicants)
+        var request = URLRequest(url: baseURL.appendingPathComponent("/v1/chat"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 120
+        request.httpBody = try JSONEncoder().encode(
+            AIChatRequestBody(
+                user_id: userId,
+                message: prompt,
+                conversation_id: "job-shortlist-\(job.id.uuidString)"
+            )
+        )
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, 200..<300 ~= httpResponse.statusCode else {
+            let bodyText = String(data: data, encoding: .utf8) ?? "Unknown AI server error"
+            throw NSError(domain: "ApplicantAIScoringService", code: 1, userInfo: [NSLocalizedDescriptionKey: bodyText])
+        }
+
+        let chatResponse = try JSONDecoder().decode(AIChatResponseBody.self, from: data)
+        return try parseMatches(from: chatResponse.answer)
+    }
+
+    private func makePrompt(job: Job, applicants: [AIApplicantContext]) -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let applicantsJSON = (try? String(data: encoder.encode(applicants), encoding: .utf8)) ?? "[]"
+        let jobSummary = """
+        {
+          "id": "\(job.id.uuidString)",
+          "title": "\(job.title ?? "")",
+          "location": "\(job.location ?? "")",
+          "description": "\(job.description ?? "")",
+          "requirements": "\(job.requirements ?? "")",
+          "job_type": "\(job.jobType ?? "")"
+        }
+        """
+
+        return """
+        You are CineMyst's candidate-shortlisting assistant for directors.
+        Evaluate all applicants for this one job and rank them by best overall fit.
+
+        Use meaning, not just exact keywords. Compare the job with each actor profile.
+        Weight the final score out of 100 using:
+        - skill match: 30
+        - experience match: 20
+        - location match: 15
+        - portfolio quality: 20
+        - activity and reliability: 15
+
+        Job:
+        \(jobSummary)
+
+        Applicants:
+        \(applicantsJSON)
+
+        Return ONLY valid JSON in this exact shape:
+        {
+          "matches": [
+            {
+              "actor_id": "uuid",
+              "match_score": 92,
+              "explanation": "short human explanation",
+              "breakdown": {
+                "skill_match": 28,
+                "experience_match": 17,
+                "location_match": 12,
+                "portfolio_quality": 19,
+                "activity_reliability": 14
+              }
+            }
+          ]
+        }
+
+        Rules:
+        - Include every applicant exactly once.
+        - Sort matches from highest score to lowest score.
+        - Keep explanations concise and specific.
+        - Do not include markdown or code fences.
+        """
+    }
+
+    private func parseMatches(from answer: String) throws -> [AIApplicantMatchResult] {
+        let trimmed = answer.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let data = trimmed.data(using: .utf8) {
+            if let object = try? JSONDecoder().decode(AIApplicantMatchEnvelope.self, from: data) {
+                return object.matches
+            }
+            if let array = try? JSONDecoder().decode([AIApplicantMatchResult].self, from: data) {
+                return array
+            }
+        }
+
+        let candidates = [extractJSONObject(from: trimmed), extractJSONArray(from: trimmed)].compactMap { $0 }
+        for candidate in candidates {
+            guard let data = candidate.data(using: .utf8) else { continue }
+            if let object = try? JSONDecoder().decode(AIApplicantMatchEnvelope.self, from: data) {
+                return object.matches
+            }
+            if let array = try? JSONDecoder().decode([AIApplicantMatchResult].self, from: data) {
+                return array
+            }
+        }
+
+        throw NSError(domain: "ApplicantAIScoringService", code: 2, userInfo: [NSLocalizedDescriptionKey: "AI shortlist response was not valid JSON."])
+    }
+
+    private func extractJSONObject(from text: String) -> String? {
+        guard let start = text.firstIndex(of: "{"), let end = text.lastIndex(of: "}") else { return nil }
+        return String(text[start...end])
+    }
+
+    private func extractJSONArray(from text: String) -> String? {
+        guard let start = text.firstIndex(of: "["), let end = text.lastIndex(of: "]") else { return nil }
+        return String(text[start...end])
+    }
 }
 
 class ApplicationsViewController: UIViewController {
@@ -22,9 +218,13 @@ class ApplicationsViewController: UIViewController {
     private var filteredApplications: [ApplicationCard] = []
     private var isFilteredByAI = false
     private let backgroundGradient = CAGradientLayer()
+    private let aiScoringService = ApplicantAIScoringService()
     // Raw data for debug/info display
     private var dbApplicationsRaw: [Application] = []
     private var taskSubmissionsMap: [UUID: [TaskSubmission]] = [:]
+    private var applicationProfileCache: [UUID: UserProfileData] = [:]
+    private var tableViewHeightConstraint: NSLayoutConstraint?
+    private var aiLoaderDotCenterXConstraints: [NSLayoutConstraint] = []
     
     // Use shared authenticated supabase client from Supabase.swift
     // Local instance was causing RLS policy violations (error 42501)
@@ -104,7 +304,7 @@ class ApplicationsViewController: UIViewController {
     
     private let topApplicantsButton: UIButton = {
         let btn = UIButton()
-        btn.setTitle("Top Applicants ", for: .normal)
+        btn.setTitle("All Applicants", for: .normal)
         btn.setTitleColor(CineMystTheme.brandPlum, for: .normal)
         btn.backgroundColor = UIColor.white.withAlphaComponent(0.6)
         btn.layer.cornerRadius = 20
@@ -115,7 +315,7 @@ class ApplicationsViewController: UIViewController {
         btn.layer.borderWidth = 1
         btn.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.10).cgColor
         btn.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
-        btn.contentEdgeInsets = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 14)
+        btn.contentEdgeInsets = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
         btn.translatesAutoresizingMaskIntoConstraints = false
         return btn
     }()
@@ -162,6 +362,82 @@ class ApplicationsViewController: UIViewController {
         tv.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 20, right: 0)
         return tv
     }()
+
+    private let aiLoadingOverlay: UIView = {
+        let view = UIView()
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.16)
+        view.alpha = 0
+        view.isHidden = true
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let aiLoadingCard: UIVisualEffectView = {
+        let effect = UIBlurEffect(style: .systemUltraThinMaterialLight)
+        let view = UIVisualEffectView(effect: effect)
+        view.layer.cornerRadius = 24
+        view.layer.masksToBounds = true
+        view.layer.borderWidth = 1
+        view.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.10).cgColor
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let aiLoadingTitleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "AI is filtering applicants"
+        label.font = UIFont.systemFont(ofSize: 18, weight: .bold)
+        label.textColor = CineMystTheme.ink
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
+    private let aiLoadingSubtitleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "Comparing skills, experience, portfolio, and reliability..."
+        label.numberOfLines = 0
+        label.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        label.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.78)
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
+    private let aiLoadingRing: UIView = {
+        let view = UIView()
+        view.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.08)
+        view.layer.cornerRadius = 32
+        view.layer.borderWidth = 1.5
+        view.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.18).cgColor
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let aiLoadingCore: UIView = {
+        let view = UIView()
+        view.backgroundColor = CineMystTheme.brandPlum
+        view.layer.cornerRadius = 12
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let aiLoadingCoreIcon: UIImageView = {
+        let imageView = UIImageView(image: UIImage(systemName: "sparkles"))
+        imageView.tintColor = .white
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+
+    private let aiLoadingDotsStack: UIStackView = {
+        let stack = UIStackView()
+        stack.axis = .horizontal
+        stack.alignment = .center
+        stack.distribution = .equalSpacing
+        stack.spacing = 10
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        return stack
+    }()
     
     // MARK: - Lifecycle
     override func viewDidLoad() {
@@ -170,6 +446,7 @@ class ApplicationsViewController: UIViewController {
         setupBackground()
         setupNavigationBar()
         setupUI()
+        setupAILoadingOverlay()
         loadApplicationsForJob()
         setupActions()
     }
@@ -237,7 +514,6 @@ class ApplicationsViewController: UIViewController {
         contentView.addSubview(filtersButton)
         filtersButton.addSubview(filterIcon)
         contentView.addSubview(topApplicantsButton)
-        topApplicantsButton.addSubview(chevronIcon)
         contentView.addSubview(aiFilterButton)
         contentView.addSubview(countLabel)
         contentView.addSubview(tableView)
@@ -283,12 +559,7 @@ class ApplicationsViewController: UIViewController {
             topApplicantsButton.topAnchor.constraint(equalTo: searchBar.bottomAnchor, constant: 16),
             topApplicantsButton.leadingAnchor.constraint(equalTo: filtersButton.trailingAnchor, constant: 10),
             topApplicantsButton.heightAnchor.constraint(equalToConstant: 38),
-            
-            chevronIcon.centerYAnchor.constraint(equalTo: topApplicantsButton.centerYAnchor),
-            chevronIcon.trailingAnchor.constraint(equalTo: topApplicantsButton.trailingAnchor, constant: -12),
-            chevronIcon.widthAnchor.constraint(equalToConstant: 10),
-            chevronIcon.heightAnchor.constraint(equalToConstant: 10),
-            
+
             aiFilterButton.topAnchor.constraint(equalTo: searchBar.bottomAnchor, constant: 16),
             aiFilterButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             aiFilterButton.heightAnchor.constraint(equalToConstant: 38),
@@ -300,7 +571,71 @@ class ApplicationsViewController: UIViewController {
             tableView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             tableView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-            tableView.heightAnchor.constraint(equalToConstant: 700)
+        ])
+
+        tableViewHeightConstraint = tableView.heightAnchor.constraint(equalToConstant: 1)
+        tableViewHeightConstraint?.isActive = true
+        updateFilterButtons()
+    }
+
+    private func setupAILoadingOverlay() {
+        view.addSubview(aiLoadingOverlay)
+        aiLoadingOverlay.addSubview(aiLoadingCard)
+        aiLoadingCard.contentView.addSubview(aiLoadingRing)
+        aiLoadingRing.addSubview(aiLoadingCore)
+        aiLoadingCore.addSubview(aiLoadingCoreIcon)
+        aiLoadingCard.contentView.addSubview(aiLoadingTitleLabel)
+        aiLoadingCard.contentView.addSubview(aiLoadingSubtitleLabel)
+        aiLoadingCard.contentView.addSubview(aiLoadingDotsStack)
+
+        for _ in 0..<3 {
+            let dot = UIView()
+            dot.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.28)
+            dot.layer.cornerRadius = 5
+            dot.translatesAutoresizingMaskIntoConstraints = false
+            dot.widthAnchor.constraint(equalToConstant: 10).isActive = true
+            dot.heightAnchor.constraint(equalToConstant: 10).isActive = true
+            aiLoadingDotsStack.addArrangedSubview(dot)
+        }
+
+        NSLayoutConstraint.activate([
+            aiLoadingOverlay.topAnchor.constraint(equalTo: view.topAnchor),
+            aiLoadingOverlay.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            aiLoadingOverlay.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            aiLoadingOverlay.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            aiLoadingCard.centerXAnchor.constraint(equalTo: aiLoadingOverlay.centerXAnchor),
+            aiLoadingCard.centerYAnchor.constraint(equalTo: aiLoadingOverlay.centerYAnchor),
+            aiLoadingCard.leadingAnchor.constraint(greaterThanOrEqualTo: aiLoadingOverlay.leadingAnchor, constant: 28),
+            aiLoadingCard.trailingAnchor.constraint(lessThanOrEqualTo: aiLoadingOverlay.trailingAnchor, constant: -28),
+            aiLoadingCard.widthAnchor.constraint(equalToConstant: 280),
+
+            aiLoadingRing.topAnchor.constraint(equalTo: aiLoadingCard.contentView.topAnchor, constant: 24),
+            aiLoadingRing.centerXAnchor.constraint(equalTo: aiLoadingCard.contentView.centerXAnchor),
+            aiLoadingRing.widthAnchor.constraint(equalToConstant: 64),
+            aiLoadingRing.heightAnchor.constraint(equalToConstant: 64),
+
+            aiLoadingCore.centerXAnchor.constraint(equalTo: aiLoadingRing.centerXAnchor),
+            aiLoadingCore.centerYAnchor.constraint(equalTo: aiLoadingRing.centerYAnchor),
+            aiLoadingCore.widthAnchor.constraint(equalToConstant: 24),
+            aiLoadingCore.heightAnchor.constraint(equalToConstant: 24),
+
+            aiLoadingCoreIcon.centerXAnchor.constraint(equalTo: aiLoadingCore.centerXAnchor),
+            aiLoadingCoreIcon.centerYAnchor.constraint(equalTo: aiLoadingCore.centerYAnchor),
+            aiLoadingCoreIcon.widthAnchor.constraint(equalToConstant: 12),
+            aiLoadingCoreIcon.heightAnchor.constraint(equalToConstant: 12),
+
+            aiLoadingTitleLabel.topAnchor.constraint(equalTo: aiLoadingRing.bottomAnchor, constant: 18),
+            aiLoadingTitleLabel.leadingAnchor.constraint(equalTo: aiLoadingCard.contentView.leadingAnchor, constant: 18),
+            aiLoadingTitleLabel.trailingAnchor.constraint(equalTo: aiLoadingCard.contentView.trailingAnchor, constant: -18),
+
+            aiLoadingSubtitleLabel.topAnchor.constraint(equalTo: aiLoadingTitleLabel.bottomAnchor, constant: 8),
+            aiLoadingSubtitleLabel.leadingAnchor.constraint(equalTo: aiLoadingCard.contentView.leadingAnchor, constant: 18),
+            aiLoadingSubtitleLabel.trailingAnchor.constraint(equalTo: aiLoadingCard.contentView.trailingAnchor, constant: -18),
+
+            aiLoadingDotsStack.topAnchor.constraint(equalTo: aiLoadingSubtitleLabel.bottomAnchor, constant: 18),
+            aiLoadingDotsStack.centerXAnchor.constraint(equalTo: aiLoadingCard.contentView.centerXAnchor),
+            aiLoadingDotsStack.bottomAnchor.constraint(equalTo: aiLoadingCard.contentView.bottomAnchor, constant: -22)
         ])
     }
 
@@ -387,6 +722,8 @@ class ApplicationsViewController: UIViewController {
                 
                 DispatchQueue.main.async {
                     self.countLabel.text = "\(self.applications.count) applications"
+                    self.updateTableHeight()
+                    self.updateFilterButtons()
                     self.tableView.reloadData()
                     print("✅ Applications loaded and displayed: \(self.applications.count)")
                 }
@@ -441,7 +778,7 @@ class ApplicationsViewController: UIViewController {
     
     private func setupActions() {
         filtersButton.addTarget(self, action: #selector(filtersTapped), for: .touchUpInside)
-        topApplicantsButton.addTarget(self, action: #selector(sortTapped), for: .touchUpInside)
+        topApplicantsButton.addTarget(self, action: #selector(showAllApplicantsTapped), for: .touchUpInside)
         aiFilterButton.addTarget(self, action: #selector(aiFilterTapped), for: .touchUpInside)
     }
     
@@ -469,25 +806,43 @@ class ApplicationsViewController: UIViewController {
         showFilterMenu()
     }
     
-    @objc private func sortTapped() {
-        showSortMenu()
+    @objc private func showAllApplicantsTapped() {
+        isFilteredByAI = false
+        filteredApplications = applications
+        countLabel.text = "\(filteredApplications.count) applications"
+        updateFilterButtons()
+        updateTableHeight()
+        tableView.reloadData()
     }
     
     @objc private func aiFilterTapped() {
-        isFilteredByAI.toggle()
+        if isFilteredByAI {
+            showAllApplicantsTapped()
+            return
+        }
+
+        runAIShortlist()
     }
     
     private func showFilterMenu() {
         let alert = UIAlertController(title: "Filter Applications", message: nil, preferredStyle: .actionSheet)
         
         alert.addAction(UIAlertAction(title: "All Applications", style: .default, handler: { _ in
+            self.isFilteredByAI = false
             self.filteredApplications = self.applications
+            self.countLabel.text = "\(self.filteredApplications.count) applications"
+            self.updateFilterButtons()
+            self.updateTableHeight()
             self.tableView.reloadData()
         }))
         
         alert.addAction(UIAlertAction(title: "By location", style: .default))
         alert.addAction(UIAlertAction(title: "Task Submitted", style: .default, handler: { _ in
+            self.isFilteredByAI = false
             self.filteredApplications = self.applications.filter { $0.hasSubmittedTask }
+            self.countLabel.text = "\(self.filteredApplications.count) applications"
+            self.updateFilterButtons()
+            self.updateTableHeight()
             self.tableView.reloadData()
         }))
         alert.addAction(UIAlertAction(title: "Connections (100+)", style: .default))
@@ -496,11 +851,338 @@ class ApplicationsViewController: UIViewController {
         present(alert, animated: true)
     }
     
-    private func showSortMenu() {
-        let alert = UIAlertController(title: "Sort By", message: nil, preferredStyle: .actionSheet)
-        alert.addAction(UIAlertAction(title: "Most Recent", style: .default))
-        alert.addAction(UIAlertAction(title: "Top Applicants", style: .default))
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+    private func updateFilterButtons() {
+        styleToggleButton(topApplicantsButton, isActive: !isFilteredByAI, activeTitleColor: .white)
+        styleToggleButton(aiFilterButton, isActive: isFilteredByAI, activeTitleColor: .white)
+    }
+
+    private func styleToggleButton(_ button: UIButton, isActive: Bool, activeTitleColor: UIColor = CineMystTheme.brandPlum) {
+        if isActive {
+            button.backgroundColor = CineMystTheme.brandPlum
+            button.setTitleColor(activeTitleColor, for: .normal)
+            button.layer.borderColor = UIColor.clear.cgColor
+        } else {
+            button.backgroundColor = UIColor.white.withAlphaComponent(0.6)
+            button.setTitleColor(CineMystTheme.brandPlum, for: .normal)
+            button.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.10).cgColor
+        }
+    }
+
+    private func updateTableHeight() {
+        let rowHeight: CGFloat = 132
+        let total = max(CGFloat(filteredApplications.count) * rowHeight, 1)
+        tableViewHeightConstraint?.constant = total
+        view.layoutIfNeeded()
+    }
+
+    private func runAIShortlist() {
+        guard let job else { return }
+
+        aiFilterButton.isEnabled = false
+        aiFilterButton.setTitle("Ranking...", for: .normal)
+        setAILoadingVisible(true)
+
+        Task {
+            let rankedApplications = await buildAIRankedApplications(for: job)
+
+            await MainActor.run {
+                self.isFilteredByAI = true
+                self.filteredApplications = rankedApplications
+                self.countLabel.text = "\(rankedApplications.count) AI-ranked applicants"
+                self.aiFilterButton.isEnabled = true
+                self.aiFilterButton.setTitle("Filtered by AI", for: .normal)
+                self.updateFilterButtons()
+                self.updateTableHeight()
+                self.tableView.reloadData()
+                self.setAILoadingVisible(false)
+            }
+        }
+    }
+
+    private func setAILoadingVisible(_ visible: Bool) {
+        if visible {
+            aiLoadingOverlay.isHidden = false
+            view.bringSubviewToFront(aiLoadingOverlay)
+            animateAILoader()
+            UIView.animate(withDuration: 0.22) {
+                self.aiLoadingOverlay.alpha = 1
+            }
+        } else {
+            UIView.animate(withDuration: 0.22, animations: {
+                self.aiLoadingOverlay.alpha = 0
+            }, completion: { _ in
+                self.aiLoadingOverlay.isHidden = true
+                self.aiLoadingRing.layer.removeAllAnimations()
+                self.aiLoadingCore.layer.removeAllAnimations()
+                self.aiLoadingDotsStack.arrangedSubviews.forEach { $0.layer.removeAllAnimations() }
+            })
+        }
+    }
+
+    private func animateAILoader() {
+        let ringPulse = CABasicAnimation(keyPath: "transform.scale")
+        ringPulse.fromValue = 1.0
+        ringPulse.toValue = 1.12
+        ringPulse.duration = 0.9
+        ringPulse.autoreverses = true
+        ringPulse.repeatCount = .infinity
+        ringPulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        aiLoadingRing.layer.add(ringPulse, forKey: "ringPulse")
+
+        let corePulse = CABasicAnimation(keyPath: "opacity")
+        corePulse.fromValue = 0.65
+        corePulse.toValue = 1.0
+        corePulse.duration = 0.75
+        corePulse.autoreverses = true
+        corePulse.repeatCount = .infinity
+        aiLoadingCore.layer.add(corePulse, forKey: "corePulse")
+
+        for (index, dot) in aiLoadingDotsStack.arrangedSubviews.enumerated() {
+            let animation = CABasicAnimation(keyPath: "opacity")
+            animation.fromValue = 0.25
+            animation.toValue = 1.0
+            animation.duration = 0.55
+            animation.beginTime = CACurrentMediaTime() + (Double(index) * 0.12)
+            animation.autoreverses = true
+            animation.repeatCount = .infinity
+            dot.layer.add(animation, forKey: "dotPulse\(index)")
+        }
+    }
+
+    private func buildAIRankedApplications(for job: Job) async -> [ApplicationCard] {
+        let contexts = await buildApplicantContexts()
+        let currentUserId = supabase.auth.currentSession?.user.id.uuidString ?? job.directorId?.uuidString ?? "director"
+
+        do {
+            let aiResults = try await aiScoringService.scoreApplicants(userId: currentUserId, job: job, applicants: contexts)
+            let contextByActor = Dictionary(uniqueKeysWithValues: contexts.map { ($0.actor_id, $0) })
+            let aiByActor = Dictionary(uniqueKeysWithValues: aiResults.map { ($0.actor_id, $0) })
+
+            let ranked = applications.map { application -> ApplicationCard in
+                var updated = application
+                if let aiResult = aiByActor[application.actorId.uuidString] {
+                    updated.aiMatchScore = max(0, min(100, aiResult.match_score))
+                    updated.aiScoreBreakdown = ApplicantAIScoreBreakdown(
+                        skill: aiResult.breakdown?.skill_match ?? 0,
+                        experience: aiResult.breakdown?.experience_match ?? 0,
+                        location: aiResult.breakdown?.location_match ?? 0,
+                        portfolio: aiResult.breakdown?.portfolio_quality ?? 0,
+                        reliability: aiResult.breakdown?.activity_reliability ?? 0
+                    )
+                    updated.aiScoreExplanation = makeAIScoreExplanation(
+                        name: application.name,
+                        explanation: aiResult.explanation,
+                        breakdown: updated.aiScoreBreakdown
+                    )
+                } else if let context = contextByActor[application.actorId.uuidString] {
+                    let fallback = fallbackMatch(for: context, job: job)
+                    updated.aiMatchScore = fallback.score
+                    updated.aiScoreBreakdown = fallback.breakdown
+                    updated.aiScoreExplanation = makeAIScoreExplanation(
+                        name: application.name,
+                        explanation: fallback.explanation,
+                        breakdown: fallback.breakdown
+                    )
+                }
+                return updated
+            }.sorted { ($0.aiMatchScore ?? 0) > ($1.aiMatchScore ?? 0) }
+
+            return ranked
+        } catch {
+            print("⚠️ AI shortlist failed, using local fallback: \(error)")
+            return applications.map { application in
+                var updated = application
+                if let context = contexts.first(where: { $0.actor_id == application.actorId.uuidString }) {
+                    let fallback = fallbackMatch(for: context, job: job)
+                    updated.aiMatchScore = fallback.score
+                    updated.aiScoreBreakdown = fallback.breakdown
+                    updated.aiScoreExplanation = makeAIScoreExplanation(
+                        name: application.name,
+                        explanation: fallback.explanation,
+                        breakdown: fallback.breakdown
+                    )
+                }
+                return updated
+            }.sorted { ($0.aiMatchScore ?? 0) > ($1.aiMatchScore ?? 0) }
+        }
+    }
+
+    private func buildApplicantContexts() async -> [AIApplicantContext] {
+        var contexts: [AIApplicantContext] = []
+        for application in applications {
+            if let context = await buildApplicantContext(for: application) {
+                contexts.append(context)
+            }
+        }
+        return contexts
+    }
+
+    private func buildApplicantContext(for application: ApplicationCard) async -> AIApplicantContext? {
+        let profileData: UserProfileData
+        if let cached = applicationProfileCache[application.actorId] {
+            profileData = cached
+        } else {
+            do {
+                let fetched = try await ProfileService.shared.fetchUserProfile(userId: application.actorId)
+                applicationProfileCache[application.actorId] = fetched
+                profileData = fetched
+            } catch {
+                print("⚠️ Could not fetch applicant profile for AI ranking: \(error)")
+                profileData = UserProfileData(
+                    profile: SupabaseProfileData(
+                        id: application.actorId,
+                        username: nil,
+                        fullName: application.name,
+                        bio: nil,
+                        role: nil,
+                        profilePictureUrl: nil,
+                        bannerUrl: nil,
+                        location: application.location,
+                        isVerified: false,
+                        connectionCount: 0,
+                        email: nil,
+                        phoneNumber: nil
+                    ),
+                    artistProfile: nil,
+                    projectCount: 0,
+                    rating: nil
+                )
+            }
+        }
+
+        let rawApplication = dbApplicationsRaw.first(where: { $0.id.uuidString == application.id })
+        let role = profileData.profile.role ?? profileData.artistProfile?.primaryRoles?.first ?? "Actor"
+        let location = profileData.profile.location ?? application.location
+        let bio = profileData.profile.bio ?? ""
+        let skills = profileData.artistProfile?.skills ?? []
+        let years = profileData.artistProfile?.yearsOfExperience ?? 0
+        let hasPortfolio = rawApplication?.portfolioUrl?.isEmpty == false || profileData.projectCount > 0
+
+        return AIApplicantContext(
+            application_id: application.id,
+            actor_id: application.actorId.uuidString,
+            name: application.name,
+            role: role,
+            location: location,
+            bio: bio,
+            skills: skills,
+            years_of_experience: years,
+            portfolio_project_count: profileData.projectCount,
+            has_portfolio: hasPortfolio,
+            has_submitted_task: application.hasSubmittedTask,
+            connection_count: profileData.profile.connectionCount,
+            current_status: rawApplication?.status.rawValue ?? "portfolio_submitted"
+        )
+    }
+
+    private func fallbackMatch(for applicant: AIApplicantContext, job: Job) -> ApplicantAIMatch {
+        let jobText = [job.title, job.description, job.requirements, job.location, job.jobType]
+            .compactMap { $0?.lowercased() }
+            .joined(separator: " ")
+
+        let skillScore = skillMatchScore(skills: applicant.skills, jobText: jobText)
+        let experienceScore = experienceMatchScore(years: applicant.years_of_experience, jobText: jobText)
+        let locationScore = locationMatchScore(applicantLocation: applicant.location, jobLocation: job.location ?? "")
+        let portfolioScore = portfolioQualityScore(projectCount: applicant.portfolio_project_count, hasPortfolio: applicant.has_portfolio)
+        let reliabilityScore = reliabilityScore(hasSubmittedTask: applicant.has_submitted_task, connectionCount: applicant.connection_count, status: applicant.current_status)
+
+        let weighted = Int(round(
+            Double(skillScore) * 0.30 +
+            Double(experienceScore) * 0.20 +
+            Double(locationScore) * 0.15 +
+            Double(portfolioScore) * 0.20 +
+            Double(reliabilityScore) * 0.15
+        ))
+
+        let breakdown = ApplicantAIScoreBreakdown(
+            skill: Int(round(Double(skillScore) * 0.30)),
+            experience: Int(round(Double(experienceScore) * 0.20)),
+            location: Int(round(Double(locationScore) * 0.15)),
+            portfolio: Int(round(Double(portfolioScore) * 0.20)),
+            reliability: Int(round(Double(reliabilityScore) * 0.15))
+        )
+
+        let explanation = """
+        Strongest signals came from \(applicant.skills.isEmpty ? "overall profile fit" : "skills and profile fit"), \(applicant.has_portfolio ? "portfolio presence" : "limited portfolio depth"), and \(applicant.has_submitted_task ? "task submission reliability" : "basic application reliability").
+        """
+
+        return ApplicantAIMatch(score: max(0, min(100, weighted)), explanation: explanation, breakdown: breakdown)
+    }
+
+    private func skillMatchScore(skills: [String], jobText: String) -> Int {
+        guard !jobText.isEmpty else { return skills.isEmpty ? 55 : 78 }
+        guard !skills.isEmpty else { return 35 }
+        let matched = skills.filter { jobText.contains($0.lowercased()) }.count
+        if matched == 0 { return 45 }
+        return min(100, 45 + (matched * 20))
+    }
+
+    private func experienceMatchScore(years: Int, jobText: String) -> Int {
+        if years <= 0 { return 45 }
+        let targetYears = parseYearsRequirement(from: jobText) ?? 2
+        if years >= targetYears { return 90 }
+        if years + 1 >= targetYears { return 75 }
+        return 55
+    }
+
+    private func parseYearsRequirement(from text: String) -> Int? {
+        let digits = text
+            .components(separatedBy: CharacterSet.decimalDigits.inverted)
+            .compactMap { Int($0) }
+        return digits.first(where: { $0 <= 30 })
+    }
+
+    private func locationMatchScore(applicantLocation: String, jobLocation: String) -> Int {
+        guard !jobLocation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return 70 }
+        let applicant = applicantLocation.lowercased()
+        let job = jobLocation.lowercased()
+        if applicant.contains(job) || job.contains(applicant) { return 95 }
+        let applicantParts = applicant.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        let jobParts = job.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        if applicantParts.contains(where: { jobParts.contains($0) }) { return 75 }
+        return 45
+    }
+
+    private func portfolioQualityScore(projectCount: Int, hasPortfolio: Bool) -> Int {
+        guard hasPortfolio else { return 30 }
+        switch projectCount {
+        case 8...: return 95
+        case 4...7: return 82
+        case 1...3: return 68
+        default: return 55
+        }
+    }
+
+    private func reliabilityScore(hasSubmittedTask: Bool, connectionCount: Int, status: String) -> Int {
+        var score = hasSubmittedTask ? 82 : 58
+        if status == "shortlisted" || status == "selected" { score += 8 }
+        if connectionCount >= 5 { score += 5 }
+        return min(score, 100)
+    }
+
+    private func makeAIScoreExplanation(name: String, explanation: String?, breakdown: ApplicantAIScoreBreakdown?) -> String {
+        var lines: [String] = ["\(name) was evaluated against this job using CineMyst AI ranking."]
+        if let explanation, !explanation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            lines.append("")
+            lines.append(explanation)
+        }
+        if let breakdown {
+            lines.append("")
+            lines.append("Score breakdown")
+            lines.append("Skill match: \(breakdown.skill) / 30")
+            lines.append("Experience match: \(breakdown.experience) / 20")
+            lines.append("Location match: \(breakdown.location) / 15")
+            lines.append("Portfolio quality: \(breakdown.portfolio) / 20")
+            lines.append("Activity / reliability: \(breakdown.reliability) / 15")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private func showAIScoreExplanation(for application: ApplicationCard) {
+        let title = application.aiMatchScore.map { "\($0)% match" } ?? "Match score"
+        let message = application.aiScoreExplanation ?? "This candidate has not been AI-ranked yet."
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
     }
     
@@ -627,6 +1309,10 @@ extension ApplicationsViewController: UITableViewDelegate, UITableViewDataSource
                 self?.viewSubmittedTask(applicationId: application.id)
             }
         }
+
+        cell.scoreTapAction = { [weak self] in
+            self?.showAIScoreExplanation(for: application)
+        }
         
         cell.shortlistAction = { [weak self] in
             self?.toggleShortlist(at: indexPath)
@@ -635,7 +1321,7 @@ extension ApplicationsViewController: UITableViewDelegate, UITableViewDataSource
     }
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return 120
+        return 132
     }
     
     private func toggleShortlist(at indexPath: IndexPath) {
@@ -821,6 +1507,7 @@ class ApplicationCell: UITableViewCell {
     var shortlistAction: (() -> Void)?
     var portfolioTapAction: (() -> Void)?
     var taskTapAction: (() -> Void)?
+    var scoreTapAction: (() -> Void)?
     
     private var taskLeadingWithConnected: NSLayoutConstraint!
     private var taskLeadingWithoutConnected: NSLayoutConstraint!
@@ -935,6 +1622,20 @@ class ApplicationCell: UITableViewCell {
         lbl.translatesAutoresizingMaskIntoConstraints = false
         return lbl
     }()
+
+    private let scoreButton: UIButton = {
+        let btn = UIButton(type: .system)
+        btn.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.10)
+        btn.layer.cornerRadius = 13
+        btn.layer.borderWidth = 1
+        btn.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.16).cgColor
+        btn.setTitleColor(CineMystTheme.brandPlum, for: .normal)
+        btn.titleLabel?.font = UIFont.systemFont(ofSize: 12, weight: .bold)
+        btn.contentEdgeInsets = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
+        btn.translatesAutoresizingMaskIntoConstraints = false
+        btn.isHidden = true
+        return btn
+    }()
     
     
     // MARK: - Updated Shortlist Button
@@ -999,10 +1700,12 @@ class ApplicationCell: UITableViewCell {
         
         cardContainerView.addSubview(taskBadge)
         taskBadge.addSubview(taskLabel)
+        cardContainerView.addSubview(scoreButton)
         
         cardContainerView.addSubview(shortlistButton)
         shortlistButton.addSubview(checkmarkIcon)
         shortlistButton.addTarget(self, action: #selector(shortlistTapped), for: .touchUpInside)
+        scoreButton.addTarget(self, action: #selector(scoreTapped), for: .touchUpInside)
         
         // Add tap gestures
         let portfolioTap = UITapGestureRecognizer(target: self, action: #selector(portfolioTapped))
@@ -1066,6 +1769,10 @@ class ApplicationCell: UITableViewCell {
             taskLabel.centerYAnchor.constraint(equalTo: taskBadge.centerYAnchor),
             taskLabel.leadingAnchor.constraint(equalTo: taskBadge.leadingAnchor, constant: 10),
             taskLabel.trailingAnchor.constraint(equalTo: taskBadge.trailingAnchor, constant: -10),
+
+            scoreButton.topAnchor.constraint(equalTo: cardContainerView.topAnchor, constant: 14),
+            scoreButton.trailingAnchor.constraint(equalTo: shortlistButton.leadingAnchor, constant: -10),
+            scoreButton.heightAnchor.constraint(equalToConstant: 28),
             
             
             // Shortlist Button - modern floating style
@@ -1114,6 +1821,14 @@ class ApplicationCell: UITableViewCell {
             taskLeadingWithConnected.isActive = false
             taskLeadingWithoutConnected.isActive = true
         }
+
+        if let aiScore = application.aiMatchScore {
+            scoreButton.isHidden = false
+            scoreButton.setTitle("\(aiScore)% match", for: .normal)
+        } else {
+            scoreButton.isHidden = true
+            scoreButton.setTitle(nil, for: .normal)
+        }
         
         
         // Shortlist UI
@@ -1139,5 +1854,9 @@ class ApplicationCell: UITableViewCell {
     
     @objc private func taskBadgeTapped() {
         taskTapAction?()
+    }
+
+    @objc private func scoreTapped() {
+        scoreTapAction?()
     }
 }

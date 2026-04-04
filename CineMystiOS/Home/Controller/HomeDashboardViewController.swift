@@ -423,11 +423,11 @@ final class HomeDashboardViewController: UIViewController {
     }
 
     private func makeTableHeader() -> UIView {
-        let header = HomeEditorialHeaderView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 252))
+        let header = HomeEditorialHeaderView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 264))
         let targetSize = CGSize(width: view.bounds.width, height: UIView.layoutFittingCompressedSize.height)
         let height = header.systemLayoutSizeFitting(targetSize, withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel).height
         header.frame.size.width = view.bounds.width
-        header.frame.size.height = max(height, 280) // Add a little extra height to ensure no truncation
+        header.frame.size.height = max(height, 294) // Keep the discover panel a touch roomier
         header.layoutIfNeeded()
         return header
     }

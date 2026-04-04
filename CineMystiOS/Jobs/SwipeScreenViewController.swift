@@ -11,6 +11,7 @@ class SwipeScreenViewController: UIViewController {
     private var cardViews: [CandidateCardView] = []
     private let maxCardsOnScreen = 3
     private var cardsLoaded = false
+    private var activeCardCenter: CGPoint = .zero
     
     // Use shared Supabase client defined in auth/Supabase.swift
 
@@ -272,7 +273,7 @@ class SwipeScreenViewController: UIViewController {
         
         cardViews.removeAll()
 
-        let models = cardData.prefix(maxCardsOnScreen)
+        let models = Array(cardData.prefix(maxCardsOnScreen))
         if models.isEmpty {
             // Show empty state
             let lbl = UILabel()
@@ -290,16 +291,10 @@ class SwipeScreenViewController: UIViewController {
             return
         }
 
-        for (index, model) in models.enumerated() {
-            let card = CandidateCardView(model: model)
-            card.onProfileTapped = { [weak self] in
-                let profileVC = ActorProfileViewController(userId: model.actorId)
-                profileVC.hidesBottomBarWhenPushed = true
-                self?.navigationController?.pushViewController(profileVC, animated: true)
-            }
-            let position = maxCardsOnScreen - 1 - index
-            setupCardFrame(card, position: position)
-            addPanGesture(to: card)
+        for (index, model) in models.reversed().enumerated() {
+            let card = makeCard(for: model)
+            let position = models.count - 1 - index
+            applyStackLayout(to: card, position: position)
             view.addSubview(card)
             cardViews.append(card)
         }
@@ -325,16 +320,22 @@ class SwipeScreenViewController: UIViewController {
                     .eq("job_id", value: job.id.uuidString)
                     .execute()
                     .value
-                
-                self.applications = applications
-                print("✅ Fetched \(applications.count) applications for job")
-                for app in applications {
+
+                let dedupedApplications = Dictionary(grouping: applications, by: \.actorId)
+                    .compactMap { _, actorApplications in
+                        actorApplications.max(by: { $0.updatedAt < $1.updatedAt })
+                    }
+                    .sorted(by: { $0.updatedAt > $1.updatedAt })
+
+                self.applications = dedupedApplications
+                print("✅ Fetched \(applications.count) applications for job, using \(dedupedApplications.count) unique applicants")
+                for app in dedupedApplications {
                     print("   - App \(app.id.uuidString.prefix(8)): Actor=\(app.actorId.uuidString.prefix(8)), Status=\(app.status)")
                 }
                 
                 // Fetch task submissions for all applications
                 var submissions: [TaskSubmission] = []
-                for app in applications {
+                for app in dedupedApplications {
                     do {
                         let appSubmissions: [TaskSubmission] = try await supabase
                             .from("task_submissions")
@@ -354,7 +355,7 @@ class SwipeScreenViewController: UIViewController {
                 
                 // Fetch user profiles
                 var userProfiles: [UUID: (name: String, imageUrl: String?)] = [:]
-                for app in applications {
+                for app in dedupedApplications {
                     do {
                         let profile = try await self.fetchUserProfile(userId: app.actorId)
                         userProfiles[app.actorId] = profile
@@ -368,10 +369,10 @@ class SwipeScreenViewController: UIViewController {
                 let submissionsByApp = Dictionary(grouping: submissions, by: { $0.applicationId })
                 
                 print("🔍 Building card data:")
-                print("  - Total applications: \(applications.count)")
+                print("  - Total applications: \(dedupedApplications.count)")
                 print("  - Applications with submissions: \(submissionsByApp.count)")
                 
-                self.cardData = applications.compactMap { app in
+                self.cardData = dedupedApplications.compactMap { app in
                     let profile = userProfiles[app.actorId] ?? ("User \(app.actorId.uuidString.prefix(8))", nil)
                     let userName = profile.name
                     let profileImageUrl = profile.imageUrl
@@ -469,18 +470,51 @@ class SwipeScreenViewController: UIViewController {
         return (name, profile.avatarUrl)
     }
 
-    private func setupCardFrame(_ card: UIView, position: Int) {
-        let inset: CGFloat = CGFloat(position) * 10
-        let cardWidth: CGFloat = view.bounds.width - 90 - inset * 2
-        let cardHeight: CGFloat = 470
+    private func makeCard(for model: CandidateModel) -> CandidateCardView {
+        let card = CandidateCardView(model: model)
+        card.onProfileTapped = { [weak self] in
+            let profileVC = ActorProfileViewController(userId: model.actorId)
+            profileVC.hidesBottomBarWhenPushed = true
+            self?.navigationController?.pushViewController(profileVC, animated: true)
+        }
+        addPanGesture(to: card)
+        return card
+    }
 
-        let topY: CGFloat = max(140, view.safeAreaInsets.top + 120)
-        card.frame = CGRect(
-            x: (view.bounds.width - cardWidth) / 2 + inset,
-            y: topY + inset,
+    private func baseCardFrame() -> CGRect {
+        let horizontalInset: CGFloat = 52
+        let cardWidth = view.bounds.width - (horizontalInset * 2)
+        let topY: CGFloat = max(146, view.safeAreaInsets.top + 118)
+        let controlsTop = view.bounds.height - view.safeAreaInsets.bottom - 30 - 70
+        let bottomGap: CGFloat = 34
+        let cardHeight = min(430, controlsTop - topY - bottomGap)
+
+        return CGRect(
+            x: (view.bounds.width - cardWidth) / 2,
+            y: topY,
             width: cardWidth,
             height: cardHeight
         )
+    }
+
+    private func applyStackLayout(to card: UIView, position: Int) {
+        let baseFrame = baseCardFrame()
+        let verticalOffset = CGFloat(position) * 10
+        let scale = position == 0 ? 1 : 0.98
+        let alpha: CGFloat = position == 0 ? 1 : 0
+
+        card.frame = baseFrame.offsetBy(dx: 0, dy: verticalOffset)
+        card.transform = CGAffineTransform(scaleX: scale, y: scale)
+        card.alpha = alpha
+        card.isUserInteractionEnabled = position == 0
+
+        if let candidateCard = card as? CandidateCardView {
+            if position == 0 {
+                candidateCard.playVideo()
+            } else {
+                candidateCard.pauseVideo()
+            }
+        }
     }
 
     private func addPanGesture(to card: UIView) {
@@ -491,15 +525,19 @@ class SwipeScreenViewController: UIViewController {
     // MARK: Swipe handling
     @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
         guard let card = gesture.view as? CandidateCardView else { return }
+        guard card === cardViews.last else { return }
 
         let translation = gesture.translation(in: view)
         let percent = translation.x / view.bounds.width
 
         switch gesture.state {
+        case .began:
+            activeCardCenter = card.center
+
         case .changed:
             card.center = CGPoint(
-                x: view.center.x + translation.x,
-                y: view.center.y + translation.y
+                x: activeCardCenter.x + translation.x,
+                y: activeCardCenter.y + translation.y
             )
             card.transform = CGAffineTransform(rotationAngle: percent * 0.3)
 
@@ -514,12 +552,7 @@ class SwipeScreenViewController: UIViewController {
 
     // MARK: - UPDATED SWIPE LOGIC WITH COUNTERS AND SHORTLIST
     private func animateSwipe(_ card: CandidateCardView, direction: CGFloat) {
-        // Get the card index
-        guard let cardIndex = cardViews.firstIndex(of: card) else { return }
-        let modelIndex = cardData.count - cardViews.count + cardIndex
-        
-        guard modelIndex < cardData.count else { return }
-        let model = cardData[modelIndex]
+        guard let model = cardData.first else { return }
 
         // 👉 UPDATE COUNTERS AND SHORTLIST
         if direction > 0 {
@@ -535,10 +568,15 @@ class SwipeScreenViewController: UIViewController {
             // Swiped left - pass the candidate
             passedCount += 1
             passedCountLabel.text = "\(passedCount)"
+
+            Task {
+                await updateApplicationStatus(applicationId: model.applicationId, status: .rejected)
+            }
         }
 
         UIView.animate(withDuration: 0.3, animations: {
             card.center.x += direction * 500
+            card.transform = card.transform.rotated(by: direction * 0.12)
             card.alpha = 0
         }, completion: { _ in
             card.removeFromSuperview()
@@ -567,9 +605,11 @@ class SwipeScreenViewController: UIViewController {
     }
 
     private func resetCard(_ card: CandidateCardView) {
+        guard let cardIndex = cardViews.firstIndex(of: card) else { return }
+        let position = (cardViews.count - 1) - cardIndex
+
         UIView.animate(withDuration: 0.25) {
-            card.center = self.view.center
-            card.transform = .identity
+            self.applyStackLayout(to: card, position: position)
         }
     }
 
@@ -577,24 +617,20 @@ class SwipeScreenViewController: UIViewController {
         if cardViews.isEmpty { return }
 
         cardViews.removeLast()
+        guard !cardData.isEmpty else { return }
         cardData.removeFirst()
 
         for (i, card) in cardViews.enumerated() {
             let position = cardViews.count - 1 - i
-            UIView.animate(withDuration: 0.2) { self.setupCardFrame(card, position: position) }
+            UIView.animate(withDuration: 0.2) {
+                self.applyStackLayout(to: card, position: position)
+            }
         }
 
         if cardViews.count < maxCardsOnScreen && cardViews.count < cardData.count {
             let model = cardData[cardViews.count]
-            let newCard = CandidateCardView(model: model)
-            newCard.onProfileTapped = { [weak self] in
-                let profileVC = ActorProfileViewController(userId: model.actorId)
-                profileVC.hidesBottomBarWhenPushed = true
-                self?.navigationController?.pushViewController(profileVC, animated: true)
-            }
-
-            setupCardFrame(newCard, position: 0)
-            addPanGesture(to: newCard)
+            let newCard = makeCard(for: model)
+            applyStackLayout(to: newCard, position: cardViews.count)
 
             view.insertSubview(newCard, at: 0)
             cardViews.insert(newCard, at: 0)

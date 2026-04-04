@@ -8,6 +8,8 @@ class CandidateCardView: UIView {
     private var player: AVPlayer?
     private var playerLayer: AVPlayerLayer?
     var onProfileTapped: (() -> Void)?
+    var applicationId: UUID { model.applicationId }
+    var actorId: UUID { model.actorId }
 
     init(model: CandidateModel) {
         self.model = model
@@ -29,6 +31,7 @@ class CandidateCardView: UIView {
         let view = UIView()
         view.translatesAutoresizingMaskIntoConstraints = false
         view.backgroundColor = .black
+        view.clipsToBounds = true
         return view
     }()
     
@@ -111,7 +114,7 @@ class CandidateCardView: UIView {
 
             // Create player layer
             playerLayer = AVPlayerLayer(player: player)
-            playerLayer?.videoGravity = .resizeAspectFill
+            playerLayer?.videoGravity = .resizeAspect
             playerLayer?.frame = videoContainerView.bounds
 
             if let playerLayer = playerLayer {

@@ -309,7 +309,7 @@ class ActorPortfolioDetailViewController: UIViewController {
         }
 
         contentStack.addArrangedSubview(makeHeroCard(p))
-        contentStack.addArrangedSubview(makeSection(title: "📐 Vital Statistics", rows: [
+        contentStack.addArrangedSubview(makeSection(title: "Vital Statistics", rows: [
             ("Bust / Waist / Hips", "\(p.bust ?? "—") / \(p.waist ?? "—") / \(p.hips ?? "—")"),
             ("Skin Tone",       p.skinTone        ?? "—"),
             ("Eye Color",       p.eyeColor        ?? "—"),
@@ -321,7 +321,7 @@ class ActorPortfolioDetailViewController: UIViewController {
             ("Armpit Hair",     p.armpitHair      ?? "—"),
             ("Upper Lips Hair", p.upperLipsHair   ?? "—"),
         ]))
-        contentStack.addArrangedSubview(makeSection(title: "🎬 Shoot Preferences", rows: [
+        contentStack.addArrangedSubview(makeSection(title: "Shoot Preferences", rows: [
             ("Outstation Shoot",     p.interestedOutstation   ?? "—"),
             ("Out of Country Shoot", p.interestedOutOfCountry ?? "—"),
             ("All Timings",          p.comfortableAllTimings  ?? "—"),
@@ -329,7 +329,7 @@ class ActorPortfolioDetailViewController: UIViewController {
         ]))
         contentStack.addArrangedSubview(makeInterestsSection(p))
         if let exp = p.previousExperience, !exp.isEmpty {
-            contentStack.addArrangedSubview(makeTextCard(title: "🎭 Previous Experience", body: exp))
+            contentStack.addArrangedSubview(makeTextCard(title: "Previous Experience", body: exp))
         }
         if p.instagramUrl != nil || p.youtubeUrl != nil || p.imdbUrl != nil {
             contentStack.addArrangedSubview(makeSocialCard(p))
@@ -340,7 +340,7 @@ class ActorPortfolioDetailViewController: UIViewController {
 
     private func makeMediaGallery(_ media: [PortfolioMedia]) -> UIView {
         let card = makeCard()
-        let title = makeSectionTitle("📸 Photos & Videos")
+        let title = makeSectionTitle("Photos & Videos")
         title.translatesAutoresizingMaskIntoConstraints = false
         card.addSubview(title)
 
@@ -504,10 +504,10 @@ class ActorPortfolioDetailViewController: UIViewController {
             grid([("EDUCATION", p.education), ("MARITAL", p.maritalStatus)]),
             grid([("PROFESSION", p.currentProfession), ("PASSPORT", p.passport)]),
             divider(),
-            makeLabel("📞 \(p.contactNo ?? "—")   ✉️ \(p.emailAddress ?? "—")", .systemFont(ofSize: 13), 0.8),
-            makeLabel("📍 \(p.currentAddress ?? "—")", .systemFont(ofSize: 13), 0.7),
-            makeLabel("🗣 \(p.languages ?? "—")", .systemFont(ofSize: 13), 0.7),
-            makeLabel("🎸 \(p.hobbies ?? "—")", .systemFont(ofSize: 13), 0.7),
+            makeLabel("Contact: \(p.contactNo ?? "—")   Email: \(p.emailAddress ?? "—")", .systemFont(ofSize: 13), 0.8),
+            makeLabel("Location: \(p.currentAddress ?? "—")", .systemFont(ofSize: 13), 0.7),
+            makeLabel("Languages: \(p.languages ?? "—")", .systemFont(ofSize: 13), 0.7),
+            makeLabel("Hobbies: \(p.hobbies ?? "—")", .systemFont(ofSize: 13), 0.7),
         ])
         vstack.axis    = .vertical
         vstack.spacing = 10
@@ -575,7 +575,7 @@ class ActorPortfolioDetailViewController: UIViewController {
         }
         if !current.isEmpty { rows.append(current) }
 
-        var rowViews: [UIView] = [makeSectionTitle("🌟 Work Interests")]
+        var rowViews: [UIView] = [makeSectionTitle("Work Interests")]
         for chips in rows {
             let s = UIStackView(arrangedSubviews: chips)
             s.axis = .horizontal; s.spacing = 6; s.distribution = .fillEqually
@@ -633,7 +633,7 @@ class ActorPortfolioDetailViewController: UIViewController {
 
     private func makeSocialCard(_ p: ActorPortfolio) -> UIView {
         let card = makeCard()
-        var rows: [UIView] = [makeSectionTitle("🌐 Social Presence")]
+        var rows: [UIView] = [makeSectionTitle("Social Presence")]
         if let ig = p.instagramUrl, !ig.isEmpty { rows.append(makeKVRow(key: "Instagram", value: ig)) }
         if let yt = p.youtubeUrl, !yt.isEmpty   { rows.append(makeKVRow(key: "YouTube", value: yt)) }
         if let im = p.imdbUrl, !im.isEmpty       { rows.append(makeKVRow(key: "IMDb", value: im)) }
