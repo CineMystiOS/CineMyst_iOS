@@ -135,7 +135,7 @@ class PortfolioCreationViewController: UIViewController {
         setupScrollView()
         setupButtons()
         setupLoader()
-        fetchUserEmail()
+        prefillUserProfile()
         showStep(0)
     }
 
@@ -239,13 +239,64 @@ class PortfolioCreationViewController: UIViewController {
         ])
     }
 
-    private func fetchUserEmail() {
+    private func dictFrom(_ raw: Any?) -> [String: Any]? {
+        guard let raw else { return nil }
+        if let dict = raw as? [String: Any] { return dict }
+        if let data = raw as? Data {
+            return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        }
+        return nil
+    }
+
+    private func prefillUserProfile() {
         Task {
             guard let session = try? await AuthManager.shared.currentSession() else { return }
+
             let email = session.user.email ?? ""
+            let emailPrefix = email
+                .split(separator: "@")
+                .first
+                .map(String.init)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            var resolvedName: String?
+
+            do {
+                let response = try await supabase
+                    .from("profiles")
+                    .select("full_name, username")
+                    .eq("id", value: session.user.id.uuidString)
+                    .single()
+                    .execute()
+
+                if let dict = dictFrom(response.data) {
+                    let fullName = (dict["full_name"] as? String)?
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    let username = (dict["username"] as? String)?
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+
+                    resolvedName = [fullName, username, emailPrefix]
+                        .compactMap { candidate in
+                            guard let candidate, !candidate.isEmpty else { return nil }
+                            return candidate
+                        }
+                        .first
+                }
+            } catch {
+                print("[PortfolioCreation] profile prefill failed: \(error)")
+            }
+
             await MainActor.run {
                 self.formData.email = email
+                if self.formData.fullName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
+                    self.formData.fullName = resolvedName ?? emailPrefix
+                }
+
                 (self.view.viewWithTag(101) as? UITextField)?.text = email
+                if let fullNameField = self.view.viewWithTag(1000) as? UITextField,
+                   fullNameField.text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
+                    fullNameField.text = self.formData.fullName
+                }
             }
         }
     }
