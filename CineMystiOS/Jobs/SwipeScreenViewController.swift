@@ -268,6 +268,9 @@ class SwipeScreenViewController: UIViewController {
 
     // MARK: Load Cards
     private func loadCards() {
+        // Remove any existing cards from view
+        view.subviews.filter { $0 is CandidateCardView }.forEach { $0.removeFromSuperview() }
+        
         // Remove any empty state labels
         view.subviews.compactMap { $0 as? UILabel }.filter { $0.tag == 4040 }.forEach { $0.removeFromSuperview() }
         
@@ -313,14 +316,16 @@ class SwipeScreenViewController: UIViewController {
                 
                 print("📥 Loading submissions for job: \(job.id.uuidString)")
                 
-                // Fetch all applications for this job (do not filter by status)
+                // Fetch applications for this job that are NOT yet processed (portfolio_submitted or task_submitted)
                 let applications: [Application] = try await supabase
                     .from("applications")
                     .select()
                     .eq("job_id", value: job.id.uuidString)
+                    .in("status", value: ["portfolio_submitted", "task_submitted"]) // Only show these
                     .execute()
                     .value
 
+                // Deduping by actorId to ensure one card per candidate
                 let dedupedApplications = Dictionary(grouping: applications, by: \.actorId)
                     .compactMap { _, actorApplications in
                         actorApplications.max(by: { $0.updatedAt < $1.updatedAt })

@@ -1,9 +1,11 @@
 import UIKit
+import Supabase
 
 class JobDetailsViewController: UIViewController {
     
     // MARK: - Properties
     var job: Job?
+    private var associatedTask: JobTask?
     
     // UI
     private let scrollView = UIScrollView()
@@ -20,7 +22,7 @@ class JobDetailsViewController: UIViewController {
     
     private let applyButton: UIButton = {
         let btn = UIButton(type: .system)
-        btn.setTitle("Apply Now", for: .normal)
+        btn.setTitle("Checking Task...", for: .normal)
         btn.setTitleColor(.white, for: .normal)
         btn.layer.cornerRadius = 16
         btn.titleLabel?.font = UIFont.boldSystemFont(ofSize: 18)
@@ -29,22 +31,135 @@ class JobDetailsViewController: UIViewController {
         btn.layer.shadowOpacity = 0.28
         btn.layer.shadowRadius = 14
         btn.layer.shadowOffset = CGSize(width: 0, height: 8)
-        btn.addTarget(nil, action: #selector(applyTapped), for: .touchUpInside)
         return btn
-   }()
-    @objc private func applyTapped() {
-        let vc = ApplicationStartedViewController()
-        vc.job = job // Pass job data
-        navigationController?.pushViewController(vc, animated: true)
-    }
+    }()
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = CineMystTheme.pinkPale
         setupBackground()
-        
         setupScrollView()
         setupLayout()
+        
+        applyButton.addTarget(self, action: #selector(ctaTapped), for: .touchUpInside)
+        
+        Task {
+            await checkTaskStatus()
+        }
+    }
+
+    private func checkTaskStatus() {
+        guard let job = job else { return }
+        
+        Task {
+            do {
+                let task = try await JobsService.shared.fetchTaskForJob(jobId: job.id)
+                await MainActor.run {
+                    self.associatedTask = task
+                    self.updateCTAButton()
+                }
+            } catch {
+                await MainActor.run {
+                    self.applyButton.setTitle("Apply Now", for: .normal)
+                }
+            }
+        }
+    }
+
+    private func updateCTAButton() {
+        if associatedTask != nil {
+            applyButton.setTitle("Go to Task", for: .normal)
+            applyButton.backgroundColor = CineMystTheme.accent
+            applyButton.layer.shadowColor = CineMystTheme.accent.withAlphaComponent(0.4).cgColor
+        } else {
+            applyButton.setTitle("Apply Now", for: .normal)
+            applyButton.backgroundColor = CineMystTheme.brandPlum
+            applyButton.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.34).cgColor
+        }
+    }
+
+    @objc private func ctaTapped() {
+        guard let job = job else { return }
+        
+        if let task = associatedTask {
+            // GO TO TASK flow
+            let vc = TaskDetailsViewController()
+            vc.job = job
+            vc.task = task
+            navigationController?.pushViewController(vc, animated: true)
+        } else {
+            // SIMPLE APPLY flow -> Submit Portfolio directly
+            submitPortfolioAndComplete()
+        }
+    }
+
+    private func submitPortfolioAndComplete() {
+        guard let job = job,
+              let currentUser = supabase.auth.currentUser else { return }
+        
+        applyButton.isEnabled = false
+        applyButton.setTitle("Applying...", for: .normal)
+        
+        _Concurrency.Task {
+            do {
+                let actorId = currentUser.id
+                
+                // 1. Check for existing apps
+                let existing: [Application] = try await supabase
+                    .from("applications")
+                    .select()
+                    .eq("job_id", value: job.id.uuidString)
+                    .eq("actor_id", value: actorId.uuidString)
+                    .execute()
+                    .value
+                
+                if let app = existing.first {
+                    // Update
+                    let updated = Application(
+                        id: app.id,
+                        jobId: app.jobId,
+                        actorId: app.actorId,
+                        status: .portfolioSubmitted,
+                        portfolioUrl: currentUser.userMetadata["portfolio_url"] as? String,
+                        portfolioSubmittedAt: Date(),
+                        appliedAt: app.appliedAt,
+                        updatedAt: Date()
+                    )
+                    _ = try await supabase.from("applications").update(updated).eq("id", value: app.id.uuidString).execute()
+                } else {
+                    // New
+                    let newApp = Application(
+                        id: UUID(),
+                        jobId: job.id,
+                        actorId: actorId,
+                        status: .portfolioSubmitted,
+                        portfolioUrl: currentUser.userMetadata["portfolio_url"] as? String,
+                        portfolioSubmittedAt: Date(),
+                        appliedAt: Date(),
+                        updatedAt: Date()
+                    )
+                    _ = try await supabase.from("applications").insert(newApp).execute()
+                }
+                
+                await MainActor.run {
+                    self.showSuccess()
+                }
+            } catch {
+                await MainActor.run {
+                    self.applyButton.isEnabled = true
+                    self.applyButton.setTitle("Apply Now", for: .normal)
+                    self.showAlert(title: "Error", message: error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    private func showSuccess() {
+        let alert = UIAlertController(title: "Applied!", message: "Your portfolio has been sent to the director.", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+            self.navigationController?.popViewController(animated: true)
+        })
+        present(alert, animated: true)
     }
 
     override func viewDidLayoutSubviews() {
@@ -54,30 +169,15 @@ class JobDetailsViewController: UIViewController {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        
-        // Hide tab bar
         tabBarController?.tabBar.isHidden = true
-        
-        // Rebuild content when view appears to ensure job data is available
         buildContentCards()
     }
+
     override func viewWillDisappear(_ animated: Bool) {
-            super.viewWillDisappear(animated)
+        super.viewWillDisappear(animated)
+        tabBarController?.tabBar.isHidden = false
+    }
 
-            // Restore tab bar only
-            tabBarController?.tabBar.isHidden = false
-
-            // Restore floating button if you hid it above:
-            // if let tb = tabBarController as? CineMystTabBarController {
-            //     tb.setFloatingButton(hidden: false)
-            // }
-        }
-
-}
-
-extension JobDetailsViewController {
-    
-    // ScrollView Setup
     private func setupBackground() {
         backgroundGradient.colors = [
             UIColor(red: 0.988, green: 0.978, blue: 0.984, alpha: 1).cgColor,
@@ -93,7 +193,6 @@ extension JobDetailsViewController {
     private func setupScrollView() {
         view.addSubview(scrollView)
         scrollView.addSubview(contentView)
-        
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         contentView.translatesAutoresizingMaskIntoConstraints = false
         
@@ -111,11 +210,9 @@ extension JobDetailsViewController {
         ])
     }
     
-    // Main Layout
     private func setupLayout() {
         contentView.addSubview(titleLabel)
         contentView.addSubview(applyButton)
-        
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         applyButton.translatesAutoresizingMaskIntoConstraints = false
         
@@ -123,37 +220,20 @@ extension JobDetailsViewController {
             titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
             titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             
-            applyButton.topAnchor.constraint(greaterThanOrEqualTo: contentView.bottomAnchor, constant: -100)
+            applyButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            applyButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            applyButton.heightAnchor.constraint(equalToConstant: 54),
+            applyButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40)
         ])
     }
-    
-    // Build the Cards Section
+
     private func buildContentCards() {
-        // Debug: Check if job data is available
-        if let job = job {
-            print("📋 JobDetailsViewController - Job data available:")
-            print("   Title: \(job.title ?? "nil")")
-            print("   Description: \(job.description ?? "nil")")
-            print("   Requirements: \(job.requirements ?? "nil")")
-            print("   Rate: ₹\(job.ratePerDay ?? 0)/day")
-        } else {
-            print("⚠️ JobDetailsViewController - No job data available, using fallback")
-        }
-        
-        // Remove existing card stack if it exists
-        contentView.subviews.forEach { subview in
-            if subview is UIStackView && subview != titleLabel && subview != applyButton {
-                subview.removeFromSuperview()
-            }
-        }
-        
+        contentView.subviews.forEach { if $0 is UIStackView && $0 != titleLabel { $0.removeFromSuperview() } }
         let cardStack = UIStackView()
         cardStack.axis = .vertical
         cardStack.spacing = 28
-        
         contentView.addSubview(cardStack)
         cardStack.translatesAutoresizingMaskIntoConstraints = false
-        
         NSLayoutConstraint.activate([
             cardStack.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 30),
             cardStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
@@ -161,202 +241,48 @@ extension JobDetailsViewController {
             cardStack.bottomAnchor.constraint(equalTo: applyButton.topAnchor, constant: -40)
         ])
         
-        // Display job data if available
         if let job = job {
-            // Job Title and Description
-            cardStack.addArrangedSubview(makeCard(
-                title: job.title ?? "Untitled Job",
-                body: job.description ?? "No description available."
-            ))
-            
-            // Requirements
-            if let requirements = job.requirements, !requirements.isEmpty {
-                cardStack.addArrangedSubview(makeRequirementsCard(requirements: requirements))
-            }
-            
-            // Compensation
-            cardStack.addArrangedSubview(makeCard(
-                title: "Compensation",
-                body: "₹\(job.ratePerDay ?? 0)/day"
-            ))
-            
-            // Deadline
-            let deadlineText: String
-            if let deadline = job.applicationDeadline {
-                let formatter = DateFormatter()
-                formatter.dateStyle = .medium
-                deadlineText = "Applications must be received by \(formatter.string(from: deadline))."
-            } else {
-                deadlineText = "No deadline specified."
-            }
-            cardStack.addArrangedSubview(makeCard(
-                title: "Deadline",
-                body: deadlineText
-            ))
-        } else {
-            // Fallback to placeholder data
-            cardStack.addArrangedSubview(makeCard(
-                title: "Lead Role in Indie Film",
-                body: """
-Seeking a versatile actor for the lead role in an upcoming independent film. The project explores themes of identity and belonging, set against the backdrop of a bustling city. The role requires a nuanced performance, capable of conveying a wide range of emotions.
-"""
-            ))
-            
-            cardStack.addArrangedSubview(makeRequirementsCard(requirements: ""))
-            
-            cardStack.addArrangedSubview(makeCard(
-                title: "Compensation",
-                body: "Paid role; compensation details will be discussed upon application."
-            ))
-            
-            cardStack.addArrangedSubview(makeCard(
-                title: "Deadline",
-                body: "Applications must be received by July 15, 2024."
-            ))
+            cardStack.addArrangedSubview(makeCard(title: job.title ?? "Untitled", body: job.description ?? "No description."))
+            if let req = job.requirements, !req.isEmpty { cardStack.addArrangedSubview(makeRequirementsCard(requirements: req)) }
+            cardStack.addArrangedSubview(makeCard(title: "Compensation", body: "₹\(job.ratePerDay ?? 0)/day"))
+            let deadline = job.applicationDeadline != nil ? "By \(DateFormatter.localizedString(from: job.applicationDeadline!, dateStyle: .medium, timeStyle: .none))" : "No deadline."
+            cardStack.addArrangedSubview(makeCard(title: "Deadline", body: deadline))
         }
-        
-        // Bottom apply button constraints
-        NSLayoutConstraint.activate([
-            applyButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            applyButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            applyButton.heightAnchor.constraint(equalToConstant: 54),
-            applyButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40)
-        ])
     }
-    
-    // Card Builder
+
     private func makeCard(title: String, body: String) -> UIView {
         let card = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialLight))
         card.contentView.backgroundColor = UIColor.white.withAlphaComponent(0.44)
         card.layer.cornerRadius = 20
         card.clipsToBounds = true
-        card.layer.borderWidth = 1
-        card.layer.borderColor = UIColor.white.withAlphaComponent(0.84).cgColor
-        card.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.14).cgColor
-        card.layer.shadowOpacity = 1
-        card.layer.shadowOffset = CGSize(width: 0, height: 8)
-        card.layer.shadowRadius = 18
-        
-        let titleLabel = UILabel()
-        titleLabel.text = title
-        titleLabel.font = .systemFont(ofSize: 19, weight: .bold)
-        titleLabel.textColor = CineMystTheme.ink
-        
-        let bodyLabel = UILabel()
-        bodyLabel.text = body
-        bodyLabel.numberOfLines = 0
-        bodyLabel.font = UIFont.systemFont(ofSize: 15)
-        bodyLabel.textColor = CineMystTheme.ink.withAlphaComponent(0.7)
-        
-        let stack = UIStackView(arrangedSubviews: [titleLabel, bodyLabel])
-        stack.axis = .vertical
-        stack.spacing = 8
-        
-        card.contentView.addSubview(stack)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        
+        let titleLabel = UILabel(); titleLabel.text = title; titleLabel.font = .systemFont(ofSize: 19, weight: .bold); titleLabel.textColor = CineMystTheme.ink
+        let bodyLabel = UILabel(); bodyLabel.text = body; bodyLabel.numberOfLines = 0; bodyLabel.font = UIFont.systemFont(ofSize: 15); bodyLabel.textColor = CineMystTheme.ink.withAlphaComponent(0.7)
+        let stack = UIStackView(arrangedSubviews: [titleLabel, bodyLabel]); stack.axis = .vertical; stack.spacing = 8
+        card.contentView.addSubview(stack); stack.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: card.contentView.topAnchor, constant: 18),
             stack.leadingAnchor.constraint(equalTo: card.contentView.leadingAnchor, constant: 18),
             stack.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor, constant: -18),
             stack.bottomAnchor.constraint(equalTo: card.contentView.bottomAnchor, constant: -18)
         ])
-        
         return card
     }
-    
-    // Requirements Card (Custom Layout)
+
     private func makeRequirementsCard(requirements: String) -> UIView {
         let card = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialLight))
         card.contentView.backgroundColor = UIColor.white.withAlphaComponent(0.44)
         card.layer.cornerRadius = 20
         card.clipsToBounds = true
-        card.layer.borderWidth = 1
-        card.layer.borderColor = UIColor.white.withAlphaComponent(0.84).cgColor
-        card.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.14).cgColor
-        card.layer.shadowOpacity = 1
-        card.layer.shadowOffset = CGSize(width: 0, height: 8)
-        card.layer.shadowRadius = 18
-
-        let title = UILabel()
-        title.text = "Requirements"
-        title.font = .systemFont(ofSize: 19, weight: .bold)
-        title.textColor = CineMystTheme.ink
-        
-        let skillsTitle = makeSmallSectionTitle("SKILLS")
-        
-        let skill1 = makeTag("Acting")
-        let skill2 = makeTag("Dancing")
-        
-        let skillsRow = UIStackView(arrangedSubviews: [skill1, skill2])
-        skillsRow.axis = .horizontal
-        skillsRow.spacing = 8
-        skillsRow.alignment = .leading          // prevents stretching vertically
-        skillsRow.distribution = .fillEqually // prevents full-width stretching
-        
-        let expTitle = makeSmallSectionTitle("EXPERIENCE")
-        
-        let expBody = UILabel()
-        if !requirements.isEmpty {
-            // Parse requirements if they contain structured data
-            // For now, display as-is
-            expBody.text = requirements
-        } else {
-            expBody.text = "3+ years in film or theatre\nOpen to all types"
-        }
-        expBody.numberOfLines = 0
-        expBody.font = UIFont.systemFont(ofSize: 15)
-        expBody.textColor = CineMystTheme.ink.withAlphaComponent(0.7)
-        
-        let stack = UIStackView(arrangedSubviews: [title, skillsTitle, skillsRow, expTitle, expBody])
-        stack.axis = .vertical
-        stack.spacing = 10
-        
-        card.contentView.addSubview(stack)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        
+        let title = UILabel(); title.text = "Requirements"; title.font = .systemFont(ofSize: 19, weight: .bold); title.textColor = CineMystTheme.ink
+        let body = UILabel(); body.text = requirements; body.numberOfLines = 0; body.font = UIFont.systemFont(ofSize: 15); body.textColor = CineMystTheme.ink.withAlphaComponent(0.7)
+        let stack = UIStackView(arrangedSubviews: [title, body]); stack.axis = .vertical; stack.spacing = 10
+        card.contentView.addSubview(stack); stack.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: card.contentView.topAnchor, constant: 18),
             stack.leadingAnchor.constraint(equalTo: card.contentView.leadingAnchor, constant: 18),
             stack.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor, constant: -18),
             stack.bottomAnchor.constraint(equalTo: card.contentView.bottomAnchor, constant: -18)
         ])
-        
         return card
     }
-    
-    // Helpers
-    private func makeSmallSectionTitle(_ text: String) -> UILabel {
-        let lbl = UILabel()
-        lbl.text = text
-        lbl.font = UIFont.boldSystemFont(ofSize: 13)
-        lbl.textColor = CineMystTheme.brandPlum
-        return lbl
-    }
-    
-    private func makeTag(_ text: String) -> UIView {
-            let container = UIView()
-            
-            let lbl = UILabel()
-            lbl.text = "  \(text)  "
-            lbl.font = UIFont.systemFont(ofSize: 14)
-            lbl.textColor = CineMystTheme.ink.withAlphaComponent(0.75)
-            lbl.textAlignment = .center
-            lbl.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.08)
-            lbl.layer.cornerRadius = 12
-            lbl.clipsToBounds = true
-            
-            container.addSubview(lbl)
-            lbl.translatesAutoresizingMaskIntoConstraints = false
-            
-            NSLayoutConstraint.activate([
-                lbl.topAnchor.constraint(equalTo: container.topAnchor),
-                lbl.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-                lbl.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-                lbl.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-                lbl.heightAnchor.constraint(equalToConstant: 30)
-            ])
-            
-            return container
-        }
 }

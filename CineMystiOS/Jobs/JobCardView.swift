@@ -41,19 +41,25 @@ class JobCardView: UIView {
         salary: String,
         daysLeft: String,
         tag: String,
-        appliedCount: String = "0 applied"
+        appliedCount: String = "0 applied",
+        hasTask: Bool = false
     ) {
         profileImageView.image = image
         titleLabel.text = title
-        
-        // Add padding to company label text for capsule look
         companyTagLabel.text = "  \(company)  "
-        
         locationLabel.text = location
         salaryLabel.text = salary
         daysLeftLabel.text = daysLeft
         tagLabel.text = "  \(tag)  "
         appliedLabel.text = appliedCount
+        
+        if hasTask {
+            applyButton.setTitle("Go to Task", for: .normal)
+            applyButton.backgroundColor = CineMystTheme.accent
+        } else {
+            applyButton.setTitle("Apply Now", for: .normal)
+            applyButton.backgroundColor = CineMystTheme.brandPlum
+        }
     }
 
     

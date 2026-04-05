@@ -17,9 +17,9 @@ struct Job: Codable, Identifiable {
     let jobType: String?
     let description: String?
     let requirements: String?
-    let referenceMaterialUrl: String?
     let status: JobStatus?
     let applicationDeadline: Date?
+    let referenceMaterialUrl: String?
     let createdAt: Date?
     let updatedAt: Date?
     

@@ -20,20 +20,6 @@ class MyApplicationsViewController: UIViewController {
         return lbl
     }()
     
-    private lazy var segmentedControl: UISegmentedControl = {
-        let sc = UISegmentedControl(items: ["Active", "Pending", "Completed"])
-        sc.selectedSegmentIndex = 0
-        sc.backgroundColor = .white
-        sc.selectedSegmentTintColor = UIColor.white
-        sc
-            .setTitleTextAttributes(
-                [.foregroundColor: UIColor.black],
-                for: .selected
-            )
-        sc.setTitleTextAttributes([.foregroundColor: UIColor.darkGray], for: .normal)
-        sc.addTarget(self, action: #selector(segmentChanged), for: .valueChanged)
-        return sc
-    }()
     
     private let subtitleLabel: UILabel = {
         let lbl = UILabel()
@@ -88,14 +74,13 @@ class MyApplicationsViewController: UIViewController {
         scrollView.backgroundColor = .clear
         scrollView.addSubview(contentView)
         
-        [titleLabel, segmentedControl, subtitleLabel, stackView].forEach {
+        [titleLabel, subtitleLabel, stackView].forEach {
             contentView.addSubview($0)
         }
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         contentView.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        segmentedControl.translatesAutoresizingMaskIntoConstraints = false
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
         stackView.translatesAutoresizingMaskIntoConstraints = false
 
@@ -110,18 +95,13 @@ class MyApplicationsViewController: UIViewController {
             contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
             contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
 
-            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
+            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 40),
             titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
 
-            segmentedControl.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 20),
-            segmentedControl.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            segmentedControl.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            segmentedControl.heightAnchor.constraint(equalToConstant: 42),
-            
-            subtitleLabel.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: 20),
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 12),
             subtitleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
 
-            stackView.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 20),
+            stackView.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 30),
             stackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             stackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40)
@@ -138,19 +118,12 @@ class MyApplicationsViewController: UIViewController {
         backgroundGradient.startPoint = CGPoint(x: 0.1, y: 0)
         backgroundGradient.endPoint = CGPoint(x: 0.9, y: 1)
         view.layer.insertSublayer(backgroundGradient, at: 0)
-        titleLabel.font = .systemFont(ofSize: 26, weight: .bold)
+        titleLabel.font = .systemFont(ofSize: 28, weight: .bold)
         titleLabel.textColor = CineMystTheme.ink
         subtitleLabel.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.62)
-        segmentedControl.backgroundColor = UIColor.white.withAlphaComponent(0.5)
-        segmentedControl.selectedSegmentTintColor = CineMystTheme.brandPlum
-        segmentedControl.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
-        segmentedControl.setTitleTextAttributes([.foregroundColor: CineMystTheme.brandPlum.withAlphaComponent(0.65)], for: .normal)
     }
 
     // MARK: - Segment Changed
-    @objc private func segmentChanged() {
-        loadCardsFor(segment: segmentedControl.selectedSegmentIndex)
-    }
 
     // MARK: - Load Applications
     private func loadApplications() {
@@ -186,126 +159,51 @@ class MyApplicationsViewController: UIViewController {
                 print("✅ Fetched \(fetchedJobs.count) jobs total")
                 self.jobs = fetchedJobs
                 
-                // Load first segment on main actor
+                // Load cards on main actor
                 await MainActor.run {
-                    loadCardsFor(segment: segmentedControl.selectedSegmentIndex)
+                    self.displayAllApplications()
                 }
             } catch {
                 print("❌ Error loading applications/jobs: \(error)")
-                // Fallback: try to show applications even if status mapping fails
                 await MainActor.run {
-                    loadCardsFor(segment: segmentedControl.selectedSegmentIndex)
+                    self.displayAllApplications()
                 }
             }
         }
     }
 
-    // MARK: - Load Cards by Status
     @MainActor
-    private func loadCardsFor(segment: Int) {
-        print("🎴 Loading cards for segment: \(segment)")
+    private func displayAllApplications() {
+        print("🎴 Loading all application cards")
         stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
         
-        switch segment {
-        case 0: 
-            print("🔍 Active segment: Status contains .portfolioSubmitted")
-            loadActiveCards()
-        case 1: 
-            print("🔍 Pending segment: Status contains .taskSubmitted")
-            loadPendingCards()
-        case 2: 
-            print("🔍 Completed segment: Status contains .selected or .shortlisted")
-            loadCompletedCards()
-        default: break
+        if applications.isEmpty {
+            let emptyLabel = UILabel()
+            emptyLabel.text = "You haven't applied to any jobs yet."
+            emptyLabel.textColor = .gray
+            emptyLabel.textAlignment = .center
+            emptyLabel.font = .systemFont(ofSize: 15)
+            emptyLabel.numberOfLines = 0
+            stackView.addArrangedSubview(emptyLabel)
+            return
+        }
+
+        // Sort by date (newest first)
+        let sortedApps = applications.sorted { $0.appliedAt > $1.appliedAt }
+
+        for app in sortedApps {
+            if let job = jobs.first(where: { $0.id == app.jobId }) {
+                stackView.addArrangedSubview(
+                    makeJobCard(job: job, application: app)
+                )
+            }
         }
     }
 
     // MARK: - Cards by Status
-    private func loadActiveCards() {
-        // Including portfolioSubmitted and shortlisted in Active
-        let activeApps = applications.filter { $0.status == .portfolioSubmitted || $0.status == .shortlisted }
-        
-        if activeApps.isEmpty {
-            let emptyLabel = UILabel()
-            emptyLabel.text = "No active applications"
-            emptyLabel.textColor = .gray
-            emptyLabel.textAlignment = .center
-            emptyLabel.font = .systemFont(ofSize: 14)
-            stackView.addArrangedSubview(emptyLabel)
-            return
-        }
-        
-        for app in activeApps {
-            if let job = jobs.first(where: { $0.id == app.jobId }) {
-                stackView.addArrangedSubview(
-                    makeJobCard(
-                        job: job,
-                        application: app,
-                        statusButtonTitle: "Go to Task",
-                        statusColor: UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1)
-                    )
-                )
-            }
-        }
-    }
-    
-    private func loadPendingCards() {
-        let pendingApps = applications.filter { $0.status == .taskSubmitted }
-        
-        if pendingApps.isEmpty {
-            let emptyLabel = UILabel()
-            emptyLabel.text = "No pending applications"
-            emptyLabel.textColor = .gray
-            emptyLabel.textAlignment = .center
-            emptyLabel.font = .systemFont(ofSize: 14)
-            stackView.addArrangedSubview(emptyLabel)
-            return
-        }
-        
-        for app in pendingApps {
-            if let job = jobs.first(where: { $0.id == app.jobId }) {
-                stackView.addArrangedSubview(
-                    makeJobCard(
-                        job: job,
-                        application: app,
-                        statusButtonTitle: "Under Review",
-                        statusColor: .systemOrange
-                    )
-                )
-            }
-        }
-    }
-    
-    private func loadCompletedCards() {
-        // Including shortlisted in completed/successful bucket for now to ensure visibility
-        let completedApps = applications.filter { $0.status == .selected || $0.status == .shortlisted }
-        
-        if completedApps.isEmpty {
-            let emptyLabel = UILabel()
-            emptyLabel.text = "No completed applications"
-            emptyLabel.textColor = .gray
-            emptyLabel.textAlignment = .center
-            emptyLabel.font = .systemFont(ofSize: 14)
-            stackView.addArrangedSubview(emptyLabel)
-            return
-        }
-        
-        for app in completedApps {
-            if let job = jobs.first(where: { $0.id == app.jobId }) {
-                stackView.addArrangedSubview(
-                    makeJobCard(
-                        job: job,
-                        application: app,
-                        statusButtonTitle: "Booked",
-                        statusColor: .systemGreen
-                    )
-                )
-            }
-        }
-    }
 
     // MARK: - Card View Builder
-    private func makeJobCard(job: Job, application: Application, statusButtonTitle: String, statusColor: UIColor) -> UIView {
+    private func makeJobCard(job: Job, application: Application) -> UIView {
         
         let card = UIView()
         card.backgroundColor = .white
@@ -345,17 +243,18 @@ class MyApplicationsViewController: UIViewController {
         appliedLabel.font = UIFont.systemFont(ofSize: 13)
         appliedLabel.textColor = .gray
         
-        let statusButton = UIButton(type: .system)
-        statusButton.setTitle(statusButtonTitle, for: .normal)
-        statusButton.setTitleColor(.white, for: .normal)
-        statusButton.backgroundColor = statusColor
-        statusButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
-        statusButton.layer.cornerRadius = 10
-        statusButton.contentEdgeInsets = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
+        let trackButton = UIButton(type: .system)
+        trackButton.setTitle("Track Status", for: .normal)
+        trackButton.setTitleColor(.white, for: .normal)
+        trackButton.backgroundColor = CineMystTheme.brandPlum
+        trackButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
+        trackButton.layer.cornerRadius = 10
+        trackButton.contentEdgeInsets = UIEdgeInsets(top: 8, left: 16, bottom: 8, right: 16)
         
         // Store application ID as tag string using objc_setAssociatedObject
-        statusButton.accessibilityIdentifier = application.id.uuidString
-        statusButton.addTarget(self, action: #selector(statusButtonTapped(_:)), for: .touchUpInside)
+        // Store application ID
+        trackButton.accessibilityIdentifier = application.id.uuidString
+        trackButton.addTarget(self, action: #selector(trackButtonTapped(_:)), for: .touchUpInside)
 
 
         let h1 = UIStackView(arrangedSubviews: [locationIcon, locationLabel, payLabel])
@@ -369,7 +268,7 @@ class MyApplicationsViewController: UIViewController {
         tagsRow.alignment = .center
         
         
-        let footer = UIStackView(arrangedSubviews: [appliedLabel, UIView(), statusButton])
+        let footer = UIStackView(arrangedSubviews: [appliedLabel, UIView(), trackButton])
         footer.axis = .horizontal
         footer.alignment = .center
 
@@ -390,17 +289,21 @@ class MyApplicationsViewController: UIViewController {
         return card
     }
     
-    @objc private func statusButtonTapped(_ sender: UIButton) {
-        if segmentedControl.selectedSegmentIndex == 0 {
-            // Active section - go to task
-            let vc = TaskDetailsViewController()
-            if let appId = sender.accessibilityIdentifier,
-               let appUUID = UUID(uuidString: appId),
-               let app = applications.first(where: { $0.id == appUUID }) {
-                vc.job = jobs.first(where: { $0.id == app.jobId })
-            }
-            navigationController?.pushViewController(vc, animated: true)
-        }
+    @objc private func trackButtonTapped(_ sender: UIButton) {
+        guard let appId = sender.accessibilityIdentifier,
+              let appUUID = UUID(uuidString: appId),
+              let app = applications.first(where: { $0.id == appUUID }),
+              let job = jobs.first(where: { $0.id == app.jobId }) else { return }
+        
+        let status = app.status.rawValue.replacingOccurrences(of: "_", with: " ").capitalized
+        
+        let message = """
+        Job: \(job.title ?? "Project")
+        Status: \(status)
+        Applied: \(timeAgoString(from: app.appliedAt))
+        """
+        
+        showAlert(title: "Application Status", message: message)
     }
     
     private func timeAgoString(from date: Date) -> String {

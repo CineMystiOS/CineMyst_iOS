@@ -6,6 +6,7 @@ final class TaskDetailsViewController: UIViewController {
     
     // MARK: - Properties
     var job: Job?
+    var task: JobTask?
     private var castingProfile: CastingProfileRecord?
     private let backgroundGradient = CAGradientLayer()
     // Use shared authenticated Supabase client defined in auth/Supabase.swift to avoid session mismatch
@@ -241,16 +242,12 @@ final class TaskDetailsViewController: UIViewController {
         // Clear existing content
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         
-        // Debug: Check if job data is available
+        // Debug: Check data
         if let job = job {
-            print("📋 TaskDetailsViewController - Job data available:")
-            print("   Title: \(job.title)")
-            print("   Company: \(job.companyName)")
-            print("   Description: \(job.description ?? "nil")")
-            print("   Requirements: \(job.requirements ?? "nil")")
-            print("   Reference Material URL: \(job.referenceMaterialUrl ?? "nil")")
-        } else {
-            print("⚠️ TaskDetailsViewController - No job data available, using fallback")
+            print("📋 TaskDetailsViewController - Job: \(job.title ?? "nil")")
+        }
+        if let t = task {
+            print("✅ TaskDetailsViewController - Task data available: \(t.taskTitle ?? "nil")")
         }
         
         // Rebuild with job data
@@ -489,12 +486,8 @@ final class TaskDetailsViewController: UIViewController {
         v.spacing = 12
         v.translatesAutoresizingMaskIntoConstraints = false
         
-        // Extract task title and description from job
-        // The job title is the overall job title, but we want the task description title
-        // For now, use the first part of the description or the job title
-        let taskDescriptionText = extractTaskDescription(from: job?.description ?? "")
-        let taskTitle = taskDescriptionText?.components(separatedBy: "\n").first ?? job?.title ?? "Task Details"
-        let taskDescription = taskDescriptionText ?? job?.description ?? "No task description available."
+        let taskTitle = task?.taskTitle ?? job?.title ?? "Audition Task"
+        let taskDescription = task?.taskDescription ?? job?.description ?? "No task description available."
         
         v.addArrangedSubview(sectionTitle(taskTitle))
         v.addArrangedSubview(paragraph(taskDescription))
@@ -547,13 +540,11 @@ final class TaskDetailsViewController: UIViewController {
         v.spacing = 12
         v.translatesAutoresizingMaskIntoConstraints = false
         
-        // Extract character info from job description
-        let charInfo = extractCharacterInfo(from: job?.description ?? "")
-        let charName = charInfo.name ?? "Character"
-        let charDesc = charInfo.description ?? "No character description available."
-        let personality = charInfo.personality ?? "No personality traits specified."
-        let ageRange = charInfo.ageRange ?? "Not specified"
-        let genre = job?.jobType ?? "Drama"
+        let charName = task?.characterName ?? "Character"
+        let charDesc = task?.characterDescription ?? job?.description ?? "No character description available."
+        let personality = task?.personalityTraits ?? "No personality traits specified."
+        let ageRange = task?.characterAgeRange ?? "Not specified"
+        let genre = task?.genre ?? job?.jobType ?? "Drama"
         
         v.addArrangedSubview(sectionTitle("Character: \(charName)"))
         v.addArrangedSubview(boldLabel("Description"))
@@ -590,12 +581,10 @@ final class TaskDetailsViewController: UIViewController {
         v.spacing = 12
         v.translatesAutoresizingMaskIntoConstraints = false
         
-        // Extract scene info from requirements
-        let sceneInfo = extractSceneInfo(from: job?.requirements ?? "")
-        let sceneTitle = sceneInfo.title ?? "Scene"
-        let setting = sceneInfo.setting ?? "No setting description available."
-        let duration = sceneInfo.duration ?? "Not specified"
-        let genre = job?.jobType ?? "Drama"
+        let sceneTitle = task?.sceneTitle ?? "Audition Scene"
+        let setting = task?.sceneSetting ?? "No setting description available."
+        let duration = task?.expectedDuration ?? "Not specified"
+        let genre = task?.genre ?? job?.jobType ?? "Drama"
         
         v.addArrangedSubview(sectionTitle("Scene: \(sceneTitle)"))
         v.addArrangedSubview(boldLabel("Setting"))
@@ -999,13 +988,6 @@ final class TaskDetailsViewController: UIViewController {
         } catch {
             showAlert(title: "Error", message: "Failed to submit task: \(error.localizedDescription)")
         }
-    }
-    
-    private func showAlert(title: String, message: String) {
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
-        present(alert, animated: true)
-        
     }
     
     // MARK: - UI Helpers

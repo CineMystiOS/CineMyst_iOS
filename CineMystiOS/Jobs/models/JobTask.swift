@@ -1,19 +1,14 @@
-//
-//  Task.swift
-//  CineMystApp
-//
-//  Created by user@55 on 17/01/26.
-//
 import Foundation
 
 struct JobTask: Codable, Identifiable {
     let id: UUID
-    let jobId: UUID
-    let taskTitle: String
-    let taskDescription: String
+    let jobId: UUID?
+    let taskTitle: String?
+    let taskDescription: String?
     let characterName: String?
     let characterDescription: String?
-    let characterAgeRange: String?
+    let characterAgeRange: String? // Present in your table
+    let characterGender: String?    // Recommending you add this
     let genre: String?
     let personalityTraits: String?
     let sceneTitle: String?
@@ -22,7 +17,7 @@ struct JobTask: Codable, Identifiable {
     let referenceMaterialUrl: String?
     let requirements: [String]?
     let dueDate: Date?
-    let createdAt: Date
+    let createdAt: Date?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -32,6 +27,7 @@ struct JobTask: Codable, Identifiable {
         case characterName = "character_name"
         case characterDescription = "character_description"
         case characterAgeRange = "character_age_range"
+        case characterGender = "character_gender"
         case genre
         case personalityTraits = "personality_traits"
         case sceneTitle = "scene_title"

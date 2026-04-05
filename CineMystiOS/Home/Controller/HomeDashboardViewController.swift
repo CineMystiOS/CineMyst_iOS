@@ -532,14 +532,16 @@ final class HomeDashboardViewController: UIViewController {
             Job(id: UUID(), directorId: UUID(), title: "Lead Actor - City of Dreams",
                 companyName: "YRF Casting", location: "Mumbai", ratePerDay: 5000, jobType: "Web Series",
                 description: "Looking for a lead actor for a web series.",
-                requirements: "Acting experience preferred", referenceMaterialUrl: nil, status: .active,
+                requirements: "Acting experience preferred", status: .active,
                 applicationDeadline: Calendar.current.date(byAdding: .day, value: 10, to: Date()),
+                referenceMaterialUrl: nil,
                 createdAt: Date(), updatedAt: Date()),
             Job(id: UUID(), directorId: UUID(), title: "Assistant Director - Feature Film",
                 companyName: "Red Chillies Entertainment", location: "Mumbai", ratePerDay: 3000, jobType: "Film",
                 description: "Assist director during film production.", requirements: "Prior AD experience",
-                referenceMaterialUrl: nil, status: .active,
+                status: .active,
                 applicationDeadline: Calendar.current.date(byAdding: .day, value: 5, to: Date()),
+                referenceMaterialUrl: nil,
                 createdAt: Date(), updatedAt: Date())
         ]
         rebuildFeed(); tableView.reloadData()

@@ -83,7 +83,7 @@ class CineMystTabBarController: UITabBarController, UITabBarControllerDelegate {
                                          tag: 0)
 
         // Jobs
-        let jobsVC = UINavigationController(rootViewController: jobsViewController())
+        let jobsVC = UINavigationController(rootViewController: JobsViewController())
         jobsVC.tabBarItem = UITabBarItem(title: "Jobs",
                                          image: UIImage(systemName: "briefcase.fill"),
                                          tag: 1)

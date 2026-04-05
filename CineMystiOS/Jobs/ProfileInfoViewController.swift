@@ -509,11 +509,7 @@ class ProfileInfoViewController: UIViewController {
     }
     
     
-    private func showAlert(title: String, message: String) {
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
-        present(alert, animated: true)
-    }
+    
 
     // MARK: - Pills (specializations / unions)
     /// Create a horizontally-scrolling row of pill buttons. When tapped they toggle their selected state,

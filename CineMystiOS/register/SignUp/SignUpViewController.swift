@@ -501,11 +501,7 @@ class SignUpViewController: UIViewController {
         view.isUserInteractionEnabled = !show
     }
 
-    private func showAlert(title: String = "CineMyst", message: String) {
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
-        present(alert, animated: true)
-    }
+    
 }
 
 // MARK: - UITextFieldDelegate
