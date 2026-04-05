@@ -255,7 +255,7 @@ final class HomeDashboardViewController: UIViewController {
         }
 
         // MARK: - Right Buttons
-        navigationItem.rightBarButtonItems = [makeChatBarButton(), makeBellBarButton()]
+        navigationItem.rightBarButtonItem = makeRightBarButtons()
 
         // MARK: - Search
         let search = UISearchController(searchResultsController: nil)
@@ -307,28 +307,63 @@ final class HomeDashboardViewController: UIViewController {
         removeInjectedHomeTitleIfNeeded()
     }
     
-    private func makeChatBarButton() -> UIBarButtonItem {
-        let container = UIView(frame: CGRect(x: 0, y: 0, width: 52, height: 46))
-        container.backgroundColor = .clear
-        container.clipsToBounds = false
+    private func makeRightBarButtons() -> UIBarButtonItem {
+        let container = UIView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            container.widthAnchor.constraint(equalToConstant: 90),
+            container.heightAnchor.constraint(equalToConstant: 44)
+        ])
 
-        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialLight))
-        blur.frame = CGRect(x: 4, y: 4, width: 38, height: 38)
-        blur.layer.cornerRadius = 19
-        blur.clipsToBounds = true
-        blur.layer.borderWidth = 1
-        blur.layer.borderColor = UIColor.white.withAlphaComponent(0.8).cgColor
+        let blur = makeNavActionBubble(frame: CGRect(x: 0, y: 0, width: 90, height: 38))
+        blur.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(blur)
+        NSLayoutConstraint.activate([
+            blur.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            blur.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            blur.widthAnchor.constraint(equalToConstant: 90),
+            blur.heightAnchor.constraint(equalToConstant: 38)
+        ])
 
-        let button = UIButton(type: .system)
-        button.frame = blur.bounds
-        let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
-        button.setImage(UIImage(systemName: "bubble.left.and.bubble.right", withConfiguration: config), for: .normal)
-        button.tintColor = CineMystTheme.ink.withAlphaComponent(0.78)
-        button.addTarget(self, action: #selector(chatTapped), for: .touchUpInside)
-        blur.contentView.addSubview(button)
+        let stack = UIStackView()
+        stack.axis = .horizontal
+        stack.distribution = .fillEqually
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        blur.contentView.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: blur.contentView.topAnchor),
+            stack.leadingAnchor.constraint(equalTo: blur.contentView.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: blur.contentView.trailingAnchor),
+            stack.bottomAnchor.constraint(equalTo: blur.contentView.bottomAnchor)
+        ])
 
-        let badge = UILabel(frame: CGRect(x: 28, y: 1, width: 22, height: 22))
+        let bellBtn = UIButton(type: .system)
+        let bellConfig = UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+        bellBtn.setImage(UIImage(systemName: "bell", withConfiguration: bellConfig), for: .normal)
+        bellBtn.tintColor = CineMystTheme.ink.withAlphaComponent(0.78)
+        bellBtn.addTarget(self, action: #selector(bellTapped), for: .touchUpInside)
+
+        let chatBtn = UIButton(type: .system)
+        let chatConfig = UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
+        chatBtn.setImage(UIImage(systemName: "bubble.left.and.bubble.right", withConfiguration: chatConfig), for: .normal)
+        chatBtn.tintColor = CineMystTheme.ink.withAlphaComponent(0.78)
+        chatBtn.addTarget(self, action: #selector(chatTapped), for: .touchUpInside)
+
+        stack.addArrangedSubview(bellBtn)
+        stack.addArrangedSubview(chatBtn)
+
+        let separator = UIView()
+        separator.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.14)
+        separator.translatesAutoresizingMaskIntoConstraints = false
+        blur.contentView.addSubview(separator)
+        NSLayoutConstraint.activate([
+            separator.widthAnchor.constraint(equalToConstant: 1),
+            separator.heightAnchor.constraint(equalToConstant: 18),
+            separator.centerXAnchor.constraint(equalTo: blur.contentView.centerXAnchor),
+            separator.centerYAnchor.constraint(equalTo: blur.contentView.centerYAnchor)
+        ])
+
+        let badge = UILabel(frame: CGRect(x: 64, y: -2, width: 22, height: 22))
         badge.backgroundColor = CineMystTheme.brandPlum
         badge.textColor = .white
         badge.font = .systemFont(ofSize: 11, weight: .bold)
@@ -345,7 +380,18 @@ final class HomeDashboardViewController: UIViewController {
         container.addSubview(badge)
         chatBadgeLabel = badge
         applyUnreadMessageBadge()
+
         return UIBarButtonItem(customView: container)
+    }
+
+    private func makeNavActionBubble(frame: CGRect) -> UIVisualEffectView {
+        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialLight))
+        blur.frame = frame
+        blur.layer.cornerRadius = frame.height / 2
+        blur.clipsToBounds = true
+        blur.layer.borderWidth = 1
+        blur.layer.borderColor = UIColor.white.withAlphaComponent(0.8).cgColor
+        return blur
     }
 
     private func startUnreadMessageUpdates() {
@@ -373,29 +419,12 @@ final class HomeDashboardViewController: UIViewController {
             chatBadgeLabel.text = unreadMessagesCount > 99 ? "99+" : "\(unreadMessagesCount)"
             let text = chatBadgeLabel.text ?? ""
             let width = max(22, text.size(withAttributes: [.font: chatBadgeLabel.font as Any]).width + 10)
-            chatBadgeLabel.frame = CGRect(x: 50 - width, y: 1, width: width, height: 22)
+            chatBadgeLabel.frame = CGRect(x: 90 - width + 4, y: 1, width: width, height: 22)
             chatBadgeLabel.layer.cornerRadius = 11
         } else {
             chatBadgeLabel.isHidden = true
             chatBadgeLabel.text = nil
         }
-    }
-
-    private func makeBellBarButton() -> UIBarButtonItem {
-        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialLight))
-        blur.frame = CGRect(x: 0, y: 0, width: 38, height: 38)
-        blur.layer.cornerRadius = 19
-        blur.clipsToBounds = true
-        blur.layer.borderWidth = 1
-        blur.layer.borderColor = UIColor.white.withAlphaComponent(0.8).cgColor
-
-        let button = UIButton(type: .system)
-        button.frame = blur.bounds
-        button.setImage(UIImage(systemName: "bell"), for: .normal)
-        button.tintColor = CineMystTheme.ink.withAlphaComponent(0.78)
-        button.addTarget(self, action: #selector(bellTapped), for: .touchUpInside)
-        blur.contentView.addSubview(button)
-        return UIBarButtonItem(customView: blur)
     }
 
     // MARK: - Table
@@ -887,7 +916,7 @@ extension HomeDashboardViewController: UITableViewDataSource, UITableViewDelegat
 
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         switch feedItems[indexPath.row] {
-        case .promoBanner: return 194
+        case .promoBanner: return 208
         case .communityHeader: return 72
         case .post:        return UITableView.automaticDimension
         case .job:         return UITableView.automaticDimension
@@ -897,7 +926,7 @@ extension HomeDashboardViewController: UITableViewDataSource, UITableViewDelegat
 
     func tableView(_ tableView: UITableView, estimatedHeightForRowAt indexPath: IndexPath) -> CGFloat {
         switch feedItems[indexPath.row] {
-        case .promoBanner: return 194
+        case .promoBanner: return 208
         case .communityHeader: return 72
         case .post:        return 380
         case .job:         return 280
@@ -1034,7 +1063,7 @@ final class PromoBannerCell: UITableViewCell, UIScrollViewDelegate {
     // ✅ KEEP PEEK BUT HANDLE IT CORRECTLY
     private let cardPeek: CGFloat = 8
     private let cardGap: CGFloat = 14
-    private let cardHeight: CGFloat = 154
+    private let cardHeight: CGFloat = 168
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
