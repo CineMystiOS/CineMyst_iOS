@@ -1016,6 +1016,7 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
     private var userFlicks:   [Flick] = []
     private let userId:       UUID?
     private var hasPortfolio: Bool   = false
+    private var hasCastingPortfolio: Bool = false
     private var isOwnProfile: Bool   = true
     /// "none" | "pending" | "connected"
     private var connectionState: String = "none"
@@ -1091,6 +1092,7 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
                 self.posts         = try await ProfileService.shared.fetchUserPosts(userId: combined.profile.id)
                 self.userFlicks    = try await self.fetchUserFlicks(userId: combined.profile.id)
                 self.hasPortfolio  = await ProfileService.shared.hasPortfolio(userId: combined.profile.id)
+                self.hasCastingPortfolio = await self.fetchHasCastingPortfolio(userId: combined.profile.id)
 
                 // Determine own vs other profile
                 let currentUserId  = try await AuthManager.shared.currentSession()?.user.id
@@ -1148,8 +1150,13 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
                 card.editPortfolioButton.removeTarget(nil, action: nil, for: .allEvents)
                 card.editPortfolioButton.addTarget(self, action: #selector(editPortfolioTapped), for: .touchUpInside)
                 
-                // Toggle text based on existence
-                let btnTitle = hasPortfolio ? "Edit Portfolio" : "Create Portfolio"
+                // Casting professionals should go to the production profile info flow.
+                let btnTitle: String
+                if shouldUseCastingPortfolioFlow(data) {
+                    btnTitle = hasCastingPortfolio ? "Edit Portfolio" : "Create Portfolio"
+                } else {
+                    btnTitle = hasPortfolio ? "Edit Portfolio" : "Create Portfolio"
+                }
                 card.editPortfolioButton.setTitle(btnTitle, for: .normal)
             } else {
                 card.connectButton.removeTarget(nil, action: nil, for: .allEvents)
@@ -1288,6 +1295,19 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
     }
 
     @objc private func editPortfolioTapped() {
+        if let data = profileData, shouldUseCastingPortfolioFlow(data) {
+            let vc = ProfileInfoViewController()
+            vc.hidesBottomBarWhenPushed = true
+            if let navigationController {
+                navigationController.pushViewController(vc, animated: true)
+            } else {
+                let nav = UINavigationController(rootViewController: vc)
+                nav.modalPresentationStyle = .fullScreen
+                present(nav, animated: true)
+            }
+            return
+        }
+
         if hasPortfolio {
             let vc = ActorPortfolioDetailViewController()
             vc.isOwnProfile = true
@@ -1427,6 +1447,14 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
         return parts.joined(separator: " • ")
     }
 
+    private func shouldUseCastingPortfolioFlow(_ data: UserProfileData) -> Bool {
+        let normalizedRole = data.profile.role?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: " ", with: "_")
+        return normalizedRole == "casting_professional"
+    }
+
     private func loadImage(from urlString: String, completion: @escaping (UIImage?) -> Void) {
         guard let url = URL(string: urlString) else { completion(nil); return }
         URLSession.shared.dataTask(with: url) { data, _, _ in
@@ -1458,6 +1486,26 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
             .order("created_at", ascending: false)
             .execute()
         return try JSONDecoder().decode([Flick].self, from: response.data)
+    }
+
+    private func fetchHasCastingPortfolio(userId: UUID) async -> Bool {
+        struct ExistingCastingProfile: Decodable {
+            let id: String
+        }
+
+        do {
+            let rows: [ExistingCastingProfile] = try await supabase
+                .from("casting_profiles")
+                .select("id")
+                .eq("id", value: userId.uuidString)
+                .limit(1)
+                .execute()
+                .value
+            return !rows.isEmpty
+        } catch {
+            print("⚠️ Failed checking casting profile existence: \(error)")
+            return false
+        }
     }
 
     @objc private func mediaSegmentChanged(_ sender: UISegmentedControl) {

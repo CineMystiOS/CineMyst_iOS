@@ -10,6 +10,10 @@ class ProfileInfoViewController: UIViewController {
 
     private let scrollView = UIScrollView()
     private let contentView = UIView()
+    private var openedFromProfile: Bool {
+        navigationController?.viewControllers.contains(where: { $0 is ActorProfileViewController }) == true
+    }
+    private var hasExistingCastingProfile = false
 
     // Selection data sources
     private let companyTypes = ["Production Company", "Post-Production", "Studio", "Network", "Independent", "Freelance"]
@@ -23,6 +27,11 @@ class ProfileInfoViewController: UIViewController {
     private var selectedContract: String?
     private var selectedBudget: String?
     private var selectedAdditionalLocation: String?
+    private var loadedProfessionalTitle: String?
+    private var loadedProductionHouse: String?
+    private var loadedPrimaryLocation: String?
+    private var loadedWebsite: String?
+    private var loadedIMDbProfile: String?
     
     // Multi-select sets for pills
     private var selectedSpecializations = Set<String>()
@@ -297,7 +306,7 @@ class ProfileInfoViewController: UIViewController {
         view.backgroundColor = .white
         
         // Setup navigation bar
-        title = "Profile Information"
+        title = openedFromProfile ? "Create Portfolio" : "Profile Information"
         navigationController?.navigationBar.titleTextAttributes = [
             .foregroundColor: UIColor(red: 67/255, green: 0/255, blue: 34/255, alpha: 1),
             .font: UIFont.boldSystemFont(ofSize: 18)
@@ -305,6 +314,10 @@ class ProfileInfoViewController: UIViewController {
         
         setupScroll()
         buildLayout()
+        if openedFromProfile {
+            nextButton.setTitle("Done", for: .normal)
+            skipButton.isHidden = true
+        }
         nextButton.addTarget(self, action: #selector(nextTapped), for: .touchUpInside)
     }
     override func viewWillAppear(_ animated: Bool) {
@@ -341,27 +354,54 @@ class ProfileInfoViewController: UIViewController {
                 .value
             
             await MainActor.run {
-                // Populate text fields
-                professionalTitleTextField?.text = castingProfile.specificRole
-                productionHouseTextField?.text = castingProfile.companyName
-                primaryLocationTextField?.text = profile.locationCity
-                
-                // Populate specializations
-                selectedSpecializations = Set(castingProfile.castingTypes)
-                
-                // Populate contract type from profile
-                if let contract = profile.employmentStatus {
-                    selectedContract = contract
+                hasExistingCastingProfile = true
+                if openedFromProfile {
+                    title = "Edit Portfolio"
                 }
+
+                // Store fetched values so they can be reapplied after the form rebuilds.
+                loadedProfessionalTitle = castingProfile.specificRole
+                loadedProductionHouse = castingProfile.companyName
+                loadedPrimaryLocation = profile.locationCity
+                loadedWebsite = profile.websiteUrl
+                loadedIMDbProfile = nil
+
+                selectedSpecializations = Set(castingProfile.castingTypes)
+                selectedContract = profile.employmentStatus
                 
                 print("✅ Loaded existing profile data")
                 
                 // Rebuild the UI to reflect loaded data
                 contentView.subviews.forEach { $0.removeFromSuperview() }
                 buildLayout()
+                applyLoadedValuesToForm()
             }
         } catch {
             print("ℹ️ No existing profile found (creating new): \(error)")
+        }
+    }
+
+    private func applyLoadedValuesToForm() {
+        professionalTitleTextField?.text = loadedProfessionalTitle
+        productionHouseTextField?.text = loadedProductionHouse
+        primaryLocationTextField?.text = loadedPrimaryLocation
+        websiteTextField?.text = loadedWebsite
+        imdbProfileTextField?.text = loadedIMDbProfile
+
+        if let contract = selectedContract {
+            updateSelection(tag: 3, value: contract)
+        }
+        if let companyType = selectedCompanyType {
+            updateSelection(tag: 1, value: companyType)
+        }
+        if let experience = selectedExperience {
+            updateSelection(tag: 2, value: experience)
+        }
+        if let budget = selectedBudget {
+            updateSelection(tag: 4, value: budget)
+        }
+        if let additionalLocation = selectedAdditionalLocation {
+            updateSelection(tag: 5, value: additionalLocation)
         }
     }
     
@@ -378,6 +418,11 @@ class ProfileInfoViewController: UIViewController {
             do {
                 try await saveDirectorProfile()
                 await MainActor.run {
+                    if self.openedFromProfile {
+                        self.navigationController?.popViewController(animated: true)
+                        return
+                    }
+
                     // Check if we came from TaskDetailsViewController (already in navigation stack)
                     if navigationController?.viewControllers.contains(where: { $0 is TaskDetailsViewController }) == true {
                         // Pop back to TaskDetailsViewController

@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import Supabase
 
 class RoleSelectionViewController: UIViewController {
     
@@ -100,7 +101,6 @@ class RoleSelectionViewController: UIViewController {
         
         selectedRole = role
         coordinator?.profileData.role = role
-        coordinator?.nextStep()
         
         // Animate selection
         roleCards.forEach { $0.setSelected(false) }
@@ -110,8 +110,40 @@ class RoleSelectionViewController: UIViewController {
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            self?.navigateToRoleDetails()
+        Task { [weak self] in
+            await self?.persistSelectedRole(role)
+            await MainActor.run {
+                self?.coordinator?.nextStep()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                    self?.navigateToRoleDetails()
+                }
+            }
+        }
+    }
+
+    private func persistSelectedRole(_ role: UserRole) async {
+        guard let userId = supabase.auth.currentSession?.user.id else { return }
+
+        struct RolePayload: Encodable {
+            let role: String
+        }
+
+        let dbRole: String
+        switch role {
+        case .artist:
+            dbRole = "artist"
+        case .castingProfessional:
+            dbRole = "casting_professional"
+        }
+
+        do {
+            try await supabase
+                .from("profiles")
+                .update(RolePayload(role: dbRole))
+                .eq("id", value: userId.uuidString)
+                .execute()
+        } catch {
+            print("⚠️ Failed to persist selected role immediately: \(error)")
         }
     }
     
