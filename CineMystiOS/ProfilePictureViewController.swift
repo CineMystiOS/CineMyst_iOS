@@ -112,7 +112,7 @@ class ProfilePictureViewController: UIViewController, UIImagePickerControllerDel
             titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             
             profileImageView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            profileImageView.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -50),
+            profileImageView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 36),
             profileImageView.widthAnchor.constraint(equalToConstant: 150),
             profileImageView.heightAnchor.constraint(equalToConstant: 150),
             

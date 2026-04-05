@@ -54,29 +54,29 @@ struct PromoCard {
 
     static let all: [PromoCard] = [
         PromoCard(
-            title: "Find Your Next Role",
-            subtitle: "Browse casting calls from top production houses across India.",
+            title: "Casting Brief",
+            subtitle: "Fresh role picks curated for actors and creators.",
             gradientStart: UIColor(red: 0.176, green: 0.043, blue: 0.118, alpha: 1),
             gradientEnd:   UIColor(red: 0.353, green: 0.118, blue: 0.259, alpha: 1),
             ctaText: "Browse Castings"
         ),
         PromoCard(
-            title: "Connect with Directors",
-            subtitle: "Build your network with directors and film professionals.",
+            title: "Industry Radar",
+            subtitle: "Discover active filmmakers and production teams to follow.",
             gradientStart: UIColor(red: 0.263, green: 0.082, blue: 0.188, alpha: 1),
             gradientEnd:   UIColor(red: 0.659, green: 0.333, blue: 0.969, alpha: 1),
             ctaText: "Start Networking"
         ),
         PromoCard(
-            title: "Showcase Your Reel",
-            subtitle: "Upload your portfolio and get discovered by casting teams.",
+            title: "Portfolio Spotlight",
+            subtitle: "Keep your reel polished and ready for the right moment.",
             gradientStart: UIColor(red: 0.5, green: 0.1, blue: 0.35, alpha: 1),
             gradientEnd:   UIColor(red: 0.804, green: 0.447, blue: 0.659, alpha: 1),
             ctaText: "Upload Reel"
         ),
         PromoCard(
-            title: "Audition Coach",
-            subtitle: "1-on-1 coaching with a free first session.",
+            title: "1:1 Mentor Session",
+            subtitle: "Refine your pitch with tailored feedback from mentors.",
             gradientStart: UIColor(red: 0.2, green: 0.05, blue: 0.35, alpha: 1),
             gradientEnd:   UIColor(red: 0.48, green: 0.23, blue: 0.93, alpha: 1),
             ctaText: "Book Session"
@@ -107,16 +107,17 @@ struct AdItem {
 }
 
 struct HomeQuickLink {
+    let value: String
     let title: String
     let tint: UIColor
     let accent: UIColor
     let icon: String
 
     static let all: [HomeQuickLink] = [
-        .init(title: "Casting Calls", tint: UIColor(red: 0.918, green: 0.878, blue: 0.911, alpha: 1), accent: UIColor(red: 0.852, green: 0.780, blue: 0.872, alpha: 1), icon: "theatermasks.fill"),
-        .init(title: "Portfolios", tint: UIColor(red: 0.928, green: 0.868, blue: 0.902, alpha: 1), accent: UIColor(red: 0.858, green: 0.768, blue: 0.828, alpha: 1), icon: "sparkles.tv.fill"),
-        .init(title: "Directors", tint: UIColor(red: 0.894, green: 0.836, blue: 0.914, alpha: 1), accent: UIColor(red: 0.812, green: 0.735, blue: 0.845, alpha: 1), icon: "person.2.fill"),
-        .init(title: "Auditions", tint: UIColor(red: 0.886, green: 0.902, blue: 0.948, alpha: 1), accent: UIColor(red: 0.792, green: 0.816, blue: 0.902, alpha: 1), icon: "music.mic")
+        .init(value: "15+", title: "Jobs", tint: UIColor(red: 0.918, green: 0.878, blue: 0.911, alpha: 1), accent: UIColor(red: 0.852, green: 0.780, blue: 0.872, alpha: 1), icon: "briefcase.fill"),
+        .init(value: "10+", title: "Mentors", tint: UIColor(red: 0.928, green: 0.868, blue: 0.902, alpha: 1), accent: UIColor(red: 0.858, green: 0.768, blue: 0.828, alpha: 1), icon: "person.crop.circle.badge.checkmark"),
+        .init(value: "5+", title: "Directors", tint: UIColor(red: 0.894, green: 0.836, blue: 0.914, alpha: 1), accent: UIColor(red: 0.812, green: 0.735, blue: 0.845, alpha: 1), icon: "person.2.fill"),
+        .init(value: "2+", title: "Casting Houses", tint: UIColor(red: 0.886, green: 0.902, blue: 0.948, alpha: 1), accent: UIColor(red: 0.792, green: 0.816, blue: 0.902, alpha: 1), icon: "building.2.fill")
     ]
 }
 
@@ -423,21 +424,15 @@ final class HomeDashboardViewController: UIViewController {
     }
 
     private func makeTableHeader() -> UIView {
-        let header = HomeEditorialHeaderView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 264))
-        let targetSize = CGSize(width: view.bounds.width, height: UIView.layoutFittingCompressedSize.height)
-        let height = header.systemLayoutSizeFitting(targetSize, withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel).height
-        header.frame.size.width = view.bounds.width
-        header.frame.size.height = max(height, 294) // Keep the discover panel a touch roomier
-        header.layoutIfNeeded()
+        let header = UIView(frame: CGRect(x: 0, y: 0, width: view.bounds.width, height: 12))
+        header.backgroundColor = .clear
         return header
     }
 
     private func updateTableHeaderLayoutIfNeeded() {
         guard let header = tableView.tableHeaderView else { return }
-        let targetSize = CGSize(width: tableView.bounds.width, height: UIView.layoutFittingCompressedSize.height)
-        let defaultHeight = header.systemLayoutSizeFitting(targetSize, withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel).height
-        let finalHeight = max(defaultHeight, 280)
         var frame = header.frame
+        let finalHeight: CGFloat = 12
         if abs(frame.width - tableView.bounds.width) > 0.5 || abs(frame.height - finalHeight) > 0.5 {
             frame.size.width = tableView.bounds.width
             frame.size.height = finalHeight
@@ -599,27 +594,27 @@ private final class HomeEditorialHeaderView: UIView {
         panelView.translatesAutoresizingMaskIntoConstraints = false
 
         introLabel.text = "Today on CineMyst"
-        introLabel.font = .systemFont(ofSize: 12, weight: .semibold)
+        introLabel.font = .systemFont(ofSize: 11, weight: .semibold)
         introLabel.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.62)
         introLabel.textAlignment = .center
 
-        titleLabel.text = "Discover your next scene"
-        titleLabel.font = .systemFont(ofSize: 23, weight: .bold)
+        titleLabel.text = "Explore your next move"
+        titleLabel.font = .systemFont(ofSize: 21, weight: .bold)
         titleLabel.textColor = CineMystTheme.ink
         titleLabel.numberOfLines = 2
         titleLabel.textAlignment = .center
 
-        subtitleLabel.text = "Elegant casting opportunities for you"
-        subtitleLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        subtitleLabel.text = nil
+        subtitleLabel.font = .systemFont(ofSize: 11.5, weight: .medium)
         subtitleLabel.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.54)
-        subtitleLabel.numberOfLines = 1
+        subtitleLabel.numberOfLines = 2
         subtitleLabel.textAlignment = .center
 
         panelView.contentView.addSubview(contentColumn)
         contentColumn.translatesAutoresizingMaskIntoConstraints = false
 
         gridStack.axis = .vertical
-        gridStack.spacing = 10
+        gridStack.spacing = 18
         gridStack.distribution = .fillEqually
 
         [introLabel, titleLabel, subtitleLabel, gridStack].forEach {
@@ -638,10 +633,10 @@ private final class HomeEditorialHeaderView: UIView {
             panelView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -horizontalInset),
             panelView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -2),
 
-            contentColumn.topAnchor.constraint(equalTo: panelView.contentView.topAnchor, constant: 12),
-            contentColumn.leadingAnchor.constraint(equalTo: panelView.contentView.leadingAnchor, constant: 18),
-            contentColumn.trailingAnchor.constraint(equalTo: panelView.contentView.trailingAnchor, constant: -18),
-            contentColumn.bottomAnchor.constraint(equalTo: panelView.contentView.bottomAnchor, constant: -12)
+            contentColumn.topAnchor.constraint(equalTo: panelView.contentView.topAnchor, constant: 16),
+            contentColumn.leadingAnchor.constraint(equalTo: panelView.contentView.leadingAnchor, constant: 20),
+            contentColumn.trailingAnchor.constraint(equalTo: panelView.contentView.trailingAnchor, constant: -20),
+            contentColumn.bottomAnchor.constraint(equalTo: panelView.contentView.bottomAnchor, constant: -20)
         ])
 
         let rows = stride(from: 0, to: HomeQuickLink.all.count, by: 2).map {
@@ -662,18 +657,19 @@ private final class HomeEditorialHeaderView: UIView {
             introLabel.leadingAnchor.constraint(equalTo: contentColumn.leadingAnchor),
             introLabel.trailingAnchor.constraint(equalTo: contentColumn.trailingAnchor),
 
-            titleLabel.topAnchor.constraint(equalTo: introLabel.bottomAnchor, constant: 2),
-            titleLabel.leadingAnchor.constraint(equalTo: contentColumn.leadingAnchor, constant: 10),
-            titleLabel.trailingAnchor.constraint(equalTo: contentColumn.trailingAnchor, constant: -10),
+            titleLabel.topAnchor.constraint(equalTo: introLabel.bottomAnchor, constant: 4),
+            titleLabel.leadingAnchor.constraint(equalTo: contentColumn.leadingAnchor, constant: 12),
+            titleLabel.trailingAnchor.constraint(equalTo: contentColumn.trailingAnchor, constant: -12),
 
-            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
-            subtitleLabel.leadingAnchor.constraint(equalTo: contentColumn.leadingAnchor, constant: 10),
-            subtitleLabel.trailingAnchor.constraint(equalTo: contentColumn.trailingAnchor, constant: -10),
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 0),
+            subtitleLabel.leadingAnchor.constraint(equalTo: contentColumn.leadingAnchor, constant: 12),
+            subtitleLabel.trailingAnchor.constraint(equalTo: contentColumn.trailingAnchor, constant: -12),
+            subtitleLabel.heightAnchor.constraint(equalToConstant: 0),
 
-            gridStack.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 8),
+            gridStack.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 18),
             gridStack.leadingAnchor.constraint(equalTo: contentColumn.leadingAnchor, constant: 10),
             gridStack.trailingAnchor.constraint(equalTo: contentColumn.trailingAnchor, constant: -10),
-            gridStack.bottomAnchor.constraint(equalTo: contentColumn.bottomAnchor, constant: -2)
+            gridStack.bottomAnchor.constraint(equalTo: contentColumn.bottomAnchor, constant: -4)
         ])
     }
 
@@ -712,36 +708,49 @@ private final class QuickLinkBubbleView: UIView {
 
         let iconView = UIImageView(image: UIImage(systemName: link.icon))
         iconView.tintColor = CineMystTheme.ink.withAlphaComponent(0.82)
-        iconView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+        iconView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
         iconWrap.addSubview(iconView)
         iconView.translatesAutoresizingMaskIntoConstraints = false
+
+        let valueLabel = UILabel()
+        valueLabel.text = link.value
+        valueLabel.font = .systemFont(ofSize: 16, weight: .bold)
+        valueLabel.textColor = CineMystTheme.ink
+        valueLabel.textAlignment = .center
+        iconWrap.addSubview(valueLabel)
+        valueLabel.translatesAutoresizingMaskIntoConstraints = false
 
         let label = UILabel()
         label.text = link.title
         label.font = .systemFont(ofSize: 12.5, weight: .medium)
-        label.textColor = CineMystTheme.ink
+        label.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.78)
         label.textAlignment = .center
         label.numberOfLines = 2
         addSubview(label)
         label.translatesAutoresizingMaskIntoConstraints = false
 
         NSLayoutConstraint.activate([
-            heightAnchor.constraint(equalToConstant: 84),
+            heightAnchor.constraint(equalToConstant: 104),
 
             blob.topAnchor.constraint(equalTo: topAnchor),
             blob.centerXAnchor.constraint(equalTo: centerXAnchor),
-            blob.widthAnchor.constraint(equalToConstant: 72),
-            blob.heightAnchor.constraint(equalToConstant: 56),
+            blob.widthAnchor.constraint(equalToConstant: 92),
+            blob.heightAnchor.constraint(equalToConstant: 70),
 
             iconWrap.centerXAnchor.constraint(equalTo: blob.centerXAnchor),
             iconWrap.centerYAnchor.constraint(equalTo: blob.centerYAnchor, constant: -1),
-            iconWrap.widthAnchor.constraint(equalToConstant: 44),
-            iconWrap.heightAnchor.constraint(equalToConstant: 44),
+            iconWrap.widthAnchor.constraint(equalToConstant: 58),
+            iconWrap.heightAnchor.constraint(equalToConstant: 58),
 
             iconView.centerXAnchor.constraint(equalTo: iconWrap.centerXAnchor),
-            iconView.centerYAnchor.constraint(equalTo: iconWrap.centerYAnchor),
+            iconView.topAnchor.constraint(equalTo: iconWrap.topAnchor, constant: 9),
 
-            label.topAnchor.constraint(equalTo: blob.bottomAnchor, constant: 8),
+            valueLabel.centerXAnchor.constraint(equalTo: iconWrap.centerXAnchor),
+            valueLabel.topAnchor.constraint(equalTo: iconView.bottomAnchor, constant: 4),
+            valueLabel.leadingAnchor.constraint(equalTo: iconWrap.leadingAnchor, constant: 4),
+            valueLabel.trailingAnchor.constraint(equalTo: iconWrap.trailingAnchor, constant: -4),
+
+            label.topAnchor.constraint(equalTo: blob.bottomAnchor, constant: 10),
             label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 2),
             label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -2)
         ])
