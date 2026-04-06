@@ -3,9 +3,8 @@
 CineMyst is an iOS application for film enthusiasts to create, share, and manage their film portfolios, connect with others, and explore new opportunities in the film industry.
 
 ## Features
-- User authentication and onboarding
 - Portfolio creation and management
-- Social features: posts, notifications, messaging
+- Casting Calls
 - Job and mentorship modules
 - Gallery and camera integration
 
