@@ -27,7 +27,7 @@ final class PostManager {
                 comments_count,
                 shares_count,
                 created_at,
-                profiles(username, profile_picture_url),
+                profiles(username, profile_picture_url, full_name),
                 post_media(media_url, media_type, thumbnail_url, width, height, display_order)
             """)
             .order("created_at", ascending: false)
@@ -78,6 +78,7 @@ final class PostManager {
                 id: postResponse.id,
                 userId: postResponse.userId,
                 username: postResponse.profiles?.username ?? "Unknown",
+                fullName: postResponse.profiles?.fullName,
                 userProfilePictureUrl: postResponse.profiles?.profilePictureUrl,
                 caption: postResponse.caption,
                 mediaUrls: postResponse.postMedia ?? [],
@@ -101,7 +102,7 @@ final class PostManager {
                 comments_count,
                 shares_count,
                 created_at,
-                profiles(username, profile_picture_url),
+                profiles(username, profile_picture_url, full_name),
                 post_media(media_url, media_type, thumbnail_url, width, height, display_order)
             """)
             .eq("user_id", value: userId)
@@ -153,6 +154,7 @@ final class PostManager {
                 id: postResponse.id,
                 userId: postResponse.userId,
                 username: postResponse.profiles?.username ?? "Unknown",
+                fullName: postResponse.profiles?.fullName,
                 userProfilePictureUrl: postResponse.profiles?.profilePictureUrl,
                 caption: postResponse.caption,
                 mediaUrls: postResponse.postMedia ?? [],
@@ -167,7 +169,7 @@ final class PostManager {
     private func fetchUserProfile(userId: String) async throws -> ProfileRecord? {
         let response = try await client
             .from("profiles")
-            .select("id, username, profile_picture_url")
+            .select("id, username, profile_picture_url, full_name")
             .eq("id", value: userId)
             .single()
             .execute()
@@ -292,7 +294,7 @@ final class PostManager {
                 comments_count,
                 shares_count,
                 created_at,
-                profiles(username, profile_picture_url),
+                profiles(username, profile_picture_url, full_name),
                 post_media(media_url, media_type, thumbnail_url, width, height, display_order)
             """)
             .eq("id", value: postId)
@@ -344,6 +346,7 @@ final class PostManager {
             id: postResponse.id,
             userId: postResponse.userId,
             username: postResponse.profiles?.username ?? "Unknown",
+            fullName: postResponse.profiles?.fullName,
             userProfilePictureUrl: postResponse.profiles?.profilePictureUrl,
             caption: postResponse.caption,
             mediaUrls: postResponse.postMedia ?? [],
@@ -537,7 +540,7 @@ final class PostManager {
             do {
                 let profileResponse = try await client
                     .from("profiles")
-                    .select("id, username, profile_picture_url")
+                    .select("id, username, profile_picture_url, full_name")
                     .eq("id", value: userId)
                     .single()
                     .execute()
@@ -584,7 +587,7 @@ final class PostManager {
         
         let response = try await client
             .from("profiles")
-            .select("id, username, profile_picture_url")
+            .select("id, username, profile_picture_url, full_name")
             .eq("id", value: userId)
             .single()
             .execute()
@@ -635,10 +638,12 @@ struct PostResponse: Codable {
     
     struct ProfileData: Codable {
         let username: String?
+        let fullName: String?
         let profilePictureUrl: String?
         
         enum CodingKeys: String, CodingKey {
             case username
+            case fullName = "full_name"
             case profilePictureUrl = "profile_picture_url"
         }
     }

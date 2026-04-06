@@ -57,44 +57,8 @@ struct ActorPortfolioFormData {
     var comfortableAllTimings: String?
     var dressesComfortableWith: String?
 
-    // Step 4 – Work Interests (yes/no)
-    var printShoot: String?
-    var sareesShoot: String?
-    var lahungaShoot: String?
-    var rampShows: String?
-    var designerShoots: String?
-    var indianWears: String?
-    var traditionalWear: String?
-    var casualWear: String?
-    var ethnicWears: String?
-    var westernWears: String?
-    var sportswear: String?
-    var nightWears: String?
-    var jewellery: String?
-    var bikiniShoots: String?
-    var lingerieShoots: String?
-    var swimSuits: String?
-    var calendarShoots: String?
-    var musicAlbums: String?
-    var acting: String?
-    var movies: String?
-    var tvc: String?
-    var tvSerials: String?
-    var kissingScene: String?
-    var intimateScenes: String?
-    var backlessScene: String?
-    var smokingScenes: String?
-    var singing: String?
-    var dancing: String?
-    var anchoring: String?
-    var webSeries: String?
-    var adjustment: String?
-    var shorts: String?
-    var topless: String?
-    var compromise: String?
-    var nude: String?
-    var semiNude: String?
-    var dustAllergy: String?
+    // Step 4 – Work Interests (Simplified as a list)
+    var workInterests: [String] = []
 
     // Step 5 – Experience & Social
     var previousExperience: String?
@@ -108,6 +72,7 @@ struct ActorPortfolioFormData {
 class PortfolioCreationViewController: UIViewController {
 
     // MARK: Properties
+    var isEditingEnabled = false
     private var currentStep = 0
     private let totalSteps  = 7     // 0-6
     private var formData    = ActorPortfolioFormData()
@@ -284,6 +249,69 @@ class PortfolioCreationViewController: UIViewController {
                 }
             } catch {
                 print("[PortfolioCreation] profile prefill failed: \(error)")
+            }
+            
+            // If editing, fetch from actor_portfolios
+            if isEditingEnabled {
+                do {
+                    let response = try await supabase
+                        .from("actor_portfolios")
+                        .select()
+                        .eq("user_id", value: session.user.id.uuidString)
+                        .single()
+                        .execute()
+                    
+                    if let dict = dictFrom(response.data) {
+                        await MainActor.run {
+                            self.formData.fullName = dict["full_name"] as? String
+                            self.formData.age = dict["age"] as? String
+                            self.formData.height = dict["height_cm"] as? String
+                            self.formData.weight = dict["weight_kg"] as? String
+                            self.formData.sex = dict["sex"] as? String
+                            self.formData.currentAddress = dict["current_address"] as? String
+                            self.formData.contactNo = dict["contact_no"] as? String
+                            self.formData.email = dict["email_address"] as? String
+                            self.formData.education = dict["education"] as? String
+                            self.formData.maritalStatus = dict["marital_status"] as? String
+                            self.formData.currentProfession = dict["current_profession"] as? String
+                            self.formData.passport = dict["passport"] as? String
+                            self.formData.hobbies = dict["hobbies"] as? String
+                            self.formData.languages = dict["languages"] as? String
+                            
+                            self.formData.bust = dict["bust"] as? String
+                            self.formData.waist = dict["waist"] as? String
+                            self.formData.hips = dict["hips"] as? String
+                            self.formData.skinTone = dict["skin_tone"] as? String
+                            self.formData.eyeColor = dict["eye_color"] as? String
+                            self.formData.hairColor = dict["hair_color"] as? String
+                            self.formData.bodyType = dict["body_type"] as? String
+                            self.formData.anyTattoo = dict["any_tattoo"] as? String
+                            self.formData.armpitHair = dict["armpit_hair"] as? String
+                            self.formData.bodyHair = dict["body_hair"] as? String
+                            self.formData.upperLipsHair = dict["upper_lips_hair"] as? String
+                            self.formData.shoeSize = dict["shoe_size"] as? String
+                            
+                            self.formData.interestedOutstation = dict["interested_outstation"] as? String
+                            self.formData.interestedOutOfCountry = dict["interested_out_of_country"] as? String
+                            self.formData.comfortableAllTimings = dict["comfortable_all_timings"] as? String
+                            self.formData.dressesComfortableWith = dict["dresses_comfortable_with"] as? String
+                            
+                            if let rawInterests = dict["work_interests"] as? [String] {
+                                self.formData.workInterests = rawInterests
+                            }
+                            
+                            self.formData.previousExperience = dict["previous_experience"] as? String
+                            self.formData.instagramUrl = dict["instagram_url"] as? String
+                            self.formData.youtubeUrl = dict["youtube_url"] as? String
+                            self.formData.imdbUrl = dict["imdb_url"] as? String
+                            
+                            // Re-show step 0 now that data is loaded
+                            self.showStep(0)
+                        }
+                    }
+                } catch {
+                    print("[PortfolioCreation] Fetch existing portfolio failed: \(error)")
+                }
             }
 
             await MainActor.run {
@@ -502,64 +530,39 @@ class PortfolioCreationViewController: UIViewController {
         return v
     }
 
-    // MARK: – Step 3: Work Interests
-
+    // MARK: – Step 3: Work Interests (Revised)
+    
     private func makeWorkInterestsStep() -> UIView {
         let v = makeContainer()
-        addSectionHeader(to: v, title: "Work Interests", subtitle: "Select Yes / No for each category")
+        addSectionHeader(to: v, title: "Work Interests", subtitle: "Select categories you are interested in")
 
-        let items: [(String, Int, String?)] = [
-            ("Print Shoot / Catalog", 4000, formData.printShoot),
-            ("Sarees Shoot", 4001, formData.sareesShoot),
-            ("Lahanga Shoot", 4002, formData.lahungaShoot),
-            ("Ramp Shows", 4003, formData.rampShows),
-            ("Designer Shoots", 4004, formData.designerShoots),
-            ("Indian Wears", 4005, formData.indianWears),
-            ("Traditional Wear", 4006, formData.traditionalWear),
-            ("Casual Wear", 4007, formData.casualWear),
-            ("Ethnic Wears", 4008, formData.ethnicWears),
-            ("Western Wears", 4009, formData.westernWears),
-            ("Sports Wears", 4010, formData.sportswear),
-            ("Night Wears", 4011, formData.nightWears),
-            ("Jewellery", 4012, formData.jewellery),
-            ("Bikini Shoots", 4013, formData.bikiniShoots),
-            ("Lingerie Shoots", 4014, formData.lingerieShoots),
-            ("Swim Suits", 4015, formData.swimSuits),
-            ("Calendar Shoots", 4016, formData.calendarShoots),
-            ("Music Albums", 4017, formData.musicAlbums),
-            ("Acting", 4018, formData.acting),
-            ("Movies", 4019, formData.movies),
-            ("TVC", 4020, formData.tvc),
-            ("TV Serials", 4021, formData.tvSerials),
-            ("Kissing Scene", 4022, formData.kissingScene),
-            ("Intimate / Bold Scenes", 4023, formData.intimateScenes),
-            ("Backless Scene", 4024, formData.backlessScene),
-            ("Smoking Scenes", 4025, formData.smokingScenes),
-            ("Singing", 4026, formData.singing),
-            ("Dancing", 4027, formData.dancing),
-            ("Anchoring", 4028, formData.anchoring),
-            ("Web Series", 4029, formData.webSeries),
-            ("Adjustment", 4030, formData.adjustment),
-            ("Shorts", 4031, formData.shorts),
-            ("Topless", 4032, formData.topless),
-            ("Compromise", 4033, formData.compromise),
-            ("Nude", 4034, formData.nude),
-            ("Semi Nude", 4035, formData.semiNude),
-            ("Allergy to Dust", 4036, formData.dustAllergy),
-        ]
-
-        var lastView: UIView = v.subviews.last!
-        for (label, tag, current) in items {
-            let row = makeToggleRow(label: label, current: current, tag: tag)
-            v.addSubview(row)
-            NSLayoutConstraint.activate([
-                row.topAnchor.constraint(equalTo: lastView.bottomAnchor, constant: 4),
-                row.leadingAnchor.constraint(equalTo: v.leadingAnchor),
-                row.trailingAnchor.constraint(equalTo: v.trailingAnchor),
-            ])
-            lastView = row
-        }
-        lastView.bottomAnchor.constraint(equalTo: v.bottomAnchor).isActive = true
+        let descriptionLabel = UILabel()
+        descriptionLabel.text = "Tell us what kind of projects you want to work on (e.g. Movies, TVC, Music Albums, Prints...)"
+        descriptionLabel.font = .systemFont(ofSize: 14)
+        descriptionLabel.textColor = .secondaryLabel
+        descriptionLabel.numberOfLines = 0
+        descriptionLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        let interestsTV = makeTextView(placeholder: "e.g. Acting, Movies, Jewelry Shoots, Ramp Shows, etc.", tag: 4000)
+        interestsTV.text = formData.workInterests.joined(separator: ", ")
+        
+        v.addSubview(descriptionLabel)
+        v.addSubview(interestsTV)
+        
+        let header = v.subviews.first(where: { $0.tag == 9001 })!
+        
+        NSLayoutConstraint.activate([
+            descriptionLabel.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 16),
+            descriptionLabel.leadingAnchor.constraint(equalTo: v.leadingAnchor),
+            descriptionLabel.trailingAnchor.constraint(equalTo: v.trailingAnchor),
+            
+            interestsTV.topAnchor.constraint(equalTo: descriptionLabel.bottomAnchor, constant: 12),
+            interestsTV.leadingAnchor.constraint(equalTo: v.leadingAnchor),
+            interestsTV.trailingAnchor.constraint(equalTo: v.trailingAnchor),
+            interestsTV.heightAnchor.constraint(equalToConstant: 120),
+            interestsTV.bottomAnchor.constraint(equalTo: v.bottomAnchor)
+        ])
+        
         return v
     }
 
@@ -567,12 +570,13 @@ class PortfolioCreationViewController: UIViewController {
 
     private func makeExperienceStep() -> UIView {
         let v = makeContainer()
-        addSectionHeader(to: v, title: "Experience & Social", subtitle: "Your acting experience and online presence")
+        addSectionHeader(to: v, title: "Experience & Social", subtitle: "Your acting journey and online presence")
 
+        let expTitle = createLabel(text: "Acting Experience", fontSize: 16, weight: .semibold)
         let expTV = makeTextView(placeholder: "Describe your previous experience, roles, productions...", tag: 5000)
         expTV.text = formData.previousExperience
-        v.addSubview(expTV)
-
+        
+        let socialTitle = createLabel(text: "Social Links", fontSize: 16, weight: .semibold)
         let ig = makeTextField(placeholder: "Instagram URL / @handle", tag: 5001)
         ig.text = formData.instagramUrl
         let yt = makeTextField(placeholder: "YouTube URL / @handle", tag: 5002)
@@ -580,26 +584,51 @@ class PortfolioCreationViewController: UIViewController {
         let imdb = makeTextField(placeholder: "IMDb Profile URL", tag: 5003)
         imdb.text = formData.imdbUrl
 
-        let header = v.subviews.last!
+        let header = v.subviews.first(where: { $0.tag == 9001 })!
+        
+        v.addSubview(expTitle)
         v.addSubview(expTV)
+        v.addSubview(socialTitle)
+        v.addSubview(ig)
+        v.addSubview(yt)
+        v.addSubview(imdb)
+
         NSLayoutConstraint.activate([
-            expTV.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 14),
+            expTitle.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 20),
+            expTitle.leadingAnchor.constraint(equalTo: v.leadingAnchor),
+            
+            expTV.topAnchor.constraint(equalTo: expTitle.bottomAnchor, constant: 10),
             expTV.leadingAnchor.constraint(equalTo: v.leadingAnchor),
             expTV.trailingAnchor.constraint(equalTo: v.trailingAnchor),
-            expTV.heightAnchor.constraint(equalToConstant: 180),
+            expTV.heightAnchor.constraint(equalToConstant: 120),
+            
+            socialTitle.topAnchor.constraint(equalTo: expTV.bottomAnchor, constant: 24),
+            socialTitle.leadingAnchor.constraint(equalTo: v.leadingAnchor),
+            
+            ig.topAnchor.constraint(equalTo: socialTitle.bottomAnchor, constant: 12),
+            ig.leadingAnchor.constraint(equalTo: v.leadingAnchor),
+            ig.trailingAnchor.constraint(equalTo: v.trailingAnchor),
+            
+            yt.topAnchor.constraint(equalTo: ig.bottomAnchor, constant: 12),
+            yt.leadingAnchor.constraint(equalTo: v.leadingAnchor),
+            yt.trailingAnchor.constraint(equalTo: v.trailingAnchor),
+            
+            imdb.topAnchor.constraint(equalTo: yt.bottomAnchor, constant: 12),
+            imdb.leadingAnchor.constraint(equalTo: v.leadingAnchor),
+            imdb.trailingAnchor.constraint(equalTo: v.trailingAnchor),
+            imdb.bottomAnchor.constraint(equalTo: v.bottomAnchor)
         ])
-        var last: UIView = expTV
-        for tf in [ig, yt, imdb] {
-            v.addSubview(tf)
-            NSLayoutConstraint.activate([
-                tf.topAnchor.constraint(equalTo: last.bottomAnchor, constant: 12),
-                tf.leadingAnchor.constraint(equalTo: v.leadingAnchor),
-                tf.trailingAnchor.constraint(equalTo: v.trailingAnchor),
-            ])
-            last = tf
-        }
-        last.bottomAnchor.constraint(equalTo: v.bottomAnchor).isActive = true
+        
         return v
+    }
+
+    private func createLabel(text: String, fontSize: CGFloat, weight: UIFont.Weight) -> UILabel {
+        let label = UILabel()
+        label.text = text
+        label.font = .systemFont(ofSize: fontSize, weight: weight)
+        label.textColor = ActorProfileDS.deepPlum
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
     }
 
     // MARK: – Step 5: Media Upload
@@ -933,25 +962,9 @@ class PortfolioCreationViewController: UIViewController {
         case 2:
             formData.dressesComfortableWith = (view.viewWithTag(3003) as? UITextField)?.text
         case 3:
-            let map: [(Int, WritableKeyPath<ActorPortfolioFormData, String?>)] = [
-                (4000, \.printShoot), (4001, \.sareesShoot), (4002, \.lahungaShoot),
-                (4003, \.rampShows), (4004, \.designerShoots), (4005, \.indianWears),
-                (4006, \.traditionalWear), (4007, \.casualWear), (4008, \.ethnicWears),
-                (4009, \.westernWears), (4010, \.sportswear), (4011, \.nightWears),
-                (4012, \.jewellery), (4013, \.bikiniShoots), (4014, \.lingerieShoots),
-                (4015, \.swimSuits), (4016, \.calendarShoots), (4017, \.musicAlbums),
-                (4018, \.acting), (4019, \.movies), (4020, \.tvc), (4021, \.tvSerials),
-                (4022, \.kissingScene), (4023, \.intimateScenes), (4024, \.backlessScene),
-                (4025, \.smokingScenes), (4026, \.singing), (4027, \.dancing),
-                (4028, \.anchoring), (4029, \.webSeries), (4030, \.adjustment),
-                (4031, \.shorts), (4032, \.topless), (4033, \.compromise),
-                (4034, \.nude), (4035, \.semiNude), (4036, \.dustAllergy),
-            ]
-            for (tag, kp) in map {
-                if let seg = view.viewWithTag(tag) as? UISegmentedControl,
-                   seg.selectedSegmentIndex != UISegmentedControl.noSegment {
-                    formData[keyPath: kp] = seg.selectedSegmentIndex == 0 ? "Yes" : "No"
-                }
+            if let tv = view.viewWithTag(4000) as? UITextView, tv.textColor != .placeholderText {
+                let interests = tv.text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+                formData.workInterests = interests
             }
         case 4:
             if let tv = view.viewWithTag(5000) as? UITextView, tv.textColor != .placeholderText {
@@ -997,27 +1010,8 @@ class PortfolioCreationViewController: UIViewController {
         t += "Outstation: \(yn(formData.interestedOutstation))  |  Abroad: \(yn(formData.interestedOutOfCountry))\n"
         t += "All Timings: \(yn(formData.comfortableAllTimings))\nDresses: \(yn(formData.dressesComfortableWith))\n\n"
 
-        t += "WORK INTERESTS (Yes = ✓ / No = ✗)\n"
-        let interests: [(String, String?)] = [
-            ("Print/Catalog", formData.printShoot), ("Sarees", formData.sareesShoot),
-            ("Lahanga", formData.lahungaShoot), ("Ramp", formData.rampShows),
-            ("Designer", formData.designerShoots), ("Indian", formData.indianWears),
-            ("Traditional", formData.traditionalWear), ("Casual", formData.casualWear),
-            ("Ethnic", formData.ethnicWears), ("Western", formData.westernWears),
-            ("Sports", formData.sportswear), ("Night Wear", formData.nightWears),
-            ("Jewellery", formData.jewellery), ("Bikini", formData.bikiniShoots),
-            ("Lingerie", formData.lingerieShoots), ("SwimSuit", formData.swimSuits),
-            ("Calendar", formData.calendarShoots), ("Music", formData.musicAlbums),
-            ("Acting", formData.acting), ("Movies", formData.movies),
-            ("TVC", formData.tvc), ("TV Serials", formData.tvSerials),
-            ("Kissing", formData.kissingScene), ("Intimate", formData.intimateScenes),
-            ("Backless", formData.backlessScene), ("Smoking", formData.smokingScenes),
-            ("Singing", formData.singing), ("Dancing", formData.dancing),
-            ("Anchoring", formData.anchoring), ("Web Series", formData.webSeries),
-        ]
-        for (name, val) in interests {
-            t += "  \(val == "Yes" ? "✓" : val == "No" ? "✗" : "·") \(name)\n"
-        }
+        t += "WORK INTERESTS\n"
+        t += "  " + (formData.workInterests.isEmpty ? "None specified" : formData.workInterests.joined(separator: ", ")) + "\n"
 
         t += "\nEXPERIENCE\n\(yn(formData.previousExperience))\n"
         return t
@@ -1076,13 +1070,7 @@ class PortfolioCreationViewController: UIViewController {
                     let interested_outstation, interested_out_of_country, comfortable_all_timings: String?
                     let dresses_comfortable_with: String?
                     // interests
-                    let print_shoot, sarees_shoot, lahanga_shoot, ramp_shows, designer_shoots: String?
-                    let indian_wears, traditional_wear, casual_wear, ethnic_wears, western_wears: String?
-                    let sportswear, night_wears, jewellery, bikini_shoots, lingerie_shoots: String?
-                    let swim_suits, calendar_shoots, music_albums, acting, movies: String?
-                    let tvc, tv_serials, kissing_scene, intimate_scenes, backless_scene: String?
-                    let smoking_scenes, singing, dancing, anchoring, web_series: String?
-                    let adjustment, shorts, topless, compromise, nude, semi_nude, dust_allergy: String?
+                    let work_interests: [String]?
                     // experience
                     let previous_experience, instagram_url, youtube_url, imdb_url: String?
                     let is_public: Bool
@@ -1124,22 +1112,7 @@ class PortfolioCreationViewController: UIViewController {
                     interested_out_of_country: f.interestedOutOfCountry,
                     comfortable_all_timings: f.comfortableAllTimings,
                     dresses_comfortable_with: f.dressesComfortableWith,
-                    print_shoot: f.printShoot, sarees_shoot: f.sareesShoot,
-                    lahanga_shoot: f.lahungaShoot, ramp_shows: f.rampShows,
-                    designer_shoots: f.designerShoots, indian_wears: f.indianWears,
-                    traditional_wear: f.traditionalWear, casual_wear: f.casualWear,
-                    ethnic_wears: f.ethnicWears, western_wears: f.westernWears,
-                    sportswear: f.sportswear, night_wears: f.nightWears,
-                    jewellery: f.jewellery, bikini_shoots: f.bikiniShoots,
-                    lingerie_shoots: f.lingerieShoots, swim_suits: f.swimSuits,
-                    calendar_shoots: f.calendarShoots, music_albums: f.musicAlbums,
-                    acting: f.acting, movies: f.movies, tvc: f.tvc, tv_serials: f.tvSerials,
-                    kissing_scene: f.kissingScene, intimate_scenes: f.intimateScenes,
-                    backless_scene: f.backlessScene, smoking_scenes: f.smokingScenes,
-                    singing: f.singing, dancing: f.dancing, anchoring: f.anchoring,
-                    web_series: f.webSeries, adjustment: f.adjustment, shorts: f.shorts,
-                    topless: f.topless, compromise: f.compromise, nude: f.nude,
-                    semi_nude: f.semiNude, dust_allergy: f.dustAllergy,
+                    work_interests: f.workInterests,
                     previous_experience: f.previousExperience,
                     instagram_url: f.instagramUrl, youtube_url: f.youtubeUrl,
                     imdb_url: f.imdbUrl, is_public: true,

@@ -1474,6 +1474,13 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
     }
 
     private func shouldUseCastingPortfolioFlow(_ data: UserProfileData) -> Bool {
+        // If they have a casting profile record, they are definitely a director
+        if hasCastingPortfolio { return true }
+        
+        // Otherwise check the role, but only if they don't have artist roles defined
+        let hasArtistRoles = !(data.artistProfile?.primaryRoles?.isEmpty ?? true)
+        if hasArtistRoles { return false }
+
         let normalizedRole = data.profile.role?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()

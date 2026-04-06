@@ -554,9 +554,27 @@ final class HomeDashboardViewController: UIViewController {
         navigationController?.pushViewController(vc, animated: true)
     }
     func openComments(for post: Post) {
-        let vc = CommentViewController(post: post); vc.modalPresentationStyle = .pageSheet
-        if let s = vc.sheetPresentationController { s.detents = [.medium(), .large()]; s.prefersGrabberVisible = true }
-        present(vc, animated: true)
+        let commentVC = CommentViewController(post: post)
+        let nav = UINavigationController(rootViewController: commentVC)
+        
+        // Add Close button
+        let closeItem = UIBarButtonItem(title: "Close", style: .done, target: self, action: #selector(dismissPresentedVC))
+        closeItem.tintColor = CineMystTheme.brandPlum
+        commentVC.navigationItem.rightBarButtonItem = closeItem
+        
+        nav.modalPresentationStyle = .pageSheet
+        if let s = nav.sheetPresentationController {
+            s.detents = [.medium(), .large()]
+            s.prefersGrabberVisible = true
+        }
+        
+        DispatchQueue.main.async { [weak self] in
+            self?.present(nav, animated: true)
+        }
+    }
+    
+    @objc private func dismissPresentedVC() {
+        presentedViewController?.dismiss(animated: true)
     }
     func openShareSheet(for post: Post) {
         let vc = ShareBottomSheetController(post: post); vc.modalPresentationStyle = .pageSheet
@@ -1610,19 +1628,30 @@ final class PostFeedCell: UITableViewCell {
 
         // Reactions
         likeButton.setImage(UIImage(systemName: "heart"), for: .normal); likeButton.tintColor = .secondaryLabel
-        likeButton.addTarget(self, action: #selector(likeTapped), for: .touchUpInside)
+        likeButton.isUserInteractionEnabled = false
         likeCount.font = .systemFont(ofSize: 12); likeCount.textColor = .secondaryLabel
         let likeRow = UIStackView(arrangedSubviews: [likeButton, likeCount])
         likeRow.axis = .horizontal; likeRow.spacing = 4; likeRow.alignment = .center
+        likeRow.isUserInteractionEnabled = true
+        likeRow.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(likeTapped(_:))))
+        
         commentButton.setImage(UIImage(systemName: "bubble.left"), for: .normal); commentButton.tintColor = .secondaryLabel
-        commentButton.addTarget(self, action: #selector(commentTapped), for: .touchUpInside)
+        commentButton.isUserInteractionEnabled = false
         commentCountLabel.font = .systemFont(ofSize: 12); commentCountLabel.textColor = .secondaryLabel
         let commentRow = UIStackView(arrangedSubviews: [commentButton, commentCountLabel])
         commentRow.axis = .horizontal; commentRow.spacing = 4; commentRow.alignment = .center
+        commentRow.isUserInteractionEnabled = true
+        commentRow.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(commentTapped(_:))))
+        
         shareButton.setImage(UIImage(systemName: "paperplane"), for: .normal); shareButton.tintColor = .secondaryLabel
-        shareButton.addTarget(self, action: #selector(shareTapped), for: .touchUpInside)
+        shareButton.isUserInteractionEnabled = false
+        let shareRow = UIStackView(arrangedSubviews: [shareButton])
+        shareRow.axis = .horizontal; shareRow.spacing = 4; shareRow.alignment = .center
+        shareRow.isUserInteractionEnabled = true
+        shareRow.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(shareTapped(_:))))
+        
         let spacer = UIView(); spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let reactionStack = UIStackView(arrangedSubviews: [likeRow, commentRow, spacer, shareButton])
+        let reactionStack = UIStackView(arrangedSubviews: [likeRow, commentRow, spacer, shareRow])
         reactionStack.axis = .horizontal; reactionStack.spacing = 16; reactionStack.alignment = .center
         card.addSubview(reactionStack); reactionStack.translatesAutoresizingMaskIntoConstraints = false
 
@@ -1662,7 +1691,7 @@ final class PostFeedCell: UITableViewCell {
 
     // MARK: Configure
     func configure(with post: Post) {
-        let name = post.username
+        let name = post.displayName
         postId = post.id
         userId = post.userId
         nameLabel.text    = name
@@ -1846,7 +1875,7 @@ final class PostFeedCell: UITableViewCell {
         return "\(s / 86400)d"
     }
 
-    @objc private func likeTapped() {
+    @objc private func likeTapped(_ sender: Any?) {
         isLiked.toggle()
         likeButton.setImage(UIImage(systemName: isLiked ? "heart.fill" : "heart"), for: .normal)
         likeButton.tintColor = isLiked ? .systemRed : .secondaryLabel
@@ -1892,9 +1921,9 @@ final class PostFeedCell: UITableViewCell {
         }
     }
 
-    @objc private func commentTapped() { onComment?() }
-    @objc private func shareTapped()   { onShare?()   }
-    @objc private func profileTapped() { onProfile?() }
+    @objc private func commentTapped(_ sender: Any?) { onComment?() }
+    @objc private func shareTapped(_ sender: Any?)   { onShare?()   }
+    @objc private func profileTapped(_ sender: Any?) { onProfile?() }
 }
 
 

@@ -20,6 +20,7 @@ struct Post: Identifiable {
     let id: String
     let userId: String
     let username: String
+    let fullName: String?
     let userProfilePictureUrl: String?
     let caption: String?
     let mediaUrls: [PostMedia]
@@ -29,7 +30,12 @@ struct Post: Identifiable {
     let createdAt: Date
     
     // Computed properties for display
-    var displayName: String { username }
+    var displayName: String { 
+        if let name = fullName, !name.isEmpty {
+            return name
+        }
+        return username 
+    }
     var timeAgo: String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
@@ -137,7 +143,12 @@ struct PostComment: Codable, Identifiable {
     }
     
     // Convenience properties for display
-    var username: String { profiles?.username ?? "Unknown" }
+    var username: String { 
+        if let name = profiles?.fullName, !name.isEmpty {
+            return name
+        }
+        return profiles?.username ?? "Unknown" 
+    }
     var profilePictureUrl: String? { profiles?.profilePictureUrl }
     var timeAgo: String {
         let formatter = RelativeDateTimeFormatter()
@@ -150,11 +161,13 @@ struct PostComment: Codable, Identifiable {
 struct CommentUserProfile: Codable, Identifiable {
     let id: String
     let username: String
+    let fullName: String?
     let profilePictureUrl: String?
     
     enum CodingKeys: String, CodingKey {
         case id
         case username
+        case fullName = "full_name"
         case profilePictureUrl = "profile_picture_url"
     }
 }

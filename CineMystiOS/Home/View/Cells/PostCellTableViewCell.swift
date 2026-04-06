@@ -96,14 +96,25 @@ final class PostCellTableViewCell: UITableViewCell {
     }
 
     private func layoutUI() {
-        let stack = UIStackView(arrangedSubviews: [
-            likeButton, likeCountLabel,
-            commentButton, commentCountLabel,
-            shareButton, shareCountLabel
-        ])
+        let likeRow = UIStackView(arrangedSubviews: [likeButton, likeCountLabel])
+        likeRow.axis = .horizontal; likeRow.spacing = 4; likeRow.alignment = .center
+        likeRow.isUserInteractionEnabled = true
+        likeRow.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(didTapLike)))
+        
+        let commentRow = UIStackView(arrangedSubviews: [commentButton, commentCountLabel])
+        commentRow.axis = .horizontal; commentRow.spacing = 4; commentRow.alignment = .center
+        commentRow.isUserInteractionEnabled = true
+        commentRow.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(didTapComment)))
+        
+        let shareRow = UIStackView(arrangedSubviews: [shareButton, shareCountLabel])
+        shareRow.axis = .horizontal; shareRow.spacing = 4; shareRow.alignment = .center
+        shareRow.isUserInteractionEnabled = true
+        shareRow.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(didTapShare)))
+        
+        let stack = UIStackView(arrangedSubviews: [likeRow, commentRow, shareRow])
         stack.axis = .horizontal
         stack.alignment = .center
-        stack.spacing = 8
+        stack.spacing = 16
         
         [avatar, usernameLabel, timeLabel, captionLabel, postImage, stack].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
@@ -144,8 +155,8 @@ final class PostCellTableViewCell: UITableViewCell {
     func configure(with post: Post) {
         self.post = post
         
-        // Set username
-        usernameLabel.text = post.username
+        // Set display name
+        usernameLabel.text = post.displayName
         
         // Set time ago
         timeLabel.text = post.timeAgo

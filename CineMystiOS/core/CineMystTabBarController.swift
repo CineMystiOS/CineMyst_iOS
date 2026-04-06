@@ -85,7 +85,7 @@ class CineMystTabBarController: UITabBarController, UITabBarControllerDelegate {
         // Castings
         let jobsVC = UINavigationController(rootViewController: JobsViewController())
         jobsVC.tabBarItem = UITabBarItem(title: "Castings",
-                                         image: UIImage(systemName: "briefcase.fill"),
+                                         image: UIImage(systemName: "movieclapper.fill"),
                                          tag: 1)
 
         // Flicks → ReelsViewController

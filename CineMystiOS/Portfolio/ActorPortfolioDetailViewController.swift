@@ -703,6 +703,7 @@ class ActorPortfolioDetailViewController: UIViewController {
 
     @objc private func editTapped() {
         let vc = PortfolioCreationViewController()
+        vc.isEditingEnabled = true
         let nav = UINavigationController(rootViewController: vc)
         nav.modalPresentationStyle = .fullScreen
         present(nav, animated: true)
