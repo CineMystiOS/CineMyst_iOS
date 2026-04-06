@@ -349,7 +349,15 @@ class PortfolioViewController: UIViewController {
 
                 guard let p = finalP else { 
                     print("❌ No portfolio found in either table for userId: \(userId)")
-                    throw NSError(domain: "Portfolio", code: 404) 
+                    await MainActor.run {
+                        self.loadingIndicator.stopAnimating()
+                        if self.isOwnProfile {
+                            self.showEmptyState()
+                        } else {
+                            self.showNoPortfolioFound()
+                        }
+                    }
+                    return
                 }
 
                 // Fetch items (use structuredId if available, else p.id)
@@ -367,10 +375,95 @@ class PortfolioViewController: UIViewController {
             } catch {
                 await MainActor.run {
                     self.loadingIndicator.stopAnimating()
-                    self.showError(error.localizedDescription)
+                    let nsError = error as NSError
+                    print("❌ Error fetching portfolio: \(nsError.domain) (\(nsError.code)) - \(error.localizedDescription)")
+                    
+                    // Supabase errors might report 404 if the table is missing or 406 if no record matches
+                    let isNotFound = nsError.code == 404 || error.localizedDescription.contains("404") || error.localizedDescription.contains("PGRST116")
+                    
+                    if isNotFound && self.isOwnProfile {
+                        self.showEmptyState()
+                    } else if isNotFound {
+                        self.showNoPortfolioFound()
+                    } else {
+                        self.showError("Unable to load portfolio. Please check your connection or ensure the database is setup.\n\nError: \(error.localizedDescription)")
+                    }
                 }
             }
         }
+    }
+
+    private func showNoPortfolioFound() {
+        // Clear old content
+        contentStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        let v = UIView()
+        v.translatesAutoresizingMaskIntoConstraints = false
+        
+        let msg = UILabel()
+        msg.text = "No Portfolio Available"
+        msg.font = .systemFont(ofSize: 18, weight: .bold)
+        msg.textColor = .white
+        msg.textAlignment = .center
+        msg.translatesAutoresizingMaskIntoConstraints = false
+        v.addSubview(msg)
+        
+        NSLayoutConstraint.activate([
+            msg.centerXAnchor.constraint(equalTo: v.centerXAnchor),
+            msg.centerYAnchor.constraint(equalTo: v.centerYAnchor)
+        ])
+        
+        contentStack.addArrangedSubview(v)
+    }
+
+    private func showEmptyState() {
+        // Clear everything but keep the hero structure mostly or just show a big button
+        contentStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        let emptyView = UIView()
+        emptyView.translatesAutoresizingMaskIntoConstraints = false
+        
+        let label = UILabel()
+        label.text = "You haven't created your portfolio yet."
+        label.font = .systemFont(ofSize: 16)
+        label.textColor = .white.withAlphaComponent(0.7)
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
+        emptyView.addSubview(label)
+        
+        let createButton = UIButton(type: .system)
+        createButton.setTitle("Create Portfolio", for: .normal)
+        createButton.titleLabel?.font = .systemFont(ofSize: 17, weight: .bold)
+        createButton.setTitleColor(.white, for: .normal)
+        createButton.backgroundColor = PDS.accent
+        createButton.layer.cornerRadius = 16
+        createButton.translatesAutoresizingMaskIntoConstraints = false
+        createButton.addTarget(self, action: #selector(createPortfolioTapped), for: .touchUpInside)
+        emptyView.addSubview(createButton)
+        
+        NSLayoutConstraint.activate([
+            label.centerYAnchor.constraint(equalTo: emptyView.centerYAnchor, constant: -40),
+            label.leadingAnchor.constraint(equalTo: emptyView.leadingAnchor, constant: 40),
+            label.trailingAnchor.constraint(equalTo: emptyView.trailingAnchor, constant: -40),
+            
+            createButton.topAnchor.constraint(equalTo: label.bottomAnchor, constant: 24),
+            createButton.centerXAnchor.constraint(equalTo: emptyView.centerXAnchor),
+            createButton.widthAnchor.constraint(equalToConstant: 220),
+            createButton.heightAnchor.constraint(equalToConstant: 54),
+            
+            emptyView.heightAnchor.constraint(equalToConstant: 400)
+        ])
+        
+        contentStack.addArrangedSubview(emptyView)
+    }
+
+    @objc private func createPortfolioTapped() {
+        let creationVC = PortfolioCreationViewController()
+        creationVC.isEditingEnabled = false
+        let nav = UINavigationController(rootViewController: creationVC)
+        nav.modalPresentationStyle = .fullScreen
+        present(nav, animated: true)
     }
 
     private func resolveUserId() async throws -> String {

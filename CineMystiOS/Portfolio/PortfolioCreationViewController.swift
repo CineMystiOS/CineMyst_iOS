@@ -1081,19 +1081,34 @@ class PortfolioCreationViewController: UIViewController {
                 // Upload media items to Supabase Storage
                 var uploadedMedia: [[String: String]] = []
                 for item in self.pickedMedia {
-                    let path = "\(uid)/\(item.id).\(item.type == "video" ? "mp4" : "jpg")"
-                    if item.type == "video", let videoURL = item.videoURL {
-                        let data = try Data(contentsOf: videoURL)
+                    let ext = item.type == "video" ? "mp4" : "jpg"
+                    let path = "\(uid)/\(item.id).\(ext)"
+                    let contentType = item.type == "video" ? "video/mp4" : "image/jpeg"
+                    
+                    do {
+                        let data: Data
+                        if item.type == "video", let videoURL = item.videoURL {
+                            // Ensure we can read the file
+                            let task = videoURL.startAccessingSecurityScopedResource()
+                            data = try Data(contentsOf: videoURL)
+                            if task { videoURL.stopAccessingSecurityScopedResource() }
+                        } else if let img = item.image, let d = img.jpegData(compressionQuality: 0.8) {
+                            data = d
+                        } else {
+                            continue
+                        }
+                        
                         try await supabase.storage
                             .from("portfolio-media")
-                            .upload(path, data: data, options: FileOptions(contentType: "video/mp4"))
-                    } else if let img = item.image, let data = img.jpegData(compressionQuality: 0.8) {
-                        try await supabase.storage
-                            .from("portfolio-media")
-                            .upload(path, data: data, options: FileOptions(contentType: "image/jpeg"))
+                            .upload(path, data: data, options: FileOptions(contentType: contentType))
+                        
+                        let publicURL = try supabase.storage.from("portfolio-media").getPublicURL(path: path)
+                        uploadedMedia.append(["url": publicURL.absoluteString, "type": item.type])
+                    } catch {
+                        print("⚠️ Failed to upload item \(item.id): \(error)")
+                        // Continue with other items or throw? We throw to notify user of upload failure.
+                        throw error
                     }
-                    let publicURL = try supabase.storage.from("portfolio-media").getPublicURL(path: path)
-                    uploadedMedia.append(["url": publicURL.absoluteString, "type": item.type])
                 }
 
                 let f = self.formData
@@ -1135,7 +1150,15 @@ class PortfolioCreationViewController: UIViewController {
                     self.loadingIndicator.stopAnimating()
                     self.nextButton.isEnabled = true
                     self.backButton.isEnabled = true
-                    self.showError("Failed to save portfolio: \(error.localizedDescription)")
+                    
+                    let nsError = error as NSError
+                    let isNotFound = nsError.code == 404 || error.localizedDescription.contains("404") || error.localizedDescription.contains("PGRST116")
+                    
+                    if isNotFound {
+                        self.showError("Failed to save portfolio.\n\nThe 'actor_portfolios' table might be missing in your database setup. Please ensure all SQL migrations are applied in your Supabase SQL Editor.")
+                    } else {
+                        self.showError("Failed to save portfolio: \(error.localizedDescription)")
+                    }
                 }
             }
         }

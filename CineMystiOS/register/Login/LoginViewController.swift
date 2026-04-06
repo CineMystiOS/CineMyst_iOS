@@ -489,25 +489,39 @@ class LoginViewController: UIViewController {
     
     private func navigateToBirthdate() {
         // Start step-by-step onboarding flow: Birthdate → Location → Profile Picture → About
-        let coordinator = OnboardingCoordinator()
-        coordinator.isPostLoginFlow = true  // Skip role selection for post-login
-        
-        let birthdayVC = BirthdayViewController()
-        birthdayVC.coordinator = coordinator
-        
-        navigationController?.pushViewController(birthdayVC, animated: true)
+        // Replace root to show onboarding full-screen, not in sheet
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            
+            let coordinator = OnboardingCoordinator()
+            coordinator.isPostLoginFlow = true  // Skip role selection for post-login
+            
+            let birthdayVC = BirthdayViewController()
+            birthdayVC.coordinator = coordinator
+            let nav = UINavigationController(rootViewController: birthdayVC)
+            
+            window.rootViewController = nav
+            window.makeKeyAndVisible()
+            
+            UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil)
+        }
     }
     
     private func navigateToOnboarding() {
-        // Create onboarding coordinator
-        let coordinator = OnboardingCoordinator()
-        
-        // Create first onboarding screen (Birthday)
-        let birthdayVC = BirthdayViewController()
-        birthdayVC.coordinator = coordinator
-        
-        // Navigate to birthday screen
-        navigationController?.pushViewController(birthdayVC, animated: true)
+        // Replace root to show onboarding full-screen, not in sheet
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            
+            let coordinator = OnboardingCoordinator()
+            let birthdayVC = BirthdayViewController()
+            birthdayVC.coordinator = coordinator
+            let nav = UINavigationController(rootViewController: birthdayVC)
+            
+            window.rootViewController = nav
+            window.makeKeyAndVisible()
+            
+            UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil)
+        }
     }
     
     private func navigateToHomeDashboard() {

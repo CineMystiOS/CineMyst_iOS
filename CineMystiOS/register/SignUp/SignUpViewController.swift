@@ -410,8 +410,8 @@ class SignUpViewController: UIViewController {
                     } else {
                         // ✅ Check if session exists
                         if authResponse.session != nil {
-                            print("✅ Session established during signup - going to dashboard")
-                            self.navigateToDashboard()
+                            print("✅ Session established during signup - going to onboarding")
+                            self.navigateToOnboarding()
                         } else {
                             // ✅ No session - try signing in
                             print("⚠️ No session after signup, attempting sign in...")
@@ -423,8 +423,8 @@ class SignUpViewController: UIViewController {
                                     try await Task.sleep(nanoseconds: 500_000_000)
                                     
                                     await MainActor.run {
-                                        print("✅ Session created via signIn - going to dashboard")
-                                        self.navigateToDashboard()
+                                        print("✅ Session created via signIn - going to onboarding")
+                                        self.navigateToOnboarding()
                                     }
                                 } catch {
                                     await MainActor.run {
@@ -454,6 +454,22 @@ class SignUpViewController: UIViewController {
                     showAlert(message: errorMessage)
                 }
             }
+        }
+    }
+    
+    private func navigateToOnboarding() {
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            
+            let coordinator = OnboardingCoordinator()
+            let birthdayVC = BirthdayViewController()
+            birthdayVC.coordinator = coordinator
+            let nav = UINavigationController(rootViewController: birthdayVC)
+            
+            window.rootViewController = nav
+            window.makeKeyAndVisible()
+            
+            UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil)
         }
     }
     
