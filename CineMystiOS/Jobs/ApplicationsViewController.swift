@@ -1407,6 +1407,26 @@ extension ApplicationsViewController: UITableViewDelegate, UITableViewDataSource
             
             print("🔍 Verification fetch: App \(verifyApp.id.uuidString.prefix(8)) status = \(verifyApp.status.rawValue)")
             
+            // AUTOMATIC JOB STATE TRANSITION: ACTIVE -> PENDING
+            // If we just shortlisted someone, ensure the job moves to pending status
+            if isShortlisted {
+                do {
+                    print("🔄 Checking job state transition for job: \(app.jobId.uuidString)")
+                    // Simple update: always set to pending if we are shortlisting
+                    // Use eq id to update the jobs table
+                    try await supabase
+                        .from("jobs")
+                        .update(["status": "pending"])
+                        .eq("id", value: app.jobId.uuidString)
+                        // .eq("status", value: "active") // Optional: only if currently active
+                        .execute()
+                    
+                    print("✅ Job status updated to PENDING for \(app.jobId.uuidString.prefix(8))")
+                } catch {
+                    print("⚠️ Note: Failed to update job status to pending (might already be pending/private/completed): \(error)")
+                }
+            }
+            
             // Update local cache
             dbApplicationsRaw[appIndex] = updatedApp
             

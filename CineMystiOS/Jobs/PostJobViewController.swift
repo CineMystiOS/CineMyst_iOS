@@ -35,6 +35,10 @@ class PostJobViewController: UIViewController {
     private var selectedGenre: String?
     private var selectedGender: String?
     
+    private let statusLabelView = UILabel()
+    private var currentStatus: String = "pending"
+    private var hasProfile: Bool = false
+    
     private let deadlineDatePicker: UIDatePicker = {
         let picker = UIDatePicker()
         picker.datePickerMode = .date
@@ -53,6 +57,7 @@ class PostJobViewController: UIViewController {
         buildForm()
         setupBottomButtons()
         setupKeyboardDismissal()
+        fetchStatus()
     }
 
     override func viewDidLayoutSubviews() {
@@ -110,6 +115,52 @@ class PostJobViewController: UIViewController {
     }
 
     private func buildForm() {
+        // Verification Shortcut Section
+        formStack.addArrangedSubview(createSectionHeader("VERIFICATION PROFILE"))
+        let profileCard = createCardContainer { stack in
+            let hStack = UIStackView()
+            hStack.axis = .horizontal
+            hStack.spacing = 12
+            hStack.alignment = .center
+            
+            let icon = UIImageView(image: UIImage(systemName: "person.badge.shield.fill"))
+            icon.tintColor = CineMystTheme.brandPlum
+            icon.contentMode = .scaleAspectFit
+            icon.widthAnchor.constraint(equalToConstant: 24).isActive = true
+            
+            let vStack = UIStackView()
+            vStack.axis = .vertical
+            vStack.spacing = 2
+            
+            let titleLabel = UILabel()
+            titleLabel.text = "Business Profile"
+            titleLabel.font = UIFont.boldSystemFont(ofSize: 16)
+            
+            statusLabelView.text = "Loading status..."
+            statusLabelView.font = UIFont.systemFont(ofSize: 13)
+            statusLabelView.textColor = .secondaryLabel
+            
+            vStack.addArrangedSubview(titleLabel)
+            vStack.addArrangedSubview(statusLabelView)
+            
+            let arrow = UIImageView(image: UIImage(systemName: "chevron.right"))
+            arrow.tintColor = .systemGray3
+            arrow.contentMode = .scaleAspectFit
+            arrow.widthAnchor.constraint(equalToConstant: 14).isActive = true
+            
+            hStack.addArrangedSubview(icon)
+            hStack.addArrangedSubview(vStack)
+            hStack.addArrangedSubview(UIView()) // spacer
+            hStack.addArrangedSubview(arrow)
+            
+            stack.addArrangedSubview(hStack)
+            
+            let tap = UITapGestureRecognizer(target: self, action: #selector(profileTapped))
+            stack.isUserInteractionEnabled = true
+            stack.addGestureRecognizer(tap)
+        }
+        formStack.addArrangedSubview(profileCard)
+
         formStack.addArrangedSubview(createSectionHeader("PROJECT INFORMATION"))
         formStack.addArrangedSubview(
             createCardContainer {
@@ -195,6 +246,47 @@ class PostJobViewController: UIViewController {
         }
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         present(alert, animated: true)
+    }
+
+    @objc private func profileTapped() {
+        let vc = ProfileInfoViewController()
+        navigationController?.pushViewController(vc, animated: true)
+    }
+
+    private func fetchStatus() {
+        Task {
+            do {
+                guard let userId = supabase.auth.currentUser?.id else { return }
+                let casting: CastingProfileRecord = try await supabase
+                    .from("casting_profiles")
+                    .select()
+                    .eq("id", value: userId.uuidString)
+                    .single()
+                    .execute()
+                    .value
+                
+                await MainActor.run {
+                    self.currentStatus = casting.status ?? "pending"
+                    self.hasProfile = true
+                    self.updateStatusUI()
+                }
+            } catch {
+                await MainActor.run {
+                    self.statusLabelView.text = "Profile not submitted"
+                    self.statusLabelView.textColor = .systemOrange
+                }
+            }
+        }
+    }
+
+    private func updateStatusUI() {
+        if currentStatus == "verified" {
+            statusLabelView.text = "Verified Account ✅"
+            statusLabelView.textColor = .systemGreen
+        } else {
+            statusLabelView.text = "Verification Pending ⏳"
+            statusLabelView.textColor = .systemOrange
+        }
     }
 
     @objc private func backTapped() {

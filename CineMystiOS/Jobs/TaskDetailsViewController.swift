@@ -325,7 +325,7 @@ final class TaskDetailsViewController: UIViewController {
         }
         
         // Specific role / Professional title
-        if let role = profile.specificRole, !role.isEmpty {
+        if let role = profile.role, !role.isEmpty {
             let roleLabel = UILabel()
             roleLabel.text = "Role: \(role)"
             roleLabel.font = UIFont.systemFont(ofSize: 13)

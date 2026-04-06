@@ -920,14 +920,6 @@ final class BecomeMentorViewController: UITableViewController {
         }
     }
 
-    private func showAlert(title: String,
-                           message: String,
-                           completion: (() -> Void)? = nil) {
-
-        let ac = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        ac.addAction(UIAlertAction(title: "OK", style: .default) { _ in completion?() })
-        present(ac, animated: true)
-    }
 
     private func uploadMentorImageIfNeeded(userId: String, image: UIImage?) async -> String? {
         guard let image else { return nil }

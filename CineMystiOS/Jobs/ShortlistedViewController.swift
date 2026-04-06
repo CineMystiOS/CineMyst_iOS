@@ -90,6 +90,29 @@ final class ShortlistedCell: UITableViewCell {
         return lbl
     }()
 
+    private let selectionCircle: UIView = {
+        let v = UIView()
+        v.layer.cornerRadius = 12
+        v.layer.borderWidth = 2
+        v.layer.borderColor = UIColor.lightGray.cgColor
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+    
+    func setSelection(_ isSelected: Bool) {
+        innerCircle.isHidden = !isSelected
+        selectionCircle.layer.borderColor = isSelected ? UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1).cgColor : UIColor.lightGray.cgColor
+    }
+    
+    private let innerCircle: UIView = {
+        let v = UIView()
+        v.layer.cornerRadius = 7
+        v.backgroundColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1)
+        v.isHidden = true
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+
     private let chatButton: UIButton = {
         let btn = UIButton(type: .system)
         btn.setImage(UIImage(systemName: "bubble.left.and.bubble.right"), for: .normal)
@@ -97,7 +120,7 @@ final class ShortlistedCell: UITableViewCell {
         btn.translatesAutoresizingMaskIntoConstraints = false
         return btn
     }()
-    
+
     var onChatTapped: (() -> Void)?
 
     // MARK: Init
@@ -140,7 +163,8 @@ final class ShortlistedCell: UITableViewCell {
 
     // MARK: Layout
     private func setupUI() {
-
+        contentView.addSubview(selectionCircle)
+        selectionCircle.addSubview(innerCircle)
         contentView.addSubview(profileImageView)
         contentView.addSubview(nameLabel)
         contentView.addSubview(experienceLabel)
@@ -154,7 +178,17 @@ final class ShortlistedCell: UITableViewCell {
 
         NSLayoutConstraint.activate([
 
-            profileImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            selectionCircle.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            selectionCircle.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            selectionCircle.widthAnchor.constraint(equalToConstant: 24),
+            selectionCircle.heightAnchor.constraint(equalToConstant: 24),
+
+            innerCircle.centerXAnchor.constraint(equalTo: selectionCircle.centerXAnchor),
+            innerCircle.centerYAnchor.constraint(equalTo: selectionCircle.centerYAnchor),
+            innerCircle.widthAnchor.constraint(equalToConstant: 14),
+            innerCircle.heightAnchor.constraint(equalToConstant: 14),
+
+            profileImageView.leadingAnchor.constraint(equalTo: selectionCircle.trailingAnchor, constant: 12),
             profileImageView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 14),
             profileImageView.widthAnchor.constraint(equalToConstant: 56),
             profileImageView.heightAnchor.constraint(equalToConstant: 56),
@@ -183,7 +217,6 @@ final class ShortlistedCell: UITableViewCell {
 
             chatButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             chatButton.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-
             contentView.bottomAnchor.constraint(equalTo: connectedTag.bottomAnchor, constant: 16)
         ])
     }
@@ -195,6 +228,7 @@ final class ShortlistedCell: UITableViewCell {
 final class ShortlistedViewController: UIViewController {
 
     var job: Job?
+    var showOnlySelected: Bool = false
     private var tableView = UITableView(frame: .zero, style: .plain)
     private var candidates: [ShortlistedCandidate] = []
     private let backgroundGradient = CAGradientLayer()
@@ -207,6 +241,30 @@ final class ShortlistedViewController: UIViewController {
         lbl.translatesAutoresizingMaskIntoConstraints = false
         return lbl
     }()
+
+    private let cueCastLabel: UILabel = {
+        let lbl = UILabel()
+        lbl.text = "Cue Cast"
+        lbl.font = .systemFont(ofSize: 28, weight: .bold)
+        lbl.textColor = CineMystTheme.ink
+        lbl.translatesAutoresizingMaskIntoConstraints = false
+        return lbl
+    }()
+
+    private let hireNowButton: UIButton = {
+        let btn = UIButton(type: .system)
+        btn.setTitle("Hire This Actor", for: .normal)
+        btn.setTitleColor(.white, for: .normal)
+        btn.backgroundColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1)
+        btn.titleLabel?.font = .systemFont(ofSize: 16, weight: .bold)
+        btn.layer.cornerRadius = 24
+        btn.alpha = 0.5
+        btn.isEnabled = false
+        btn.translatesAutoresizingMaskIntoConstraints = false
+        return btn
+    }()
+
+    private var selectedActorId: UUID?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -233,7 +291,7 @@ final class ShortlistedViewController: UIViewController {
     // MARK: Navigation Bar
     private func setupNavBar() {
 
-        navigationItem.title = "Shortlisted"
+        navigationItem.title = "Cue Cast"
         navigationController?.navigationBar.prefersLargeTitles = false
         navigationController?.navigationBar.titleTextAttributes = [
             .foregroundColor: CineMystTheme.ink,
@@ -278,12 +336,19 @@ final class ShortlistedViewController: UIViewController {
                 
                 print("🔍 Loading shortlisted candidates for job: \(job.id.uuidString)")
                 
-                // Fetch shortlisted applications
-                let shortlistedApps: [Application] = try await supabase
+                // Fetch shortlisted/selected applications
+                var query = supabase
                     .from("applications")
                     .select()
                     .eq("job_id", value: job.id.uuidString)
-                    .in("status", value: ["shortlisted", "selected"])
+                
+                if showOnlySelected {
+                    query = query.eq("status", value: "selected")
+                } else {
+                    query = query.in("status", values: ["shortlisted", "selected"])
+                }
+                
+                let shortlistedApps: [Application] = try await query
                     .execute()
                     .value
                 
@@ -380,16 +445,26 @@ final class ShortlistedViewController: UIViewController {
 
     // MARK: UI
     private func setupUI() {
+        view.addSubview(cueCastLabel)
         view.addSubview(subtitleLabel)
+        view.addSubview(hireNowButton)
 
         NSLayoutConstraint.activate([
-            subtitleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            subtitleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 2)
+            cueCastLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            cueCastLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
+
+            subtitleLabel.leadingAnchor.constraint(equalTo: cueCastLabel.leadingAnchor),
+            subtitleLabel.topAnchor.constraint(equalTo: cueCastLabel.bottomAnchor, constant: 4),
+
+            hireNowButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 40),
+            hireNowButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -40),
+            hireNowButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+            hireNowButton.heightAnchor.constraint(equalToConstant: 48)
         ])
+        
+        hireNowButton.addTarget(self, action: #selector(didTapHireNow), for: .touchUpInside)
     }
 
-
-    // MARK: Table Setup
     private func setupTable() {
         view.addSubview(tableView)
 
@@ -397,17 +472,120 @@ final class ShortlistedViewController: UIViewController {
         tableView.separatorStyle = .none
         tableView.register(ShortlistedCell.self, forCellReuseIdentifier: ShortlistedCell.id)
         tableView.dataSource = self
+        tableView.delegate = self
+        tableView.backgroundColor = .clear
         tableView.rowHeight = UITableView.automaticDimension
 
         NSLayoutConstraint.activate([
-            tableView.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 10),
+            tableView.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 16),
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            tableView.bottomAnchor.constraint(equalTo: hireNowButton.topAnchor, constant: -10)
         ])
+    }
+
+    @objc private func didTapHireNow() {
+        guard let actorId = selectedActorId,
+              let candidate = candidates.first(where: { $0.actorId == actorId }) else { return }
+        finalizeHiring(candidate: candidate)
+    }
+    
+    // MARK: - Finalize Hiring
+    
+    private func finalizeHiring(candidate: ShortlistedCandidate) {
+        let alert = UIAlertController(
+            title: "Finalize Role",
+            message: "Are you sure you want to select \(candidate.name) for this role? This will mark the job as completed.",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Yes, Hire", style: .default) { [weak self] _ in
+            self?.executeHiring(candidate: candidate)
+        })
+        
+        present(alert, animated: true)
+    }
+    
+    private func executeHiring(candidate: ShortlistedCandidate) {
+        Task {
+            do {
+                guard let job = job else { return }
+                
+                // 1. Update application status to 'selected'
+                try await supabase
+                    .from("applications")
+                    .update(["status": "selected"])
+                    .eq("job_id", value: job.id.uuidString)
+                    .eq("actor_id", value: candidate.actorId.uuidString)
+                    .execute()
+                
+                // 2. Update job status to 'completed'
+                try await supabase
+                    .from("jobs")
+                    .update(["status": "completed"])
+                    .eq("id", value: job.id.uuidString)
+                    .execute()
+                
+                print("🏆 Hiring finalized for \(candidate.name)! Job \(job.id.uuidString.prefix(8)) is now COMPLETED.")
+                
+                await MainActor.run {
+                    let success = UIAlertController(title: "Success", message: "\(candidate.name) has been hired! The job is now moved to Completed.", preferredStyle: .alert)
+                    success.addAction(UIAlertAction(title: "Awesome", style: .default) { [weak self] _ in
+                        guard let self = self, let nav = self.navigationController else { return }
+                        if let dashboard = nav.viewControllers.first(where: { $0 is PostedJobsDashboardViewController }) {
+                            nav.popToViewController(dashboard, animated: true)
+                        } else {
+                            nav.popViewController(animated: true)
+                        }
+                    })
+                    self.present(success, animated: true)
+                }
+            } catch {
+                print("❌ Hiring failed: \(error)")
+                await MainActor.run {
+                    self.showAlert(title: "Error", message: "Failed to finalize hiring: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    // MARK: - Messaging
+    
+    private func openChatWithApplicant(actorId: UUID, name: String) {
+        Task {
+            do {
+                let conversation = try await MessagesService.shared.getOrCreateConversation(withUserId: actorId)
+                
+                await MainActor.run {
+                    let chatVC = ChatViewController()
+                    chatVC.conversationId = conversation.id
+                    chatVC.otherUserName = name
+                    self.navigationController?.pushViewController(chatVC, animated: true)
+                }
+            } catch {
+                await MainActor.run {
+                    self.showAlert(title: "Error", message: "Failed to start conversation: \(error.localizedDescription)")
+                }
+            }
+        }
     }
 }
 
+
+// MARK: - Table Delegate
+extension ShortlistedViewController: UITableViewDelegate {
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        let candidate = candidates[indexPath.row]
+        selectedActorId = candidate.actorId
+        
+        // Update Hire button state
+        hireNowButton.alpha = 1.0
+        hireNowButton.isEnabled = true
+        
+        tableView.reloadData()
+    }
+}
 
 // MARK: - Table DataSource
 extension ShortlistedViewController: UITableViewDataSource {
@@ -418,11 +596,11 @@ extension ShortlistedViewController: UITableViewDataSource {
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        print("🎨 Creating cell for row \(indexPath.row)")
         let cell = tableView.dequeueReusableCell(withIdentifier: ShortlistedCell.id, for: indexPath) as! ShortlistedCell
         let candidate = candidates[indexPath.row]
 
         cell.configure(with: candidate)
+        cell.setSelection(candidate.actorId == selectedActorId)
         cell.selectionStyle = .none
         
         // Set chat button action
@@ -431,34 +609,5 @@ extension ShortlistedViewController: UITableViewDataSource {
         }
         
         return cell
-    }
-    
-    // MARK: - Messaging
-    
-    private func openChatWithApplicant(actorId: UUID, name: String) {
-        Task {
-            do {
-                // Create or get existing conversation
-                let conversation = try await MessagesService.shared.getOrCreateConversation(withUserId: actorId)
-                
-                await MainActor.run {
-                    // Import MessagesViewController to use ChatViewController
-                    let chatVC = ChatViewController()
-                    chatVC.conversationId = conversation.id
-                    chatVC.otherUserName = name
-                    self.navigationController?.pushViewController(chatVC, animated: true)
-                }
-            } catch {
-                await MainActor.run {
-                    let alert = UIAlertController(
-                        title: "Error",
-                        message: "Failed to start conversation: \(error.localizedDescription)",
-                        preferredStyle: .alert
-                    )
-                    alert.addAction(UIAlertAction(title: "OK", style: .default))
-                    self.present(alert, animated: true)
-                }
-            }
-        }
     }
 }

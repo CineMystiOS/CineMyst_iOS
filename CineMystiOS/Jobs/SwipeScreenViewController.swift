@@ -585,8 +585,33 @@ class SwipeScreenViewController: UIViewController {
             card.alpha = 0
         }, completion: { _ in
             card.removeFromSuperview()
+            
+            // Check if job needs to move to 'pending' if it was 'active' and something was shortlisted
+            if direction > 0 {
+                self.ensureJobIsPending()
+            }
+            
             self.pushNextCard()
         })
+    }
+    
+    private func ensureJobIsPending() {
+        guard let job = job, job.status == .active else { return }
+        
+        Task {
+            do {
+                try await supabase
+                    .from("jobs")
+                    .update(["status": "pending"])
+                    .eq("id", value: job.id.uuidString)
+                    .execute()
+                print("✅ Job state transitioned: ACTIVE -> PENDING for job \(job.id.uuidString.prefix(8))")
+                // Update local job model too
+                // self.job?.status = .pending // job is a var but we should handle it
+            } catch {
+                print("⚠️ Failed to update job status to pending: \(error)")
+            }
+        }
     }
     
     private func updateApplicationStatus(applicationId: UUID, status: Application.ApplicationStatus) async {

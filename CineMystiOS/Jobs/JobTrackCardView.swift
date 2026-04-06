@@ -123,7 +123,7 @@ class JobTrackCardView: UIView {
     }
 
     // MARK: - Configure
-    func configure(with job: JobCardModel) {
+    func configure(with job: JobCardModel, buttonTitle: String? = nil) {
         titleLabel.text = job.title
         companyLabel.text = job.company
         locationLabel.text = job.location
@@ -133,6 +133,12 @@ class JobTrackCardView: UIView {
         statusTag.text = job.statusText
         statusTag.textColor = job.statusColor
         statusTag.backgroundColor = job.statusColor.withAlphaComponent(0.15)
+        
+        if let title = buttonTitle {
+            viewApplicationsBtn.setTitle(title, for: .normal)
+        } else {
+            viewApplicationsBtn.setTitle("View Applications", for: .normal)
+        }
     }
     
     

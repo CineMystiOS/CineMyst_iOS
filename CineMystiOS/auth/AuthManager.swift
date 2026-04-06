@@ -11,6 +11,35 @@ import UIKit
 import SafariServices
 import AuthenticationServices
 
+// MARK: - Profile Errors
+enum ProfileError: Error {
+    case imageCompressionFailed
+    case invalidSession
+    case uploadFailed
+    case noProfileFound
+}
+
+// MARK: - Batch Password Reset Result
+struct PasswordResetBatchResult {
+    let successCount: Int
+    let failedEmails: [(email: String, error: String)]
+    let errorMessage: String?
+    
+    var isFullSuccess: Bool {
+        errorMessage == nil && failedEmails.isEmpty
+    }
+    
+    var summary: String {
+        if isFullSuccess {
+            return "✅ Successfully sent \(successCount) password reset emails"
+        } else if let error = errorMessage {
+            return "❌ Error: \(error)"
+        } else {
+            return "⚠️ Mixed results: \(successCount) succeeded, \(failedEmails.count) failed"
+        }
+    }
+}
+
 final class AuthManager: NSObject {
     static let shared = AuthManager()
     private override init() {}
@@ -297,11 +326,31 @@ final class AuthManager: NSObject {
     private func saveCastingProfile(_ data: ProfileData, userId: UUID) async throws {
         let castingProfile = CastingProfileRecordForSave(
             id: userId.uuidString,
-            specificRole: data.specificRole,
+            fullName: nil,
+            role: data.specificRole,
+            phoneNumber: nil,
+            emailId: nil,
+            location: nil,
+            governmentIdUrl: nil,
+            selfieUrl: nil,
+            pastProjectDetails: nil,
+            projectRole: nil,
+            productionHouse: data.companyName,
+            imdbLink: nil,
             companyName: data.companyName,
+            officialWorkEmail: nil,
+            linkedinProfile: nil,
+            instagramProfile: nil,
+            portfolioWebsite: nil,
+            guildIdCardUrl: nil,
+            guildName: nil,
+            membershipNumber: nil,
+            membershipExpiry: nil,
+            industryReferences: nil,
             castingTypes: Array(data.castingTypes),
             castingRadius: data.castingRadius,
-            contactPreference: data.contactPreference
+            contactPreference: data.contactPreference,
+            status: "pending"
         )
         
         do {
@@ -476,19 +525,59 @@ struct ArtistProfileRecordForSave: Encodable {
 
 struct CastingProfileRecordForSave: Encodable {
     let id: String
-    let specificRole: String?
+    let fullName: String?
+    let role: String?
+    let phoneNumber: String?
+    let emailId: String?
+    let location: String?
+    let governmentIdUrl: String?
+    let selfieUrl: String?
+    let pastProjectDetails: String?
+    let projectRole: String?
+    let productionHouse: String?
+    let imdbLink: String?
     let companyName: String?
-    let castingTypes: [String]
+    let officialWorkEmail: String?
+    let linkedinProfile: String?
+    let instagramProfile: String?
+    let portfolioWebsite: String?
+    let guildIdCardUrl: String?
+    let guildName: String?
+    let membershipNumber: String?
+    let membershipExpiry: String?
+    let industryReferences: String?
+    let castingTypes: [String]?
     let castingRadius: Int?
     let contactPreference: String?
+    let status: String?
     
     enum CodingKeys: String, CodingKey {
         case id
-        case specificRole = "specific_role"
+        case fullName = "full_name"
+        case role
+        case phoneNumber = "phone_number"
+        case emailId = "email_id"
+        case location
+        case governmentIdUrl = "government_id_url"
+        case selfieUrl = "selfie_url"
+        case pastProjectDetails = "past_project_details"
+        case projectRole = "project_role"
+        case productionHouse = "production_house"
+        case imdbLink = "imdb_link"
         case companyName = "company_name"
+        case officialWorkEmail = "official_work_email"
+        case linkedinProfile = "linkedin_profile"
+        case instagramProfile = "instagram_profile"
+        case portfolioWebsite = "portfolio_website"
+        case guildIdCardUrl = "guild_id_card_url"
+        case guildName = "guild_name"
+        case membershipNumber = "membership_number"
+        case membershipExpiry = "membership_expiry"
+        case industryReferences = "industry_references"
         case castingTypes = "casting_types"
         case castingRadius = "casting_radius"
         case contactPreference = "contact_preference"
+        case status
     }
 }
 
@@ -654,51 +743,62 @@ struct ArtistProfileRecord: Codable {
 
 struct CastingProfileRecord: Codable {
     let id: String
-    let specificRole: String?
+    let fullName: String?
+    let role: String?
+    let phoneNumber: String?
+    let emailId: String?
+    let location: String?
+    let governmentIdUrl: String?
+    let selfieUrl: String?
+    let pastProjectDetails: String?
+    let projectRole: String?
+    let productionHouse: String?
+    let imdbLink: String?
     let companyName: String?
-    let castingTypes: [String]
+    let officialWorkEmail: String?
+    let linkedinProfile: String?
+    let instagramProfile: String?
+    let portfolioWebsite: String?
+    let guildIdCardUrl: String?
+    let guildName: String?
+    let membershipNumber: String?
+    let membershipExpiry: String?
+    let industryReferences: String?
+    let castingTypes: [String]?
     let castingRadius: Int?
     let contactPreference: String?
+    let status: String?
     let createdAt: String?
     
     enum CodingKeys: String, CodingKey {
         case id
-        case specificRole = "specific_role"
+        case fullName = "full_name"
+        case role
+        case phoneNumber = "phone_number"
+        case emailId = "email_id"
+        case location
+        case governmentIdUrl = "government_id_url"
+        case selfieUrl = "selfie_url"
+        case pastProjectDetails = "past_project_details"
+        case projectRole = "project_role"
+        case productionHouse = "production_house"
+        case imdbLink = "imdb_link"
         case companyName = "company_name"
+        case officialWorkEmail = "official_work_email"
+        case linkedinProfile = "linkedin_profile"
+        case instagramProfile = "instagram_profile"
+        case portfolioWebsite = "portfolio_website"
+        case guildIdCardUrl = "guild_id_card_url"
+        case guildName = "guild_name"
+        case membershipNumber = "membership_number"
+        case membershipExpiry = "membership_expiry"
+        case industryReferences = "industry_references"
         case castingTypes = "casting_types"
         case castingRadius = "casting_radius"
         case contactPreference = "contact_preference"
+        case status
         case createdAt = "created_at"
     }
-}
-
-// MARK: - Batch Password Reset Result
-struct PasswordResetBatchResult {
-    let successCount: Int
-    let failedEmails: [(email: String, error: String)]
-    let errorMessage: String?
-    
-    var isFullSuccess: Bool {
-        errorMessage == nil && failedEmails.isEmpty
-    }
-    
-    var summary: String {
-        if isFullSuccess {
-            return "✅ Successfully sent \(successCount) password reset emails"
-        } else if let error = errorMessage {
-            return "❌ Error: \(error)"
-        } else {
-            return "⚠️ Mixed results: \(successCount) succeeded, \(failedEmails.count) failed"
-        }
-    }
-}
-
-// MARK: - Profile Errors
-enum ProfileError: Error {
-    case imageCompressionFailed
-    case invalidSession
-    case uploadFailed
-    case noProfileFound
 }
 
 extension Notification.Name {

@@ -197,14 +197,15 @@ class PostedJobsDashboardViewController: UIViewController {
 
 
     // MARK: - Load Cards
+    private var currentTask: Task<Void, Never>?
+
     private func loadCards(for index: Int) {
-        stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        currentTask?.cancel()
         
         let sectionName = ["Active Jobs", "Pending", "Completed"][index]
         print("📱 Loading \(sectionName) section...")
         
-        // Fetch jobs from database
-        Task { [weak self] in
+        currentTask = Task { [weak self] in
             do {
                 guard let userId = supabase.auth.currentUser?.id else {
                     print("❌ User not authenticated")
@@ -224,21 +225,63 @@ class PostedJobsDashboardViewController: UIViewController {
                 let jobs = try await JobsService.shared.fetchJobsByDirector(directorId: userId, status: status)
                 
                 print("✅ Found \(jobs.count) jobs for \(sectionName)")
-                for job in jobs {
-                    print("   - \(job.title ?? "Untitled") | Status: \(job.status?.rawValue ?? "nil") | ID: \(job.id.uuidString.prefix(8))")
+                
+                var displayJobs = jobs
+                
+                // DATA HEALING: If we are in Active Jobs, check if any should actually be Pending
+                if index == 0 {
+                    for job in jobs {
+                        // Check if this job has any shortlisted or selected applications
+                        do {
+                            let shortlistedCount: Int = try await supabase
+                                .from("applications")
+                                .select("id", head: true, count: .exact)
+                                .eq("job_id", value: job.id.uuidString)
+                                .in("status", values: ["shortlisted", "selected"])
+                                .execute()
+                                .count ?? 0
+                            
+                            if shortlistedCount > 0 {
+                                print("🛠 Auto-healing job \(job.id.uuidString.prefix(8)): Moving to PENDING as it has \(shortlistedCount) shortlisted candidates.")
+                                try await supabase
+                                    .from("jobs")
+                                    .update(["status": "pending"])
+                                    .eq("id", value: job.id.uuidString)
+                                    .execute()
+                                
+                                // Remove from local display list for Active section
+                                if let idx = displayJobs.firstIndex(where: { $0.id == job.id }) {
+                                    displayJobs.remove(at: idx)
+                                }
+                            }
+                        } catch {
+                            print("⚠️ Failed to check/heal job status: \(error)")
+                        }
+                    }
                 }
                 
                 await MainActor.run {
                     guard let self = self else { return }
                     
-                    for job in jobs {
+                    self.stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+                    
+                    for job in displayJobs {
                         let jobCardModel = job.toJobCardModel(applicationsCount: 0)
                         let card = JobTrackCardView()
-                        card.configure(with: jobCardModel)
+                        
+                        let isCompleted = index == 2
+                        let buttonTitle = isCompleted ? "View Selected" : "View Applications"
+                        
+                        card.configure(with: jobCardModel, buttonTitle: buttonTitle)
                         card.onViewApplicationsTapped = { [weak self] in
-                            let vc = SwipeScreenViewController()
-                            vc.job = job
-                            self?.navigationController?.pushViewController(vc, animated: true)
+                            if isCompleted {
+                                let vc = ActorProfileViewController()
+                                self?.navigationController?.pushViewController(vc, animated: true)
+                            } else {
+                                let vc = SwipeScreenViewController()
+                                vc.job = job
+                                self?.navigationController?.pushViewController(vc, animated: true)
+                            }
                         }
                         self.stackView.addArrangedSubview(card)
                     }

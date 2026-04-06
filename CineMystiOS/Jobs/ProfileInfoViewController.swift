@@ -16,33 +16,41 @@ class ProfileInfoViewController: UIViewController {
     private var hasExistingCastingProfile = false
 
     // Selection data sources
+    private let castingRoles = ["Director", "Assistant Director", "Casting Professional"]
     private let companyTypes = ["Production Company", "Post-Production", "Studio", "Network", "Independent", "Freelance"]
     private let experienceYears = ["0-2 years", "3-5 years", "6-10 years", "11-15 years", "16-20 years", "20+ years"]
-    private let contractTypes = ["Full-time employee", "Part-time employee", "Freelance/Contract", "Project Based", "Day Rate", "Weekly Rate"]
-    private let budgetRanges = ["Under ₹ 500/day", "₹ 500-₹ 1000/day", "₹ 1000-₹ 2000/day", "₹ 2000-₹ 3500/day", "₹ 3500-₹ 5000/day", "₹ 5000+/day"]
     
     // Store selected values
+    private var selectedRole: String?
     private var selectedCompanyType: String?
     private var selectedExperience: String?
-    private var selectedContract: String?
-    private var selectedBudget: String?
-    private var selectedAdditionalLocation: String?
-    private var loadedProfessionalTitle: String?
-    private var loadedProductionHouse: String?
-    private var loadedPrimaryLocation: String?
-    private var loadedWebsite: String?
-    private var loadedIMDbProfile: String?
+    private var selectedMembershipExpiry: Date?
     
-    // Multi-select sets for pills
-    private var selectedSpecializations = Set<String>()
-    private var selectedUnions = Set<String>()
+    // Document URLs (from storage)
+    private var governmentIdUrl: String?
+    private var selfieUrl: String?
+    private var guildIdCardUrl: String?
     
     // Store text field references
-    private var professionalTitleTextField: UITextField?
+    private var fullNameTextField: UITextField?
+    private var phoneNumberTextField: UITextField?
+    private var emailTextField: UITextField?
+    private var locationTextField: UITextField?
+    
+    private var pastProjectDetailsTextView: UITextView?
+    private var projectRoleTextField: UITextField?
     private var productionHouseTextField: UITextField?
-    private var primaryLocationTextField: UITextField?
-    private var websiteTextField: UITextField?
-    private var imdbProfileTextField: UITextField?
+    private var imdbLinkTextField: UITextField?
+    
+    private var companyNameTextField: UITextField?
+    private var officialEmailTextField: UITextField?
+    private var linkedinTextField: UITextField?
+    private var instagramTextField: UITextField?
+    private var portfolioWebsiteTextField: UITextField?
+    
+    private var guildNameTextField: UITextField?
+    private var membershipNumberTextField: UITextField?
+    private var industryReferencesTextView: UITextView?
 
     // MARK: - Helpers (UI builders)
     private func sectionHeader(_ text: String) -> UILabel {
@@ -69,16 +77,22 @@ class ProfileInfoViewController: UIViewController {
         tf.heightAnchor.constraint(equalToConstant: 44).isActive = true
         
         // Store reference based on title
-        if title == "Professional Title *" {
-            professionalTitleTextField = tf
-        } else if title == "Production House *" {
-            productionHouseTextField = tf
-        } else if title == "Primary Location *" {
-            primaryLocationTextField = tf
-        } else if title == "Website/Portfolio" {
-            websiteTextField = tf
-        } else if title == "IMDb Profile" {
-            imdbProfileTextField = tf
+        switch title {
+        case "Full Name *": fullNameTextField = tf
+        case "Phone Number *": phoneNumberTextField = tf
+        case "Email ID *": emailTextField = tf
+        case "Location *": locationTextField = tf
+        case "Role in Projects": projectRoleTextField = tf
+        case "Production House / Studio Name": productionHouseTextField = tf
+        case "IMDb / YouTube / OTT Links": imdbLinkTextField = tf
+        case "Company / Organization Name": companyNameTextField = tf
+        case "Official Work Email": officialEmailTextField = tf
+        case "LinkedIn Profile": linkedinTextField = tf
+        case "Instagram / Professional Social Media": instagramTextField = tf
+        case "Portfolio Website": portfolioWebsiteTextField = tf
+        case "Guild Name": guildNameTextField = tf
+        case "Membership Number": membershipNumberTextField = tf
+        default: break
         }
 
         let stack = UIStackView(arrangedSubviews: [titleLabel, tf])
@@ -98,7 +112,91 @@ class ProfileInfoViewController: UIViewController {
         return container
     }
 
-    // Each selection cell's value label will have tag = 1000 + containerTag
+    private func textViewField(title: String, placeholder: String) -> UIView {
+        let container = UIView()
+        let titleLabel = UILabel()
+        titleLabel.text = title
+        titleLabel.font = UIFont.systemFont(ofSize: 14)
+        titleLabel.textColor = .darkGray
+
+        let tv = UITextView()
+        tv.backgroundColor = UIColor.systemGray6
+        tv.layer.cornerRadius = 8
+        tv.font = UIFont.systemFont(ofSize: 14)
+        tv.heightAnchor.constraint(equalToConstant: 100).isActive = true
+        
+        if title == "Past Project Details" {
+            pastProjectDetailsTextView = tv
+        } else if title == "Industry References" {
+            industryReferencesTextView = tv
+        }
+
+        let stack = UIStackView(arrangedSubviews: [titleLabel, tv])
+        stack.axis = .vertical
+        stack.spacing = 6
+        container.addSubview(stack)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: container.topAnchor),
+            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+        ])
+        return container
+    }
+
+    private func documentUploadRow(title: String, icon: String, identifier: String) -> UIView {
+        let container = UIView()
+        container.backgroundColor = UIColor.systemGray6
+        container.layer.cornerRadius = 8
+        container.heightAnchor.constraint(equalToConstant: 60).isActive = true
+        container.accessibilityIdentifier = identifier
+
+        let img = UIImageView(image: UIImage(systemName: icon))
+        img.tintColor = .darkGray
+        img.contentMode = .scaleAspectFit
+
+        let label = UILabel()
+        label.text = title
+        label.font = UIFont.systemFont(ofSize: 14)
+        label.textColor = .black
+
+        let statusLabel = UILabel()
+        statusLabel.text = "Tap to upload"
+        statusLabel.font = UIFont.systemFont(ofSize: 12)
+        statusLabel.textColor = .gray
+        statusLabel.tag = 500
+
+        let vStack = UIStackView(arrangedSubviews: [label, statusLabel])
+        vStack.axis = .vertical
+        vStack.spacing = 2
+
+        let hStack = UIStackView(arrangedSubviews: [img, vStack, UIView(), UIImageView(image: UIImage(systemName: "plus.circle"))])
+        hStack.axis = .horizontal
+        hStack.spacing = 12
+        hStack.alignment = .center
+
+        container.addSubview(hStack)
+        hStack.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            hStack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 12),
+            hStack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -12),
+            hStack.centerYAnchor.constraint(equalTo: container.centerYAnchor)
+        ])
+        
+        img.widthAnchor.constraint(equalToConstant: 24).isActive = true
+        img.heightAnchor.constraint(equalToConstant: 24).isActive = true
+
+        let tap = UITapGestureRecognizer(target: self, action: #selector(uploadRowTapped(_:)))
+        container.addGestureRecognizer(tap)
+        return container
+    }
+    
+    @objc private func uploadRowTapped(_ sender: UITapGestureRecognizer) {
+        guard let id = sender.view?.accessibilityIdentifier else { return }
+        presentImagePicker(for: id)
+    }
+
     private func selectionCell(title: String, value: String, tag: Int) -> UIView {
         let container = UIView()
         container.backgroundColor = UIColor.systemGray6
@@ -115,7 +213,6 @@ class ProfileInfoViewController: UIViewController {
         valueLabel.text = value
         valueLabel.font = UIFont.systemFont(ofSize: 14)
         valueLabel.textColor = .gray
-        // unique predictable tag for value label
         valueLabel.tag = 1000 + tag
 
         let chevron = UIImageView(image: UIImage(systemName: "chevron.right"))
@@ -135,11 +232,29 @@ class ProfileInfoViewController: UIViewController {
             row.bottomAnchor.constraint(equalTo: container.bottomAnchor)
         ])
 
-        // Add tap gesture
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(selectionCellTapped(_:)))
         container.addGestureRecognizer(tapGesture)
-
         return container
+    }
+
+    private func presentImagePicker(for identifier: String) {
+        let picker = UIImagePickerController()
+        picker.delegate = self
+        picker.accessibilityHint = identifier
+        
+        let ac = UIAlertController(title: "Upload", message: "Choose source", preferredStyle: .actionSheet)
+        ac.addAction(UIAlertAction(title: "Camera", style: .default) { _ in
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                picker.sourceType = .camera
+                self.present(picker, animated: true)
+            }
+        })
+        ac.addAction(UIAlertAction(title: "Photo Library", style: .default) { _ in
+            picker.sourceType = .photoLibrary
+            self.present(picker, animated: true)
+        })
+        ac.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        present(ac, animated: true)
     }
 
     // MARK: - Actions for selection cells
@@ -150,34 +265,26 @@ class ProfileInfoViewController: UIViewController {
         var options: [String] = []
         
         switch tag {
-        case 1:
-            title = "Company Type"
-            options = companyTypes
-        case 2:
-            title = "Years of Experience"
-            options = experienceYears
-        case 3:
-            title = "Preferred Contract"
-            options = contractTypes
-        case 4:
-            title = "Budget Range"
-            options = budgetRanges
-        case 5:
-            // Additional Locations: show a text entry alert (freeform input)
-            let alert = UIAlertController(title: "Additional Location", message: "Enter location (city, area, etc.)", preferredStyle: .alert)
-            alert.addTextField { tf in
-                tf.placeholder = "e.g. Mumbai"
-            }
+        case 10:
+            title = "Primary Role"
+            options = castingRoles
+        case 20: 
+            let alert = UIAlertController(title: "\n\n\n\n\n\n\n\n\n", message: nil, preferredStyle: .actionSheet)
+            let picker = UIDatePicker()
+            picker.datePickerMode = .date
+            picker.preferredDatePickerStyle = .wheels
+            picker.frame = CGRect(x: 0, y: 0, width: alert.view.bounds.width - 20, height: 200)
+            alert.view.addSubview(picker)
+            alert.addAction(UIAlertAction(title: "Done", style: .default) { _ in
+                let formatter = DateFormatter()
+                formatter.dateStyle = .medium
+                self.selectedMembershipExpiry = picker.date
+                self.updateSelection(tag: tag, value: formatter.string(from: picker.date))
+            })
             alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-            alert.addAction(UIAlertAction(title: "Add", style: .default, handler: { [weak self] _ in
-                guard let text = alert.textFields?.first?.text,
-                      !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-                self?.updateSelection(tag: tag, value: text)
-            }))
             present(alert, animated: true)
             return
-        default:
-            return
+        default: break
         }
         
         showBottomPicker(title: title, options: options, tag: tag)
@@ -198,35 +305,15 @@ class ProfileInfoViewController: UIViewController {
     }
 
     private func updateSelection(tag: Int, value: String) {
-        // The value label was assigned tag = 1000 + containerTag
         let valueTag = 1000 + tag
         if let valueLabel = view.viewWithTag(valueTag) as? UILabel {
             valueLabel.text = value
-            valueLabel.textColor = .darkGray
-        } else {
-            // fallback: try container traversal (shouldn't normally be needed)
-            if let container = view.viewWithTag(tag) {
-                for sub in container.subviews {
-                    if let stack = sub as? UIStackView {
-                        for arranged in stack.arrangedSubviews {
-                            if let lbl = arranged as? UILabel, lbl.tag == valueTag {
-                                lbl.text = value
-                                lbl.textColor = .darkGray
-                                break
-                            }
-                        }
-                    }
-                }
-            }
+            valueLabel.textColor = .black
         }
         
-        // Store the selected value
         switch tag {
-        case 1: selectedCompanyType = value
-        case 2: selectedExperience = value
-        case 3: selectedContract = value
-        case 4: selectedBudget = value
-        case 5: selectedAdditionalLocation = value
+        case 10: selectedRole = value
+        case 20: break // Date already stored
         default: break
         }
     }
@@ -281,9 +368,9 @@ class ProfileInfoViewController: UIViewController {
         return card
     }()
 
-    private let nextButton: UIButton = {
+    private let submitButton: UIButton = {
         let b = UIButton(type: .system)
-        b.setTitle("Next   →", for: .normal)
+        b.setTitle("Submit Profile", for: .normal)
         b.setTitleColor(.white, for: .normal)
         b.titleLabel?.font = UIFont.boldSystemFont(ofSize: 16)
         b.backgroundColor = UIColor(red: 67/255, green: 0, blue: 34/255, alpha: 1)
@@ -292,11 +379,17 @@ class ProfileInfoViewController: UIViewController {
         return b
     }()
 
-    private let skipButton: UIButton = {
+    private let trackButton: UIButton = {
         let b = UIButton(type: .system)
-        b.setTitle("Skip for now", for: .normal)
-        b.setTitleColor(.gray, for: .normal)
-        b.titleLabel?.font = UIFont.systemFont(ofSize: 14)
+        b.setTitle("Track Verification Status", for: .normal)
+        b.setTitleColor(UIColor(red: 67/255, green: 0, blue: 34/255, alpha: 1), for: .normal)
+        b.titleLabel?.font = UIFont.boldSystemFont(ofSize: 16)
+        b.backgroundColor = .white
+        b.layer.cornerRadius = 12
+        b.layer.borderWidth = 2
+        b.layer.borderColor = UIColor(red: 67/255, green: 0, blue: 34/255, alpha: 1).cgColor
+        b.heightAnchor.constraint(equalToConstant: 52).isActive = true
+        b.isHidden = true
         return b
     }()
 
@@ -314,11 +407,13 @@ class ProfileInfoViewController: UIViewController {
         
         setupScroll()
         buildLayout()
+        
+        submitButton.addTarget(self, action: #selector(submitTapped), for: .touchUpInside)
+        trackButton.addTarget(self, action: #selector(trackTapped), for: .touchUpInside)
+        
         if openedFromProfile {
-            nextButton.setTitle("Done", for: .normal)
-            skipButton.isHidden = true
+            submitButton.setTitle("Update Profile", for: .normal)
         }
-        nextButton.addTarget(self, action: #selector(nextTapped), for: .touchUpInside)
     }
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
@@ -358,51 +453,65 @@ class ProfileInfoViewController: UIViewController {
                 if openedFromProfile {
                     title = "Edit Portfolio"
                 }
-
-                // Store fetched values so they can be reapplied after the form rebuilds.
-                loadedProfessionalTitle = castingProfile.specificRole
-                loadedProductionHouse = castingProfile.companyName
-                loadedPrimaryLocation = profile.locationCity
-                loadedWebsite = profile.websiteUrl
-                loadedIMDbProfile = nil
-
-                selectedSpecializations = Set(castingProfile.castingTypes)
-                selectedContract = profile.employmentStatus
                 
+                // Map values to local state
+                self.selectedRole = castingProfile.role
+                self.governmentIdUrl = castingProfile.governmentIdUrl
+                self.selfieUrl = castingProfile.selfieUrl
+                self.guildIdCardUrl = castingProfile.guildIdCardUrl
+                
+                if let expiryStr = castingProfile.membershipExpiry {
+                    let formatter = ISO8601DateFormatter()
+                    self.selectedMembershipExpiry = formatter.date(from: expiryStr)
+                }
+
                 print("✅ Loaded existing profile data")
                 
-                // Rebuild the UI to reflect loaded data
-                contentView.subviews.forEach { $0.removeFromSuperview() }
-                buildLayout()
-                applyLoadedValuesToForm()
+                // Rebuild the UI to reflect loaded data (if needed)
+                // In some cases we might want to just apply values if buildLayout was already called
+                applyLoadedValuesToForm(profile: profile, casting: castingProfile)
             }
         } catch {
             print("ℹ️ No existing profile found (creating new): \(error)")
         }
     }
 
-    private func applyLoadedValuesToForm() {
-        professionalTitleTextField?.text = loadedProfessionalTitle
-        productionHouseTextField?.text = loadedProductionHouse
-        primaryLocationTextField?.text = loadedPrimaryLocation
-        websiteTextField?.text = loadedWebsite
-        imdbProfileTextField?.text = loadedIMDbProfile
-
-        if let contract = selectedContract {
-            updateSelection(tag: 3, value: contract)
+    private func applyLoadedValuesToForm(profile: ProfileRecord, casting: CastingProfileRecord) {
+        fullNameTextField?.text = casting.fullName ?? profile.fullName
+        phoneNumberTextField?.text = casting.phoneNumber ?? profile.phoneNumber
+        emailTextField?.text = casting.emailId ?? profile.email
+        locationTextField?.text = casting.location ?? profile.locationCity
+        
+        pastProjectDetailsTextView?.text = casting.pastProjectDetails
+        projectRoleTextField?.text = casting.projectRole
+        productionHouseTextField?.text = casting.productionHouse
+        imdbLinkTextField?.text = casting.imdbLink
+        
+        companyNameTextField?.text = casting.companyName
+        officialEmailTextField?.text = casting.officialWorkEmail
+        linkedinTextField?.text = casting.linkedinProfile
+        instagramTextField?.text = casting.instagramProfile
+        portfolioWebsiteTextField?.text = casting.portfolioWebsite
+        
+        guildNameTextField?.text = casting.guildName
+        membershipNumberTextField?.text = casting.membershipNumber
+        industryReferencesTextView?.text = casting.industryReferences
+        
+        // Update selection UI
+        if let role = casting.role {
+            updateSelection(tag: 10, value: role)
         }
-        if let companyType = selectedCompanyType {
-            updateSelection(tag: 1, value: companyType)
+        
+        if let expiry = selectedMembershipExpiry {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            updateSelection(tag: 20, value: formatter.string(from: expiry))
         }
-        if let experience = selectedExperience {
-            updateSelection(tag: 2, value: experience)
-        }
-        if let budget = selectedBudget {
-            updateSelection(tag: 4, value: budget)
-        }
-        if let additionalLocation = selectedAdditionalLocation {
-            updateSelection(tag: 5, value: additionalLocation)
-        }
+        
+        // Update upload indicators
+        if governmentIdUrl != nil { updateUIForUpload(identifier: "gov_id") }
+        if selfieUrl != nil { updateUIForUpload(identifier: "selfie") }
+        if guildIdCardUrl != nil { updateUIForUpload(identifier: "guild_card") }
     }
     
     override func viewWillDisappear(_ animated: Bool) {
@@ -412,25 +521,18 @@ class ProfileInfoViewController: UIViewController {
         tabBarController?.tabBar.isHidden = false
     }
 
-    @objc private func nextTapped() {
-        // Save profile info to database first
+    @objc private func submitTapped() {
         Task {
             do {
                 try await saveDirectorProfile()
                 await MainActor.run {
-                    if self.openedFromProfile {
-                        self.navigationController?.popViewController(animated: true)
-                        return
-                    }
-
-                    // Check if we came from TaskDetailsViewController (already in navigation stack)
-                    if navigationController?.viewControllers.contains(where: { $0 is TaskDetailsViewController }) == true {
-                        // Pop back to TaskDetailsViewController
-                        navigationController?.popViewController(animated: true)
-                    } else {
-                        // Otherwise navigate to PostJobViewController
-                        let vc = PostJobViewController()
-                        navigationController?.pushViewController(vc, animated: true)
+                    self.showAlert(title: "Submitted", message: "Your profile has been submitted for verification. You can track the status in your dashboard.") {
+                        if self.openedFromProfile {
+                            self.navigationController?.popViewController(animated: true)
+                        } else {
+                            let vc = PostJobViewController()
+                            self.navigationController?.pushViewController(vc, animated: true)
+                        }
                     }
                 }
             } catch {
@@ -442,62 +544,75 @@ class ProfileInfoViewController: UIViewController {
         }
     }
     
+    @objc private func trackTapped() {
+        // Feature to track application
+        self.showAlert(title: "Application Status", message: "Your verification is currently under review. This usually takes 24-48 hours.")
+    }
+    
     private func saveDirectorProfile() async throws {
         // Get current user ID
         guard let userId = supabase.auth.currentUser?.id else {
             throw NSError(domain: "Auth", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
         }
         
-        // Extract form values from stored references
-        let professionalTitle = professionalTitleTextField?.text ?? ""
-        let productionHouse = productionHouseTextField?.text ?? ""
-        let primaryLocation = primaryLocationTextField?.text ?? ""
-        let website = websiteTextField?.text ?? ""
-        let imdbProfile = imdbProfileTextField?.text ?? ""
-        
-        // Use casting_profiles table since director_profiles doesn't exist
-        // Map director profile fields to casting profile structure
+        let dateFormatter = ISO8601DateFormatter()
+        let now = dateFormatter.string(from: Date())
+
         let castingProfile = CastingProfileRecordForSave(
             id: userId.uuidString,
-            specificRole: professionalTitle.isEmpty ? nil : professionalTitle,
-            companyName: productionHouse.isEmpty ? nil : productionHouse,
-            castingTypes: Array(selectedSpecializations), // Use specializations as casting types
-            castingRadius: nil, // Not applicable for directors
-            contactPreference: nil
+            fullName: fullNameTextField?.text,
+            role: selectedRole,
+            phoneNumber: phoneNumberTextField?.text,
+            emailId: emailTextField?.text,
+            location: locationTextField?.text,
+            governmentIdUrl: governmentIdUrl,
+            selfieUrl: selfieUrl,
+            pastProjectDetails: pastProjectDetailsTextView?.text,
+            projectRole: projectRoleTextField?.text,
+            productionHouse: productionHouseTextField?.text,
+            imdbLink: imdbLinkTextField?.text,
+            companyName: companyNameTextField?.text,
+            officialWorkEmail: officialEmailTextField?.text,
+            linkedinProfile: linkedinTextField?.text,
+            instagramProfile: instagramTextField?.text,
+            portfolioWebsite: portfolioWebsiteTextField?.text,
+            guildIdCardUrl: guildIdCardUrl,
+            guildName: guildNameTextField?.text,
+            membershipNumber: membershipNumberTextField?.text,
+            membershipExpiry: selectedMembershipExpiry.map { dateFormatter.string(from: $0) },
+            industryReferences: industryReferencesTextView?.text,
+            castingTypes: nil,
+            castingRadius: nil,
+            contactPreference: nil,
+            status: "pending"
         )
         
-        // Save to casting_profiles table (upsert to update if exists)
         try await supabase
             .from("casting_profiles")
             .upsert(castingProfile)
             .execute()
         
-        // Also save/update the main profile with location info
-        // This ensures location is available for job posting
-        // Use "casting_professional" as the role since "director" is not a valid role in the database
-        let dateFormatter = ISO8601DateFormatter()
-        let now = dateFormatter.string(from: Date())
-        
+        // Also update profiles table
         let profile = ProfileRecordForSave(
             id: userId.uuidString,
             username: nil,
-            fullName: nil,
+            fullName: fullNameTextField?.text,
             dateOfBirth: nil,
             profilePictureUrl: nil,
             avatarUrl: nil,
-            role: "casting_professional", // Use casting_professional as directors are a type of casting professional
-            employmentStatus: selectedContract,
+            role: "casting_professional",
+            employmentStatus: nil,
             locationState: nil,
             postalCode: nil,
-            locationCity: primaryLocation.isEmpty ? nil : primaryLocation,
+            locationCity: locationTextField?.text,
             bio: nil,
-            phoneNumber: nil,
-            websiteUrl: nil,
+            phoneNumber: phoneNumberTextField?.text,
+            websiteUrl: portfolioWebsiteTextField?.text,
             isVerified: false,
             connectionCount: 0,
-            onboardingCompleted: true,  // Director profile is considered onboarding complete
+            onboardingCompleted: true,
             lastActiveAt: now,
-            bannerUrl: nil  // ✅ ADD THIS LINE
+            bannerUrl: nil
         )
         
         try await supabase
@@ -505,96 +620,57 @@ class ProfileInfoViewController: UIViewController {
             .upsert(profile)
             .execute()
         
-        print("✅ Director profile saved successfully to casting_profiles and profiles tables")
+        print("✅ Comprehensive director profile saved successfully")
     }
     
-    
-    
-
-    // MARK: - Pills (specializations / unions)
-    /// Create a horizontally-scrolling row of pill buttons. When tapped they toggle their selected state,
-    /// change background/text color, and update the corresponding selected set on the view controller.
-    private func makeHorizontalTagRow(_ tags: [String], isSpecialization: Bool) -> UIView {
-        let scroll = UIScrollView()
-        scroll.showsHorizontalScrollIndicator = false
-
-        let stack = UIStackView()
-        stack.axis = .horizontal
-        stack.spacing = 12
-        stack.alignment = .center
-
-        scroll.addSubview(stack)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: scroll.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: scroll.bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: scroll.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: scroll.trailingAnchor),
-            stack.heightAnchor.constraint(equalTo: scroll.heightAnchor)
-        ])
-
-        for text in tags {
-            let pill = UIButton(type: .system)
-            pill.setTitle("  \(text)  ", for: .normal)
-            pill.titleLabel?.font = UIFont.systemFont(ofSize: 12)
-            pill.setTitleColor(.black, for: .normal)
-            pill.backgroundColor = UIColor(white: 0.92, alpha: 1)
-            pill.layer.cornerRadius = 18
-            pill.clipsToBounds = true
-            pill.heightAnchor.constraint(equalToConstant: 36).isActive = true
-
-            // Use accessibilityIdentifier to mark which set to update
-            pill.accessibilityIdentifier = isSpecialization ? "spec" : "union"
-            // store the text in accessibilityLabel so we can read it in the selector
-            pill.accessibilityLabel = text
-
-            pill.addTarget(self, action: #selector(pillTapped(_:)), for: .touchUpInside)
-
-            // if it's already selected in our sets, mark visually
-            if isSpecialization && selectedSpecializations.contains(text) {
-                pill.backgroundColor = UIColor(red: 67/255, green: 0/255, blue: 34/255, alpha: 1)
-                pill.setTitleColor(.white, for: .normal)
-            } else if !isSpecialization && selectedUnions.contains(text) {
-                pill.backgroundColor = UIColor(red: 67/255, green: 0/255, blue: 34/255, alpha: 1)
-                pill.setTitleColor(.white, for: .normal)
+    private func uploadImage(_ image: UIImage, for identifier: String) async {
+        guard let userId = supabase.auth.currentUser?.id else { return }
+        guard let imageData = image.jpegData(compressionQuality: 0.5) else { return }
+        
+        let path = "verifications/\(userId.uuidString)/\(identifier).jpg"
+        
+        do {
+            try await supabase.storage
+                .from("profile-pictures")
+                .upload(path: path, file: imageData, options: FileOptions(upsert: true))
+            
+            let url = try supabase.storage
+                .from("profile-pictures")
+                .getPublicURL(path: path)
+            
+            await MainActor.run {
+                switch identifier {
+                case "gov_id": self.governmentIdUrl = url.absoluteString
+                case "selfie": self.selfieUrl = url.absoluteString
+                case "guild_card": self.guildIdCardUrl = url.absoluteString
+                default: break
+                }
+                
+                // Update UI status
+                self.updateUIForUpload(identifier: identifier)
             }
-
-            stack.addArrangedSubview(pill)
+        } catch {
+            print("❌ Upload failed: \(error)")
         }
-
-        scroll.heightAnchor.constraint(equalToConstant: 40).isActive = true
-        return scroll
     }
-
-    @objc private func pillTapped(_ sender: UIButton) {
-        guard let text = sender.accessibilityLabel else { return }
-        let isSpec = (sender.accessibilityIdentifier == "spec")
-        if isSpec {
-            if selectedSpecializations.contains(text) {
-                // deselect
-                selectedSpecializations.remove(text)
-                sender.backgroundColor = UIColor(white: 0.92, alpha: 1)
-                sender.setTitleColor(.black, for: .normal)
-            } else {
-                selectedSpecializations.insert(text)
-                sender.backgroundColor = UIColor(red: 67/255, green: 0/255, blue: 34/255, alpha: 1)
-                sender.setTitleColor(.white, for: .normal)
-            }
-        } else {
-            if selectedUnions.contains(text) {
-                selectedUnions.remove(text)
-                sender.backgroundColor = UIColor(white: 0.92, alpha: 1)
-                sender.setTitleColor(.black, for: .normal)
-            } else {
-                selectedUnions.insert(text)
-                sender.backgroundColor = UIColor(red: 67/255, green: 0/255, blue: 34/255, alpha: 1)
-                sender.setTitleColor(.white, for: .normal)
+    
+    private func updateUIForUpload(identifier: String) {
+        // Find the row with this identifier and update statusLabel (tag 500)
+        let rows = contentView.subviews.compactMap { $0 as? UIStackView }.flatMap { $0.arrangedSubviews }
+        for row in rows {
+            if row.accessibilityIdentifier == identifier {
+                if let statusLbl = row.viewWithTag(500) as? UILabel {
+                    statusLbl.text = "✅ Uploaded"
+                    statusLbl.textColor = .systemGreen
+                }
             }
         }
-        // If you need to persist selection immediately, call your save/update API here.
     }
+    
+    
+    
 
+    
     // MARK: - Layout / Scroll
     private func setupScroll() {
         view.addSubview(scrollView)
@@ -631,48 +707,64 @@ class ProfileInfoViewController: UIViewController {
             stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40)
         ])
 
-        stack.addArrangedSubview(sectionHeader("Basic Information"))
-        stack.addArrangedSubview(inputField(title: "Professional Title *", placeholder: "e.g. Producer, Production Manager, Studio"))
+        // 1. Personal Details
+        stack.addArrangedSubview(sectionHeader("Personal Details"))
+        stack.addArrangedSubview(inputField(title: "Full Name *", placeholder: "As per ID"))
+        stack.addArrangedSubview(selectionCell(title: "Primary Role", value: "Select role", tag: 10))
+        stack.addArrangedSubview(inputField(title: "Phone Number *", placeholder: "+91 ..."))
+        stack.addArrangedSubview(inputField(title: "Email ID *", placeholder: "your@email.com"))
+        stack.addArrangedSubview(inputField(title: "Location *", placeholder: "City, Country"))
 
-        stack.addArrangedSubview(sectionHeader("Company Details"))
-        stack.addArrangedSubview(inputField(title: "Production House *", placeholder: "Your production company name"))
-        stack.addArrangedSubview(selectionCell(title: "Company Type", value: "Select company", tag: 1))
-        stack.addArrangedSubview(selectionCell(title: "Years of Experience", value: "Select experience", tag: 2))
+        // 2. Identity Verification
+        stack.addArrangedSubview(sectionHeader("Identity Verification"))
+        stack.addArrangedSubview(documentUploadRow(title: "Government ID", icon: "doc.text.viewfinder", identifier: "gov_id"))
+        stack.addArrangedSubview(documentUploadRow(title: "Live Selfie", icon: "person.badge.shield.fill", identifier: "selfie"))
 
-        stack.addArrangedSubview(sectionHeader("Location and Reach"))
-        stack.addArrangedSubview(inputField(title: "Primary Location *", placeholder: "Your production company name"))
-        stack.addArrangedSubview(selectionCell(title: "Additional Locations", value: "Add location", tag: 5))
+        // 3. Experience & Projects
+        stack.addArrangedSubview(sectionHeader("Experience & Projects"))
+        stack.addArrangedSubview(textViewField(title: "Past Project Details", placeholder: "List your major projects..."))
+        stack.addArrangedSubview(inputField(title: "Role in Projects", placeholder: "e.g. Lead Director"))
+        stack.addArrangedSubview(inputField(title: "Production House / Studio Name", placeholder: "e.g. Dharma Productions"))
+        stack.addArrangedSubview(inputField(title: "IMDb / YouTube / OTT Links", placeholder: "Links to your work"))
 
-        stack.addArrangedSubview(sectionHeader("Professional Expertise"))
-
-        let specLabel = UILabel()
-        specLabel.text = "Specializations"
-        specLabel.font = UIFont.boldSystemFont(ofSize: 18)
-        stack.addArrangedSubview(specLabel)
-
-        // Specializations pills (selectable)
-        let specRow = makeHorizontalTagRow(["Feature Films", "TV Series", "Commercials", "Documentary"], isSpecialization: true)
-        stack.addArrangedSubview(specRow)
-
-        let unionLabel = UILabel()
-        unionLabel.text = "Union Affiliations"
-        unionLabel.font = UIFont.boldSystemFont(ofSize: 14)
-        stack.addArrangedSubview(unionLabel)
-
-        // Unions pills (selectable)
-        let unionRow = makeHorizontalTagRow(["DGA", "PGA", "CSA", "IATSE", "WGA"], isSpecialization: false)
-        stack.addArrangedSubview(unionRow)
-
+        // 4. Professional Links
         stack.addArrangedSubview(sectionHeader("Professional Links"))
-        stack.addArrangedSubview(inputField(title: "Website/Portfolio", placeholder: "https://your-website.com"))
-        stack.addArrangedSubview(inputField(title: "IMDb Profile", placeholder: "https://imdb.com/name/..."))
-        stack.addArrangedSubview(selectionCell(title: "Preferred Contract", value: "Select contract", tag: 3))
-        stack.addArrangedSubview(selectionCell(title: "Budget Range", value: "Select budget range", tag: 4))
+        stack.addArrangedSubview(inputField(title: "Company / Organization Name", placeholder: "Your current company"))
+        stack.addArrangedSubview(inputField(title: "Official Work Email", placeholder: "work@company.com"))
+        stack.addArrangedSubview(inputField(title: "LinkedIn Profile", placeholder: "linkedin.com/in/..."))
+        stack.addArrangedSubview(inputField(title: "Instagram / Professional Social Media", placeholder: "@handle"))
+        stack.addArrangedSubview(inputField(title: "Portfolio Website", placeholder: "https://..."))
+
+        // 5. Guild & Affiliations
+        stack.addArrangedSubview(sectionHeader("Guild & Affiliations"))
+        stack.addArrangedSubview(documentUploadRow(title: "Guild ID Card", icon: "card.fill", identifier: "guild_card"))
+        stack.addArrangedSubview(inputField(title: "Guild Name", placeholder: "e.g. DGA, WGA"))
+        stack.addArrangedSubview(inputField(title: "Membership Number", placeholder: "ID number"))
+        stack.addArrangedSubview(selectionCell(title: "Membership Expiry", value: "Select date", tag: 20))
+
+        // 6. References
+        stack.addArrangedSubview(sectionHeader("Industry References"))
+        stack.addArrangedSubview(textViewField(title: "Industry References", placeholder: "Name + Role + Contact"))
 
         stack.addArrangedSubview(verificationCard)
-        stack.addArrangedSubview(nextButton)
-        stack.addArrangedSubview(skipButton)
+        stack.addArrangedSubview(statusLabel)
+        stack.addArrangedSubview(submitButton)
+        stack.addArrangedSubview(trackButton)
+        
+        if hasExistingCastingProfile {
+            trackButton.isHidden = false
+            submitButton.setTitle("Update & Re-submit", for: .normal)
+        }
     }
+    
+    private let statusLabel: UILabel = {
+        let lbl = UILabel()
+        lbl.font = UIFont.systemFont(ofSize: 14)
+        lbl.textAlignment = .center
+        lbl.textColor = .systemOrange
+        lbl.isHidden = true
+        return lbl
+    }()
 }
 
 // MARK: - Bottom Picker View Controller
@@ -829,7 +921,19 @@ class BottomPickerViewController: UIViewController, UITableViewDelegate, UITable
     }
 }
 
-// MARK: - TextField Padding Extension
+// MARK: - Delegates
+extension ProfileInfoViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        picker.dismiss(animated: true)
+        guard let image = info[.originalImage] as? UIImage,
+              let id = picker.accessibilityHint else { return }
+        Task {
+            await uploadImage(image, for: id)
+        }
+    }
+}
+
+// MARK: - Onboarding Coordinator
 extension UITextField {
     func setPaddingLeft(_ amount: CGFloat) {
         let padding = UIView(frame: CGRect(x: 0, y: 0, width: amount, height: 44))
