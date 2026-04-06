@@ -396,7 +396,7 @@ final class AIAssistantViewController: UIViewController, UITableViewDataSource, 
 
     private func userFacingMessage(for error: Error) -> String {
         let message = (error as NSError).localizedDescription
-        return "I couldn't reach the CineMyst AI backend right now. Please make sure the local server is running on 127.0.0.1:8000.\n\nDetails: \(message)"
+        return "I couldn't reach the CineMyst AI backend right now. Please try again in a moment.\n\nDetails: \(message)"
     }
 
     private func makeChip(title: String) -> UIView {
@@ -457,7 +457,7 @@ private final class AIChatService {
            !configuredBaseURL.isEmpty {
             self.baseURL = configuredURL
         } else {
-            self.baseURL = URL(string: "http://127.0.0.1:8000")!
+            self.baseURL = URL(string: "https://cinemyst-chatbot-backend.onrender.com")!
         }
     }
 

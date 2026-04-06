@@ -87,7 +87,7 @@ private final class ApplicantAIScoringService {
            !configuredBaseURL.isEmpty {
             self.baseURL = configuredURL
         } else {
-            self.baseURL = URL(string: "http://127.0.0.1:8000")!
+            self.baseURL = URL(string: "https://cinemyst-chatbot-backend.onrender.com")!
         }
     }
 
