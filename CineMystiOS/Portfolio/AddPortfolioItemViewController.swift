@@ -397,10 +397,31 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
     }
 
     private func uploadVideoToSupabase(fileURL: URL) {
+        // PERMISSION: Some URLs require explicit startAccessing
+        let _ = fileURL.startAccessingSecurityScopedResource()
+        
+        // COPY: PHPicker temp URLs are deleted when the provider block ends. 
+        // We must copy to a permanent temp file for the upload Task.
+        let tempDir = FileManager.default.temporaryDirectory
+        let destinationURL = tempDir.appendingPathComponent("upload_\(UUID().uuidString).\(fileURL.pathExtension)")
+        
+        do {
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                try? FileManager.default.removeItem(at: destinationURL)
+            }
+            try FileManager.default.copyItem(at: fileURL, to: destinationURL)
+            fileURL.stopAccessingSecurityScopedResource()
+        } catch {
+            fileURL.stopAccessingSecurityScopedResource()
+            self.uploadProgressLabel.text = "❌ Copy failed"
+            self.showAlert(title: "Processing Error", message: "Failed to prepare video for upload: \(error.localizedDescription)")
+            return
+        }
+
         Task {
             do {
-                let videoData = try Data(contentsOf: fileURL)
-                let fileExtension = fileURL.pathExtension.isEmpty ? "mov" : fileURL.pathExtension
+                let videoData = try Data(contentsOf: destinationURL)
+                let fileExtension = destinationURL.pathExtension.isEmpty ? "mov" : destinationURL.pathExtension
                 let fileName = "portfolio_\(UUID().uuidString).\(fileExtension)"
 
                 try await supabase
@@ -413,6 +434,9 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
                     .from("portfolio-media")
                     .getPublicURL(path: fileName)
 
+                // CLEANUP
+                try? FileManager.default.removeItem(at: destinationURL)
+
                 DispatchQueue.main.async {
                     self.uploadedImageUrl = nil
                     self.uploadedMediaUrl = publicUrl.absoluteString
@@ -422,6 +446,7 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
 
                 print("✅ Video uploaded: \(publicUrl)")
             } catch {
+                try? FileManager.default.removeItem(at: destinationURL)
                 DispatchQueue.main.async {
                     self.uploadProgressLabel.text = "❌ Upload failed"
                     self.imagePreview.isHidden = true

@@ -918,6 +918,12 @@ class PortfolioViewController: UIViewController {
             role.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -12)
         ])
         
+        // TAP GESTURE TO PLAY/VIEW
+        let tap = PFProjectTapGesture(target: self, action: #selector(projectItemTapped(_:)))
+        tap.projectData = dict
+        card.addGestureRecognizer(tap)
+        card.isUserInteractionEnabled = true
+
         // If it's a video, add a play indicator
         let lowerCandidates: [String?] = [videoURL, mediaURL, genericURL, posterURL] + nestedMediaURLs.map { Optional($0) }
         let lowerURL = lowerCandidates
@@ -942,6 +948,44 @@ class PortfolioViewController: UIViewController {
         }
         
         return card
+    }
+
+    @objc private func projectItemTapped(_ gesture: PFProjectTapGesture) {
+        guard let dict = gesture.projectData else { return }
+        
+        let posterURL = resolvePortfolioMediaURL((dict["poster_url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines))
+        let videoURL = resolvePortfolioMediaURL((dict["video_url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines))
+        let mediaURL = resolvePortfolioMediaURL((dict["media_url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines))
+        let genericURL = resolvePortfolioMediaURL((dict["url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines))
+        let nestedMediaURLs = extractMediaURLs(from: dict)
+        
+        let playbackCandidates = [videoURL, mediaURL, genericURL, posterURL]
+        let bestURL = playbackCandidates.compactMap { $0 }.first(where: { 
+            let l = $0.lowercased()
+            return l.hasSuffix(".mp4") || l.hasSuffix(".mov") || l.hasSuffix(".m4v") || l.contains("video") || l.contains("youtube.com") || l.contains("youtu.be")
+        }) ?? nestedMediaURLs.first(where: { 
+            let l = $0.lowercased()
+            return l.hasSuffix(".mp4") || l.hasSuffix(".mov") || l.hasSuffix(".m4v") || l.contains("video") || l.contains("youtube.com") || l.contains("youtu.be")
+        }) ?? posterURL ?? nestedMediaURLs.first
+        
+        guard let resolved = bestURL, !resolved.isEmpty else { return }
+        
+        let lower = resolved.lowercased()
+        if lower.hasSuffix(".mp4") || lower.hasSuffix(".mov") || lower.hasSuffix(".m4v") || lower.contains("video") {
+            if let url = URL(string: resolved) {
+                let player = AVPlayer(url: url)
+                let playerVC = AVPlayerViewController()
+                playerVC.player = player
+                present(playerVC, animated: true) { player.play() }
+            }
+        } else if lower.contains("youtube.com") || lower.contains("youtu.be") {
+            openURL(resolved)
+        } else {
+            let vc = FullScreenImageViewController(imageURL: resolved)
+            vc.modalPresentationStyle = UIModalPresentationStyle.overFullScreen
+            vc.modalTransitionStyle = UIModalTransitionStyle.crossDissolve
+            present(vc, animated: true)
+        }
     }
 
     private func normalizedProjects(from content: AnyCodable?) -> [[String: Any]] {
@@ -1325,8 +1369,8 @@ class PortfolioViewController: UIViewController {
                 ])
             }
 
-            let tap = MediaTapGesture(target: self, action: #selector(mediaGalleryItemTapped(_:)))
-            tap.item = PortfolioMedia(url: resolvedURL, type: type)
+            let tap = PFMediaTapGesture(target: self, action: #selector(mediaGalleryItemTapped(_:)))
+            tap.item = PFPortfolioMedia(url: resolvedURL, type: type)
             iv.addGestureRecognizer(tap)
             iv.isUserInteractionEnabled = true
             hStack.addArrangedSubview(iv)
@@ -1349,7 +1393,7 @@ class PortfolioViewController: UIViewController {
         return v
     }
 
-    @objc private func mediaGalleryItemTapped(_ gesture: MediaTapGesture) {
+    @objc private func mediaGalleryItemTapped(_ gesture: PFMediaTapGesture) {
         guard let item = gesture.item else { return }
 
         if item.type == "video", let url = URL(string: item.url) {
@@ -1359,8 +1403,8 @@ class PortfolioViewController: UIViewController {
             present(playerVC, animated: true) { player.play() }
         } else {
             let vc = FullScreenImageViewController(imageURL: item.url)
-            vc.modalPresentationStyle = .overFullScreen
-            vc.modalTransitionStyle = .crossDissolve
+            vc.modalPresentationStyle = UIModalPresentationStyle.overFullScreen
+            vc.modalTransitionStyle = UIModalTransitionStyle.crossDissolve
             present(vc, animated: true)
         }
     }
@@ -1475,6 +1519,18 @@ class PortfolioBasicInfoEditViewController: UIViewController {
     private let youtubeField = UITextField()
     private let imdbField = UITextField()
     
+    // Stats
+    private let ageField = UITextField()
+    private let sexField = UITextField()
+    private let heightField = UITextField()
+    private let weightField = UITextField()
+    private let skinField = UITextField()
+    private let eyeField = UITextField()
+    private let hairField = UITextField()
+    private let bustField = UITextField()
+    private let waistField = UITextField()
+    private let hipsField = UITextField()
+    
     init(portfolio: PortfolioResponse) {
         self.portfolio = portfolio
         super.init(nibName: nil, bundle: nil)
@@ -1524,12 +1580,27 @@ class PortfolioBasicInfoEditViewController: UIViewController {
         bioField.translatesAutoresizingMaskIntoConstraints = false
         
         let socialHeader = sectionHeader("SOCIAL LINKS")
-        let fields: [(UITextField, String?, String)] = [
+        let socialFields: [(UITextField, String?, String)] = [
             (instagramField, portfolio.instagram_url, "📱  Instagram URL"),
             (youtubeField,   portfolio.youtube_url,   "📺  YouTube URL"),
             (imdbField,      portfolio.imdb_url,      "🎬  IMDb URL"),
         ]
-        for (f, val, placeholder) in fields {
+        
+        let statsHeader = sectionHeader("VITAL STATISTICS")
+        let statsFields: [(UITextField, String?, String)] = [
+            (ageField, portfolio.age, "🎂 Age"),
+            (sexField, portfolio.sex, "⚧ Sex"),
+            (heightField, portfolio.height_cm, "📏 Height (cm)"),
+            (weightField, portfolio.weight_kg, "⚖️ Weight (kg)"),
+            (skinField, portfolio.skin_tone, "🎨 Skin Tone"),
+            (eyeField, portfolio.eye_color, "👁️ Eye Color"),
+            (hairField, portfolio.hair_color, "💇 Hair Color"),
+            (bustField, portfolio.bust, "📏 Bust"),
+            (waistField, portfolio.waist, "📏 Waist"),
+            (hipsField, portfolio.hips, "📏 Hips"),
+        ]
+
+        func setupField(_ f: UITextField, val: String?, placeholder: String) {
             f.text = val
             f.placeholder = placeholder
             f.borderStyle = .none
@@ -1538,13 +1609,26 @@ class PortfolioBasicInfoEditViewController: UIViewController {
             f.layer.cornerRadius = 10
             f.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 14, height: 44))
             f.leftViewMode = .always
-            f.autocapitalizationType = .none
-            f.keyboardType = .URL
             f.translatesAutoresizingMaskIntoConstraints = false
             f.heightAnchor.constraint(equalToConstant: 44).isActive = true
         }
+
+        for (f, val, placeholder) in socialFields {
+            setupField(f, val: val, placeholder: placeholder)
+            f.autocapitalizationType = .none
+            f.keyboardType = .URL
+        }
         
-        [bioHeader, bioField, socialHeader, instagramField, youtubeField, imdbField].forEach { content.addSubview($0) }
+        for (f, val, placeholder) in statsFields {
+            setupField(f, val: val, placeholder: placeholder)
+        }
+        
+        content.addSubview(bioHeader); content.addSubview(bioField)
+        content.addSubview(socialHeader); content.addSubview(instagramField); content.addSubview(youtubeField); content.addSubview(imdbField)
+        content.addSubview(statsHeader)
+        let statsStack = UIStackView(arrangedSubviews: [ageField, sexField, heightField, weightField, skinField, eyeField, hairField, bustField, waistField, hipsField])
+        statsStack.axis = .vertical; statsStack.spacing = 10; statsStack.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(statsStack)
         
         NSLayoutConstraint.activate([
             bioHeader.topAnchor.constraint(equalTo: content.topAnchor, constant: 24),
@@ -1553,6 +1637,7 @@ class PortfolioBasicInfoEditViewController: UIViewController {
             bioField.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 16),
             bioField.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -16),
             bioField.heightAnchor.constraint(equalToConstant: 120),
+            
             socialHeader.topAnchor.constraint(equalTo: bioField.bottomAnchor, constant: 24),
             socialHeader.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
             instagramField.topAnchor.constraint(equalTo: socialHeader.bottomAnchor, constant: 8),
@@ -1564,7 +1649,13 @@ class PortfolioBasicInfoEditViewController: UIViewController {
             imdbField.topAnchor.constraint(equalTo: youtubeField.bottomAnchor, constant: 10),
             imdbField.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 16),
             imdbField.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -16),
-            imdbField.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -40),
+            
+            statsHeader.topAnchor.constraint(equalTo: imdbField.bottomAnchor, constant: 24),
+            statsHeader.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
+            statsStack.topAnchor.constraint(equalTo: statsHeader.bottomAnchor, constant: 8),
+            statsStack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 16),
+            statsStack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -16),
+            statsStack.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -40),
         ])
     }
     
@@ -1573,13 +1664,14 @@ class PortfolioBasicInfoEditViewController: UIViewController {
     @objc private func saveTapped() {
         Task {
             do {
+                // 1. Update 'portfolios' (bio and social)
                 struct PortfolioUpdate: Encodable {
                     let bio: String?
                     let instagram_url: String?
                     let youtube_url: String?
                     let imdb_url: String?
                 }
-                let update = PortfolioUpdate(
+                let pUpdate = PortfolioUpdate(
                     bio: bioField.text.isEmpty ? nil : bioField.text,
                     instagram_url: instagramField.text?.isEmpty == true ? nil : instagramField.text,
                     youtube_url:   youtubeField.text?.isEmpty == true ? nil : youtubeField.text,
@@ -1587,8 +1679,33 @@ class PortfolioBasicInfoEditViewController: UIViewController {
                 )
                 try await supabase
                     .from("portfolios")
-                    .update(update)
+                    .update(pUpdate)
                     .eq("id", value: portfolio.id)
+                    .execute()
+                
+                // 2. Update 'actor_portfolios' (vital stats)
+                let userId = portfolio.user_id
+                struct ActorStatUpdate: Encodable {
+                    let age: String?; let sex: String?; let height_cm: String?; let weight_kg: String?
+                    let skin_tone: String?; let eye_color: String?; let hair_color: String?
+                    let bust: String?; let waist: String?; let hips: String?
+                }
+                let sUpdate = ActorStatUpdate(
+                    age: ageField.text?.isEmpty == true ? nil : ageField.text,
+                    sex: sexField.text?.isEmpty == true ? nil : sexField.text,
+                    height_cm: heightField.text?.isEmpty == true ? nil : heightField.text,
+                    weight_kg: weightField.text?.isEmpty == true ? nil : weightField.text,
+                    skin_tone: skinField.text?.isEmpty == true ? nil : skinField.text,
+                    eye_color: eyeField.text?.isEmpty == true ? nil : eyeField.text,
+                    hair_color: hairField.text?.isEmpty == true ? nil : hairField.text,
+                    bust: bustField.text?.isEmpty == true ? nil : bustField.text,
+                    waist: waistField.text?.isEmpty == true ? nil : waistField.text,
+                    hips: hipsField.text?.isEmpty == true ? nil : hipsField.text
+                )
+                try await supabase
+                    .from("actor_portfolios")
+                    .update(sUpdate)
+                    .eq("user_id", value: userId)
                     .execute()
                 
                 await MainActor.run {
@@ -1602,6 +1719,20 @@ class PortfolioBasicInfoEditViewController: UIViewController {
             }
         }
     }
+}
+
+// MARK: - Gesture Helpers
+class PFMediaTapGesture: UITapGestureRecognizer {
+    var item: PFPortfolioMedia?
+}
+
+class PFProjectTapGesture: UITapGestureRecognizer {
+    var projectData: [String: Any]?
+}
+
+struct PFPortfolioMedia {
+    let url: String
+    let type: String
 }
 
 // MARK: - Image Loader Helper
