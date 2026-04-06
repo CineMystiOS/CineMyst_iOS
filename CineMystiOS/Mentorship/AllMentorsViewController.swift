@@ -10,7 +10,7 @@
 import UIKit
 import Supabase
 
-// MARK: - MentorCardCell (tightened layout + aligned rating)
+// MARK: - MentorCardCell
 final class MentorCardCell: UITableViewCell {
     static let reuseIdentifier = "MentorCardCell"
     var onExtraServicesTap: (([String]) -> Void)?
@@ -67,53 +67,14 @@ final class MentorCardCell: UITableViewCell {
         return l
     }()
 
-    // Right column (rating / reviews / price)
+    // Right column (price)
     private let ratingStack: UIStackView = {
         let s = UIStackView()
         s.axis = .vertical
         s.alignment = .trailing
-        s.spacing = 6
+        s.spacing = 0
         s.translatesAutoresizingMaskIntoConstraints = false
         return s
-    }()
-    private let ratingRow: UIStackView = {
-        let s = UIStackView()
-        s.axis = .horizontal
-        s.alignment = .center
-        s.spacing = 6
-        s.translatesAutoresizingMaskIntoConstraints = false
-        return s
-    }()
-    private let starImageView: UIImageView = {
-        let iv = UIImageView(image: UIImage(systemName: "star.fill"))
-        iv.tintColor = CineMystTheme.pink
-        iv.contentMode = .scaleAspectFit
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        return iv
-    }()
-    private let ratingLabel: UILabel = {
-        let l = UILabel()
-        l.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
-        l.textColor = MentorshipUI.softText
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
-    }()
-    private let ratingPillView: UIVisualEffectView = {
-        let blur = UIBlurEffect(style: .systemUltraThinMaterialLight)
-        let view = UIVisualEffectView(effect: blur)
-        view.translatesAutoresizingMaskIntoConstraints = false
-        view.layer.cornerRadius = 14
-        view.layer.masksToBounds = true
-        view.layer.borderWidth = 1
-        view.layer.borderColor = MentorshipUI.plumStroke.cgColor
-        return view
-    }()
-    private let reviewsLabel: UILabel = {
-        let l = UILabel()
-        l.font = UIFont.systemFont(ofSize: 11)
-        l.textColor = .secondaryLabel
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
     }()
     private let priceLabel: UILabel = {
         let l = UILabel()
@@ -253,7 +214,6 @@ final class MentorCardCell: UITableViewCell {
         cardView.addSubview(divider)
         cardView.addSubview(bottomRow)
         pricePillView.addSubview(priceLabel)
-        ratingPillView.contentView.addSubview(ratingRow)
 
         // left vertical stack
         subtitleStack.addArrangedSubview(roleLabel)
@@ -264,11 +224,7 @@ final class MentorCardCell: UITableViewCell {
         leftStack.alignment = .leading
         leftStack.translatesAutoresizingMaskIntoConstraints = false
 
-        // right vertical stack (ratingStack)
-        ratingRow.addArrangedSubview(starImageView)
-        ratingRow.addArrangedSubview(ratingLabel)
-        ratingStack.addArrangedSubview(ratingPillView)
-        ratingStack.addArrangedSubview(reviewsLabel)
+        // right vertical stack
         ratingStack.addArrangedSubview(pricePillView)
 
         // Build topRow: left, spacer, ratingStack, photo
@@ -314,14 +270,6 @@ final class MentorCardCell: UITableViewCell {
             imageGradientOverlay.bottomAnchor.constraint(equalTo: imageContainerView.bottomAnchor),
             imageGradientOverlay.heightAnchor.constraint(equalTo: imageContainerView.heightAnchor, multiplier: 0.42),
 
-            starImageView.widthAnchor.constraint(equalToConstant: 14),
-            starImageView.heightAnchor.constraint(equalToConstant: 14),
-
-            ratingRow.topAnchor.constraint(equalTo: ratingPillView.contentView.topAnchor, constant: 6),
-            ratingRow.bottomAnchor.constraint(equalTo: ratingPillView.contentView.bottomAnchor, constant: -6),
-            ratingRow.leadingAnchor.constraint(equalTo: ratingPillView.contentView.leadingAnchor, constant: 10),
-            ratingRow.trailingAnchor.constraint(equalTo: ratingPillView.contentView.trailingAnchor, constant: -10),
-
             priceLabel.topAnchor.constraint(equalTo: pricePillView.topAnchor, constant: 7),
             priceLabel.leadingAnchor.constraint(equalTo: pricePillView.leadingAnchor, constant: 11),
             priceLabel.trailingAnchor.constraint(equalTo: pricePillView.trailingAnchor, constant: -11),
@@ -349,7 +297,6 @@ final class MentorCardCell: UITableViewCell {
         // --- ALIGNMENT FIX: ensure rating stack and photo align to top of topRow
         ratingStack.topAnchor.constraint(equalTo: topRow.topAnchor).isActive = true
         photoView.topAnchor.constraint(equalTo: topRow.topAnchor).isActive = true
-        ratingStack.setCustomSpacing(4, after: ratingRow)
 
         // default styling for tagsStack (plain text tags)
         tagsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
@@ -379,11 +326,6 @@ final class MentorCardCell: UITableViewCell {
         } else {
             orgLabel.text = ""
         }
-
-        // rating and reviews
-        ratingLabel.text = String(format: "%.1f", mentor.rating)
-    // hide review count per request
-        reviewsLabel.isHidden = true
 
         // price from `money` column if present
         priceLabel.text = mentor.moneyString ?? ""

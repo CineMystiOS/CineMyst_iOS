@@ -190,7 +190,7 @@ final class BookViewController: UIViewController {
         }
 
         let s1 = makeBlock(title: "Year Exp", valueLabel: yearExpValueLabel)
-        let s2 = makeBlock(title: "Mentor", valueLabel: mentorStatValueLabel)
+        let s2 = makeBlock(title: "Services", valueLabel: mentorStatValueLabel)
         let s3 = makeBlock(title: "Sessions", valueLabel: sessionsValueLabel)
 
         yearExpValueLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -323,6 +323,7 @@ final class BookViewController: UIViewController {
 
         setupLayout()
         bookButton.addTarget(self, action: #selector(didTapBookSession), for: .touchUpInside)
+        portfolioButton.addTarget(self, action: #selector(didTapPortfolio), for: .touchUpInside)
 
         applyMentorIfNeeded()
     }
@@ -369,6 +370,29 @@ final class BookViewController: UIViewController {
             vc.allowedAreas = areas
         }
         navigationController?.pushViewController(vc, animated: true)
+    }
+
+    @objc private func didTapPortfolio() {
+        guard
+            let rawUserId = mentor?.userId,
+            let targetUserId = UUID(uuidString: rawUserId)
+        else {
+            let alert = UIAlertController(
+                title: "Portfolio unavailable",
+                message: "We couldn't find this mentor's portfolio right now.",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            present(alert, animated: true)
+            return
+        }
+
+        let vc = ActorPortfolioDetailViewController()
+        vc.targetUserId = targetUserId
+        vc.isOwnProfile = false
+        let nav = UINavigationController(rootViewController: vc)
+        nav.modalPresentationStyle = .fullScreen
+        present(nav, animated: true)
     }
 
     // MARK: Layout
@@ -445,16 +469,15 @@ final class BookViewController: UIViewController {
             roleLabel.bottomAnchor.constraint(equalTo: rolePillView.bottomAnchor, constant: -6)
         ])
 
-        let headerStack = UIStackView(arrangedSubviews: [nameLabel, rolePillView, portfolioButton, starsView, reviewsCountLabel])
+        let headerStack = UIStackView(arrangedSubviews: [nameLabel, rolePillView, portfolioButton])
         headerStack.axis = .vertical
         headerStack.alignment = .center
         headerStack.spacing = 10
 
         let aboutCard = makeSectionCard(titleLabel: aboutTitle, bodyView: aboutText, iconName: "text.alignleft")
         let mentorshipCard = makeSectionCard(titleLabel: mentorshipTitle, bodyView: mentorshipText, iconName: "sparkles")
-        let reviewsCard = makeSectionCard(titleLabel: reviewsTitle, bodyView: reviewsStack, iconName: "quote.bubble")
 
-        let mainStack = UIStackView(arrangedSubviews: [headerStack, statsRow, aboutCard, mentorshipCard, reviewsCard])
+        let mainStack = UIStackView(arrangedSubviews: [headerStack, statsRow, aboutCard, mentorshipCard])
         mainStack.axis = .vertical
         mainStack.spacing = 20
 
@@ -691,23 +714,14 @@ final class BookViewController: UIViewController {
             }
             if let areas = detail.mentorshipAreas, !areas.isEmpty {
                 self.mentorshipText.text = areas.joined(separator: ", ")
+                self.mentorStatValueLabel.text = "\(areas.count)"
+            } else if let areas = self.mentor?.mentorshipAreas, !areas.isEmpty {
+                self.mentorStatValueLabel.text = "\(areas.count)"
+            } else {
+                self.mentorStatValueLabel.text = "1"
             }
             if let count = detail.ratingCount {
                 self.reviewsCountLabel.text = "\(count) reviews"
-            }
-
-            // Show the numeric rating in the middle stat block and refresh stars
-            if let r = detail.rating {
-                let displayRating = self.normalizedDisplayRating(r)
-                self.mentorStatValueLabel.text = String(format: "%.1f", displayRating)
-                self.updateStarsView(with: displayRating)
-            } else if let r = self.mentor?.rating {
-                let displayRating = self.normalizedDisplayRating(r)
-                self.mentorStatValueLabel.text = String(format: "%.1f", displayRating)
-                self.updateStarsView(with: displayRating)
-            } else {
-                self.mentorStatValueLabel.text = "3.0"
-                self.updateStarsView(with: 3.0)
             }
 
             // Prefer direct columns (yoe, session) from the mentor_profiles table; fall back to metadata JSON

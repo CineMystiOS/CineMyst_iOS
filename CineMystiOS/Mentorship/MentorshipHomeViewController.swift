@@ -109,44 +109,6 @@ final class MentorCell: UICollectionViewCell {
         return s
     }()
 
-    private let starImageView: UIImageView = {
-        let iv = UIImageView(image: UIImage(systemName: "star.fill"))
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        iv.tintColor = CineMystTheme.pink
-        return iv
-    }()
-
-    private let ratingLabel: UILabel = {
-        let l = UILabel()
-        l.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
-        l.translatesAutoresizingMaskIntoConstraints = false
-        l.textColor = MentorshipUI.softText
-        return l
-    }()
-
-    private lazy var ratingStack: UIStackView = {
-        let s = UIStackView(arrangedSubviews: [starImageView, ratingLabel])
-        s.axis = .horizontal
-        s.spacing = 4
-        s.alignment = .center
-        s.translatesAutoresizingMaskIntoConstraints = false
-        return s
-    }()
-
-    private let ratingBadgeView: UIView = {
-        let v = UIView()
-        v.translatesAutoresizingMaskIntoConstraints = false
-        v.backgroundColor = UIColor.white.withAlphaComponent(0.92)
-        v.layer.cornerRadius = 12
-        v.layer.shadowColor = MentorshipUI.shadow.cgColor
-        v.layer.shadowOpacity = 1
-        v.layer.shadowOffset = CGSize(width: 0, height: 3)
-        v.layer.shadowRadius = 6
-        v.layer.borderWidth = 1
-        v.layer.borderColor = MentorshipUI.plumStroke.cgColor
-        return v
-    }()
-
     private lazy var textStack: UIStackView = {
         let stack = UIStackView(arrangedSubviews: [nameLabel, rolePriceRow])
         stack.axis = .vertical
@@ -163,8 +125,6 @@ final class MentorCell: UICollectionViewCell {
 
         cardView.addSubview(imageContainerView)
         imageContainerView.addSubview(photoView)
-        imageContainerView.addSubview(ratingBadgeView)
-        ratingBadgeView.addSubview(ratingStack)
         cardView.addSubview(textStack)
         priceChipView.addSubview(priceLabel)
 
@@ -176,9 +136,6 @@ final class MentorCell: UICollectionViewCell {
         roleLabel.setContentCompressionResistancePriority(.required, for: .vertical)
         priceChipView.setContentCompressionResistancePriority(.required, for: .horizontal)
         priceChipView.setContentHuggingPriority(.required, for: .horizontal)
-        ratingStack.setContentCompressionResistancePriority(.required, for: .horizontal)
-        ratingStack.setContentHuggingPriority(.required, for: .horizontal)
-
         setupConstraints()
     }
 
@@ -201,14 +158,6 @@ final class MentorCell: UICollectionViewCell {
             photoView.trailingAnchor.constraint(equalTo: imageContainerView.trailingAnchor),
             photoView.bottomAnchor.constraint(equalTo: imageContainerView.bottomAnchor),
 
-            ratingBadgeView.topAnchor.constraint(equalTo: imageContainerView.topAnchor, constant: 10),
-            ratingBadgeView.trailingAnchor.constraint(equalTo: imageContainerView.trailingAnchor, constant: -10),
-
-            ratingStack.topAnchor.constraint(equalTo: ratingBadgeView.topAnchor, constant: 6),
-            ratingStack.leadingAnchor.constraint(equalTo: ratingBadgeView.leadingAnchor, constant: 8),
-            ratingStack.trailingAnchor.constraint(equalTo: ratingBadgeView.trailingAnchor, constant: -8),
-            ratingStack.bottomAnchor.constraint(equalTo: ratingBadgeView.bottomAnchor, constant: -6),
-
             textStack.topAnchor.constraint(equalTo: imageContainerView.bottomAnchor, constant: 10),
             textStack.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 11),
             textStack.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -11),
@@ -217,18 +166,13 @@ final class MentorCell: UICollectionViewCell {
             priceLabel.topAnchor.constraint(equalTo: priceChipView.topAnchor, constant: 5),
             priceLabel.leadingAnchor.constraint(equalTo: priceChipView.leadingAnchor, constant: 8),
             priceLabel.trailingAnchor.constraint(equalTo: priceChipView.trailingAnchor, constant: -8),
-            priceLabel.bottomAnchor.constraint(equalTo: priceChipView.bottomAnchor, constant: -5),
-
-            starImageView.widthAnchor.constraint(equalToConstant: 12),
-            starImageView.heightAnchor.constraint(equalToConstant: 12)
+            priceLabel.bottomAnchor.constraint(equalTo: priceChipView.bottomAnchor, constant: -5)
         ])
     }
 
     func configure(with mentor: Mentor) {
         nameLabel.text = mentor.name
         roleLabel.text = mentor.role
-        let displayRating = mentor.rating > 0.01 ? mentor.rating : 4.0
-        ratingLabel.text = String(format: "%.1f", displayRating)
         priceLabel.text = Self.priceHint(for: mentor)
         priceChipView.isHidden = priceLabel.text == nil
         // Prefer remote profilePictureUrl if provided, with cache; otherwise use local asset or symbol
