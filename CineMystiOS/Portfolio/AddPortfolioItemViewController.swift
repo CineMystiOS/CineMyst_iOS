@@ -8,6 +8,7 @@
 import UIKit
 import PhotosUI
 import UniformTypeIdentifiers
+import AVFoundation
 import Supabase
 
 private enum PDS {
@@ -26,6 +27,8 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
     var onItemAdded: ((PortfolioItemData) -> Void)?
     private var selectedImage: UIImage?
     private var uploadedImageUrl: String?
+    private var uploadedMediaUrl: String?
+    private var uploadedMediaIsVideo = false
     
     // MARK: - UI Components
     private let scrollView = UIScrollView()
@@ -278,6 +281,9 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
             selectedImage = image
             displaySelectedImage(image)
             uploadImageToSupabase(image)
+        } else if let mediaURL = info[.mediaURL] as? URL {
+            displaySelectedVideo(from: mediaURL)
+            uploadVideoToSupabase(fileURL: mediaURL)
         }
     }
     
@@ -290,15 +296,24 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
         defer { picker.dismiss(animated: true) }
         
         guard let result = results.first else { return }
-        
-        result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.image.identifier) { url, error in
-            if let url = url, let imageData = try? Data(contentsOf: url) {
-                if let image = UIImage(data: imageData) {
-                    DispatchQueue.main.async {
-                        self.selectedImage = image
-                        self.displaySelectedImage(image)
-                        self.uploadImageToSupabase(image)
-                    }
+
+        if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
+            result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { url, _ in
+                guard let url else { return }
+                DispatchQueue.main.async {
+                    self.displaySelectedVideo(from: url)
+                }
+                self.uploadVideoToSupabase(fileURL: url)
+            }
+            return
+        }
+
+        result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.image.identifier) { url, _ in
+            if let url = url, let imageData = try? Data(contentsOf: url), let image = UIImage(data: imageData) {
+                DispatchQueue.main.async {
+                    self.selectedImage = image
+                    self.displaySelectedImage(image)
+                    self.uploadImageToSupabase(image)
                 }
             }
         }
@@ -311,6 +326,32 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
             self.imagePreview.isHidden = false
             self.uploadButton.isHidden = true
             self.uploadProgressLabel.text = "Uploading..."
+        }
+    }
+
+    private func displaySelectedVideo(from fileURL: URL) {
+        let asset = AVAsset(url: fileURL)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        let time = CMTime(seconds: 0.5, preferredTimescale: 60)
+
+        if let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) {
+            let image = UIImage(cgImage: cgImage)
+            DispatchQueue.main.async {
+                self.imagePreview.image = image
+                self.imagePreview.isHidden = false
+                self.uploadButton.isHidden = true
+                self.uploadProgressLabel.text = "Uploading video..."
+            }
+        } else {
+            DispatchQueue.main.async {
+                self.imagePreview.image = UIImage(systemName: "play.rectangle.fill")
+                self.imagePreview.tintColor = .white.withAlphaComponent(0.85)
+                self.imagePreview.contentMode = .scaleAspectFit
+                self.imagePreview.isHidden = false
+                self.uploadButton.isHidden = true
+                self.uploadProgressLabel.text = "Uploading video..."
+            }
         }
     }
     
@@ -326,17 +367,19 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
                 
                 try await supabase
                     .storage
-                    .from("portfolio_images")
+                    .from("portfolio-media")
                     .upload(fileName, data: imageData)
                 
                 // Get public URL
                 let publicUrl = try supabase
                     .storage
-                    .from("portfolio_images")
+                    .from("portfolio-media")
                     .getPublicURL(path: fileName)
                 
                 DispatchQueue.main.async {
                     self.uploadedImageUrl = publicUrl.absoluteString
+                    self.uploadedMediaUrl = publicUrl.absoluteString
+                    self.uploadedMediaIsVideo = false
                     self.uploadProgressLabel.text = "✅ Image uploaded successfully"
                 }
                 
@@ -349,6 +392,44 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
                     self.showAlert(title: "Upload Error", message: error.localizedDescription)
                 }
                 print("❌ Upload error: \(error)")
+            }
+        }
+    }
+
+    private func uploadVideoToSupabase(fileURL: URL) {
+        Task {
+            do {
+                let videoData = try Data(contentsOf: fileURL)
+                let fileExtension = fileURL.pathExtension.isEmpty ? "mov" : fileURL.pathExtension
+                let fileName = "portfolio_\(UUID().uuidString).\(fileExtension)"
+
+                try await supabase
+                    .storage
+                    .from("portfolio-media")
+                    .upload(fileName, data: videoData)
+
+                let publicUrl = try supabase
+                    .storage
+                    .from("portfolio-media")
+                    .getPublicURL(path: fileName)
+
+                DispatchQueue.main.async {
+                    self.uploadedImageUrl = nil
+                    self.uploadedMediaUrl = publicUrl.absoluteString
+                    self.uploadedMediaIsVideo = true
+                    self.uploadProgressLabel.text = "✅ Video uploaded successfully"
+                }
+
+                print("✅ Video uploaded: \(publicUrl)")
+            } catch {
+                DispatchQueue.main.async {
+                    self.uploadProgressLabel.text = "❌ Upload failed"
+                    self.imagePreview.isHidden = true
+                    self.uploadButton.isHidden = false
+                    self.imagePreview.contentMode = .scaleAspectFill
+                    self.showAlert(title: "Upload Error", message: error.localizedDescription)
+                }
+                print("❌ Video upload error: \(error)")
             }
         }
     }
@@ -378,8 +459,8 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
             genre: genreField.text?.isEmpty == true ? nil : genreField.text,
             durationMinutes: .none,
             description: descriptionView.text?.isEmpty == true ? nil : descriptionView.text,
-            posterUrl: uploadedImageUrl,
-            mediaUrls: .none
+            posterUrl: uploadedMediaIsVideo ? nil : uploadedImageUrl,
+            mediaUrls: uploadedMediaUrl.map { [$0] }
         )
         
         Task {

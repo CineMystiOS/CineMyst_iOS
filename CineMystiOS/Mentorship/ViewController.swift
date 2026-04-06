@@ -50,7 +50,9 @@ final class BookViewController: UIViewController {
     private let contentView = UIView()
     private let bottomActionContainer: UIView = {
         let v = UIView()
-        v.backgroundColor = MentorshipUI.pageBackground
+        v.backgroundColor = UIColor.white.withAlphaComponent(0.82)
+        v.layer.borderColor = MentorshipUI.plumStroke.cgColor
+        v.layer.borderWidth = 1
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
@@ -75,6 +77,7 @@ final class BookViewController: UIViewController {
         let l = UILabel()
         l.text = ""
         l.font = .systemFont(ofSize: 28, weight: .bold)
+        l.textColor = MentorshipUI.deepPlum
         l.textAlignment = .center
         l.numberOfLines = 0
         return l
@@ -84,21 +87,9 @@ final class BookViewController: UIViewController {
         let l = UILabel()
         l.text = ""
         l.font = .systemFont(ofSize: 14, weight: .semibold)
-        l.textColor = MentorshipUI.softText
+        l.textColor = MentorshipUI.brandPlum.withAlphaComponent(0.78)
         l.textAlignment = .center
         return l
-    }()
-
-    private let portfolioButton: UIButton = {
-        var config = UIButton.Configuration.tinted()
-        config.title = "Portfolio"
-        config.baseForegroundColor = MentorshipUI.brandPlum
-        config.baseBackgroundColor = MentorshipUI.plumChip
-        config.cornerStyle = .capsule
-        config.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14)
-        let b = UIButton(configuration: config)
-        b.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
-        return b
     }()
 
     // starsView is a placeholder stack we can update when mentor is set
@@ -178,12 +169,12 @@ final class BookViewController: UIViewController {
             v.spacing = 4
             v.layoutMargins = .init(top: 12, left: 12, bottom: 12, right: 12)
             v.isLayoutMarginsRelativeArrangement = true
-            v.backgroundColor = MentorshipUI.raisedSurface
+            v.backgroundColor = UIColor.white.withAlphaComponent(0.86)
             v.layer.cornerRadius = 20
             v.layer.shadowColor = MentorshipUI.shadow.cgColor
             v.layer.shadowOpacity = 1
-            v.layer.shadowOffset = CGSize(width: 0, height: 10)
-            v.layer.shadowRadius = 18
+            v.layer.shadowOffset = CGSize(width: 0, height: 12)
+            v.layer.shadowRadius = 22
             v.layer.borderWidth = 1
             v.layer.borderColor = MentorshipUI.plumStroke.cgColor
             return v
@@ -244,12 +235,12 @@ final class BookViewController: UIViewController {
     private func makeSectionCard(titleLabel: UILabel, bodyView: UIView, iconName: String) -> UIView {
         let card = UIView()
         card.translatesAutoresizingMaskIntoConstraints = false
-        card.backgroundColor = MentorshipUI.raisedSurface
+        card.backgroundColor = UIColor.white.withAlphaComponent(0.84)
         card.layer.cornerRadius = 24
         card.layer.shadowColor = MentorshipUI.shadow.cgColor
         card.layer.shadowOpacity = 1
-        card.layer.shadowOffset = CGSize(width: 0, height: 8)
-        card.layer.shadowRadius = 20
+        card.layer.shadowOffset = CGSize(width: 0, height: 10)
+        card.layer.shadowRadius = 22
         card.layer.borderWidth = 1
         card.layer.borderColor = MentorshipUI.plumStroke.cgColor
 
@@ -323,8 +314,6 @@ final class BookViewController: UIViewController {
 
         setupLayout()
         bookButton.addTarget(self, action: #selector(didTapBookSession), for: .touchUpInside)
-        portfolioButton.addTarget(self, action: #selector(didTapPortfolio), for: .touchUpInside)
-
         applyMentorIfNeeded()
     }
 
@@ -370,29 +359,6 @@ final class BookViewController: UIViewController {
             vc.allowedAreas = areas
         }
         navigationController?.pushViewController(vc, animated: true)
-    }
-
-    @objc private func didTapPortfolio() {
-        guard
-            let rawUserId = mentor?.userId,
-            let targetUserId = UUID(uuidString: rawUserId)
-        else {
-            let alert = UIAlertController(
-                title: "Portfolio unavailable",
-                message: "We couldn't find this mentor's portfolio right now.",
-                preferredStyle: .alert
-            )
-            alert.addAction(UIAlertAction(title: "OK", style: .default))
-            present(alert, animated: true)
-            return
-        }
-
-        let vc = ActorPortfolioDetailViewController()
-        vc.targetUserId = targetUserId
-        vc.isOwnProfile = false
-        let nav = UINavigationController(rootViewController: vc)
-        nav.modalPresentationStyle = .fullScreen
-        present(nav, animated: true)
     }
 
     // MARK: Layout
@@ -443,14 +409,15 @@ final class BookViewController: UIViewController {
 
         // Card container
         let card = UIView()
-        card.backgroundColor = UIColor.white.withAlphaComponent(0.96)
+        card.backgroundColor = UIColor.white.withAlphaComponent(0.84)
         card.layer.cornerRadius = 30
         card.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         card.layer.shadowColor = MentorshipUI.shadow.cgColor
-        card.layer.shadowOpacity = 0.35
-        card.layer.shadowOffset = CGSize(width: 0, height: -4)
-        card.layer.shadowRadius = 14
-        card.layer.borderWidth = 0
+        card.layer.shadowOpacity = 1
+        card.layer.shadowOffset = CGSize(width: 0, height: -6)
+        card.layer.shadowRadius = 24
+        card.layer.borderWidth = 1
+        card.layer.borderColor = MentorshipUI.plumStroke.cgColor
         contentView.addSubview(card)
         card.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -462,6 +429,8 @@ final class BookViewController: UIViewController {
 
         // Stacks
         rolePillView.addSubview(roleLabel)
+        rolePillView.layer.borderWidth = 1
+        rolePillView.layer.borderColor = MentorshipUI.plumStroke.cgColor
         NSLayoutConstraint.activate([
             roleLabel.topAnchor.constraint(equalTo: rolePillView.topAnchor, constant: 6),
             roleLabel.leadingAnchor.constraint(equalTo: rolePillView.leadingAnchor, constant: 12),
@@ -469,7 +438,7 @@ final class BookViewController: UIViewController {
             roleLabel.bottomAnchor.constraint(equalTo: rolePillView.bottomAnchor, constant: -6)
         ])
 
-        let headerStack = UIStackView(arrangedSubviews: [nameLabel, rolePillView, portfolioButton])
+        let headerStack = UIStackView(arrangedSubviews: [nameLabel, rolePillView])
         headerStack.axis = .vertical
         headerStack.alignment = .center
         headerStack.spacing = 10
@@ -479,7 +448,7 @@ final class BookViewController: UIViewController {
 
         let mainStack = UIStackView(arrangedSubviews: [headerStack, statsRow, aboutCard, mentorshipCard])
         mainStack.axis = .vertical
-        mainStack.spacing = 20
+        mainStack.spacing = 22
 
         card.addSubview(mainStack)
         mainStack.translatesAutoresizingMaskIntoConstraints = false
@@ -488,6 +457,31 @@ final class BookViewController: UIViewController {
             mainStack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 18),
             mainStack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -18),
             mainStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -18)
+        ])
+
+        let cardGlow = CAGradientLayer()
+        cardGlow.colors = [
+            UIColor.white.withAlphaComponent(0.28).cgColor,
+            UIColor.white.withAlphaComponent(0.08).cgColor,
+            UIColor.clear.cgColor
+        ]
+        cardGlow.locations = [0.0, 0.35, 1.0]
+        cardGlow.startPoint = CGPoint(x: 0.5, y: 0.0)
+        cardGlow.endPoint = CGPoint(x: 0.5, y: 1.0)
+        cardGlow.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: 180)
+        let glowView = UIView()
+        glowView.translatesAutoresizingMaskIntoConstraints = false
+        glowView.isUserInteractionEnabled = false
+        glowView.layer.cornerRadius = 30
+        glowView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        glowView.clipsToBounds = true
+        glowView.layer.insertSublayer(cardGlow, at: 0)
+        card.insertSubview(glowView, at: 0)
+        NSLayoutConstraint.activate([
+            glowView.topAnchor.constraint(equalTo: card.topAnchor),
+            glowView.leadingAnchor.constraint(equalTo: card.leadingAnchor),
+            glowView.trailingAnchor.constraint(equalTo: card.trailingAnchor),
+            glowView.heightAnchor.constraint(equalToConstant: 180)
         ])
 
         // Bottom Book button
@@ -517,9 +511,9 @@ final class BookViewController: UIViewController {
         headerOverlayView.layer.sublayers?.forEach { $0.removeFromSuperlayer() }
         let gradient = CAGradientLayer()
         gradient.colors = [
-            UIColor.black.withAlphaComponent(0.02).cgColor,
-            UIColor.black.withAlphaComponent(0.08).cgColor,
-            UIColor.black.withAlphaComponent(0.42).cgColor
+            UIColor.black.withAlphaComponent(0.01).cgColor,
+            UIColor.black.withAlphaComponent(0.10).cgColor,
+            UIColor.black.withAlphaComponent(0.52).cgColor
         ]
         gradient.locations = [0.0, 0.45, 1.0]
         gradient.startPoint = CGPoint(x: 0.5, y: 0.0)

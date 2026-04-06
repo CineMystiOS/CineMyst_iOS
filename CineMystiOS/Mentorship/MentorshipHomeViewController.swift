@@ -633,6 +633,73 @@ final class BookingCardCell: UITableViewCell {
     }
 }
 
+// MARK: - Gradient Wordmark View
+private final class GradientWordmarkView: UIView {
+    private let text: String
+    private let sizingLabel = UILabel()
+    private let gradientLayer = CAGradientLayer()
+    private let textLayer = CATextLayer()
+
+    init(text: String) {
+        self.text = text
+        super.init(frame: .zero)
+
+        let font = UIFont.systemFont(ofSize: 26, weight: .bold)
+        let leadingFont = UIFont.systemFont(ofSize: 30, weight: .bold)
+        sizingLabel.text = text
+        sizingLabel.font = font
+
+        gradientLayer.colors = [
+            CineMystTheme.deepPlum.cgColor,
+            CineMystTheme.brandPlum.cgColor,
+            CineMystTheme.pink.cgColor
+        ]
+        gradientLayer.locations = [0, 0.55, 1]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0.5)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 0.5)
+
+        let attributed = NSMutableAttributedString(
+            string: text,
+            attributes: [
+                .font: font
+            ]
+        )
+        if !text.isEmpty {
+            attributed.addAttribute(.font, value: leadingFont, range: NSRange(location: 0, length: 1))
+            attributed.addAttribute(.baselineOffset, value: -1, range: NSRange(location: 0, length: 1))
+        }
+        textLayer.string = attributed
+        textLayer.contentsScale = UIScreen.main.scale
+        textLayer.alignmentMode = .left
+        textLayer.truncationMode = .none
+        textLayer.isWrapped = false
+
+        layer.addSublayer(gradientLayer)
+        gradientLayer.mask = textLayer
+
+        layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.22).cgColor
+        layer.shadowOpacity = 1
+        layer.shadowRadius = 10
+        layer.shadowOffset = CGSize(width: 0, height: 4)
+
+        isUserInteractionEnabled = false
+        backgroundColor = .clear
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var intrinsicContentSize: CGSize {
+        let baseSize = sizingLabel.intrinsicContentSize
+        return CGSize(width: ceil(baseSize.width + 10), height: ceil(max(baseSize.height, 34)))
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        gradientLayer.frame = bounds
+        textLayer.frame = bounds
+    }
+}
+
 // MARK: - MentorshipHomeViewController
 final class MentorshipHomeViewController: UIViewController {
 
@@ -647,12 +714,10 @@ final class MentorshipHomeViewController: UIViewController {
     private let compactHomeMentorLimit = 2
 
     // UI elements
-    private let titleLabel: UILabel = {
-        let l = UILabel()
-        l.text = "Mentorship"
-        l.font = UIFont.systemFont(ofSize: 30, weight: .bold)
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
+    private lazy var titleLabel: UIView = {
+        let v = GradientWordmarkView(text: "Mentorship")
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
     }()
 
     private let subtitleLabel: UILabel = {
@@ -877,7 +942,6 @@ final class MentorshipHomeViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = MentorshipUI.pageBackground
         setupBackground()
-        titleLabel.textColor = CineMystTheme.ink
         subtitleLabel.textColor = MentorshipUI.mutedText
         mentorsLabel.textColor = MentorshipUI.brandPlum
         bookingsTitle.textColor = MentorshipUI.brandPlum
@@ -1171,7 +1235,7 @@ final class MentorshipHomeViewController: UIViewController {
         let pagePadding: CGFloat = 20
 
         NSLayoutConstraint.activate([
-            titleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
+            titleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
             titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: pagePadding),
             titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -pagePadding),
 

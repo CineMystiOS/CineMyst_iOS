@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import AVKit
 import Supabase
 
 // MARK: - Design System
@@ -423,11 +424,13 @@ class PortfolioViewController: UIViewController {
         let galleryItems = p.mediaItems
         if !galleryItems.isEmpty {
             contentStack.addArrangedSubview(makeMediaGallerySection(galleryItems))
+            contentStack.addArrangedSubview(makeSectionSpacer())
         }
 
         // --- 2. VITAL STATISTICS / PHYSICAL TRAITS ---
         if p.height_cm != nil || p.bust != nil || p.skin_tone != nil {
             contentStack.addArrangedSubview(makeVitalsSection(p))
+            contentStack.addArrangedSubview(makeSectionSpacer())
         }
 
         // --- 3. PROJECT HISTORY SECTIONS ---
@@ -453,31 +456,20 @@ class PortfolioViewController: UIViewController {
         ]
         
         for (idx, (title, content)) in actorSections.enumerated() {
-            let formattedList = content?.value as? [[String: Any]] ?? []
+            let formattedList = normalizedProjects(from: content)
             if !formattedList.isEmpty {
-                let sectionHeader = UILabel(); sectionHeader.text = title; sectionHeader.font = .systemFont(ofSize: 11, weight: .bold); sectionHeader.textColor = .white.withAlphaComponent(0.5); sectionHeader.translatesAutoresizingMaskIntoConstraints = false
-                contentStack.addArrangedSubview(sectionHeader)
-                
-                let scroll = UIScrollView(); scroll.showsHorizontalScrollIndicator = false; scroll.translatesAutoresizingMaskIntoConstraints = false; scroll.heightAnchor.constraint(equalToConstant: 220).isActive = true
-                let stack = UIStackView(); stack.axis = .horizontal; stack.spacing = 12; stack.translatesAutoresizingMaskIntoConstraints = false
-                scroll.addSubview(stack)
-                NSLayoutConstraint.activate([
-                    stack.topAnchor.constraint(equalTo: scroll.topAnchor), stack.bottomAnchor.constraint(equalTo: scroll.bottomAnchor),
-                    stack.leadingAnchor.constraint(equalTo: scroll.leadingAnchor), stack.trailingAnchor.constraint(equalTo: scroll.trailingAnchor)
-                ])
-                
-                for project in formattedList {
-                    stack.addArrangedSubview(makeProjectMediaCard(project))
-                }
-                contentStack.addArrangedSubview(scroll)
+                contentStack.addArrangedSubview(makeProjectSectionCard(title: title, projects: formattedList))
+                contentStack.addArrangedSubview(makeSectionSpacer())
             } else if isOwnProfile {
                 contentStack.addArrangedSubview(makeEmptyActorSection(title: title, tag: idx))
+                contentStack.addArrangedSubview(makeSectionSpacer())
             }
         }
 
         // --- 4. BIOGRAPHY / ADDITIONAL EXPERIENCE ---
         if let exp = p.previous_experience, !exp.isEmpty {
             contentStack.addArrangedSubview(makeExperienceSection(exp))
+            contentStack.addArrangedSubview(makeSectionSpacer())
         }
 
         // Bottom padding
@@ -788,7 +780,8 @@ class PortfolioViewController: UIViewController {
                                         title: item.title, year: item.year, role: item.role,
                                         production_company: item.productionCompany,
                                         genre: item.genre, description: item.description,
-                                        poster_url: item.posterUrl
+                                        poster_url: item.posterUrl,
+                                        media_urls: item.mediaUrls
                                     )
                                 )
                                 print("✅ Artist project saved successfully, refreshing UI...")
@@ -884,19 +877,36 @@ class PortfolioViewController: UIViewController {
         card.layer.borderWidth = 1; card.layer.borderColor = PDS.glassBorder.cgColor
         
         let poster = UIImageView(); poster.contentMode = .scaleAspectFill; poster.clipsToBounds = true; poster.translatesAutoresizingMaskIntoConstraints = false
-        if let url = dict["poster_url"] as? String, !url.isEmpty {
-            Task { poster.image = await ImageLoader.shared.image(from: url) }
-        } else { poster.backgroundColor = .white.withAlphaComponent(0.05) }
+        let posterURL = resolvePortfolioMediaURL((dict["poster_url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines))
+        let videoURL = resolvePortfolioMediaURL((dict["video_url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines))
+        let mediaURL = resolvePortfolioMediaURL((dict["media_url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines))
+        let genericURL = resolvePortfolioMediaURL((dict["url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines))
+        let thumbnailURL = resolvePortfolioMediaURL((dict["thumbnail_url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines))
+        let nestedMediaURLs = extractMediaURLs(from: dict)
+        let mediaCandidates: [String?] = [posterURL, thumbnailURL, videoURL, mediaURL, genericURL]
+        let primaryMediaURL = mediaCandidates
+            .compactMap { value -> String? in
+                guard let value, !value.isEmpty else { return nil }
+                return value
+            }
+            .first ?? nestedMediaURLs.first
+        if let primaryMediaURL {
+            Task { poster.image = await ImageLoader.shared.image(from: primaryMediaURL) }
+        } else {
+            poster.backgroundColor = .white.withAlphaComponent(0.05)
+        }
         
         let title = UILabel(); title.text = dict["title"] as? String; title.font = .systemFont(ofSize: 12, weight: .bold); title.textColor = .white; title.translatesAutoresizingMaskIntoConstraints = false
         let role  = UILabel(); role.text  = dict["role"] as? String;  role.font  = .systemFont(ofSize: 11); role.textColor = .white.withAlphaComponent(0.7); role.translatesAutoresizingMaskIntoConstraints = false
+        title.numberOfLines = 2
+        role.numberOfLines = 2
         
         card.addSubview(poster); card.addSubview(title); card.addSubview(role)
         NSLayoutConstraint.activate([
             poster.topAnchor.constraint(equalTo: card.topAnchor),
             poster.leadingAnchor.constraint(equalTo: card.leadingAnchor),
             poster.trailingAnchor.constraint(equalTo: card.trailingAnchor),
-            poster.heightAnchor.constraint(equalToConstant: 160),
+            poster.heightAnchor.constraint(equalToConstant: 152),
             
             title.topAnchor.constraint(equalTo: poster.bottomAnchor, constant: 10),
             title.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 12),
@@ -909,16 +919,211 @@ class PortfolioViewController: UIViewController {
         ])
         
         // If it's a video, add a play indicator
-        let playIcon = UIImageView(image: UIImage(systemName: "play.circle.fill"))
-        playIcon.tintColor = .white; playIcon.translatesAutoresizingMaskIntoConstraints = false; playIcon.alpha = 0.8
-        card.addSubview(playIcon)
-        NSLayoutConstraint.activate([
-            playIcon.centerXAnchor.constraint(equalTo: poster.centerXAnchor),
-            playIcon.centerYAnchor.constraint(equalTo: poster.centerYAnchor),
-            playIcon.widthAnchor.constraint(equalToConstant: 30),
-            playIcon.heightAnchor.constraint(equalToConstant: 30)
-        ])
+        let lowerCandidates: [String?] = [videoURL, mediaURL, genericURL, posterURL] + nestedMediaURLs.map { Optional($0) }
+        let lowerURL = lowerCandidates
+            .compactMap { value -> String? in
+                guard let value, !value.isEmpty else { return nil }
+                return value.lowercased()
+            }
+            .first ?? ""
+        let isVideo = lowerURL.hasSuffix(".mp4") || lowerURL.hasSuffix(".mov") || lowerURL.hasSuffix(".m4v") || lowerURL.contains("video") || lowerURL.contains("youtube.com") || lowerURL.contains("youtu.be")
+        if isVideo {
+            let playIcon = UIImageView(image: UIImage(systemName: "play.circle.fill"))
+            playIcon.tintColor = .white
+            playIcon.translatesAutoresizingMaskIntoConstraints = false
+            playIcon.alpha = 0.86
+            card.addSubview(playIcon)
+            NSLayoutConstraint.activate([
+                playIcon.centerXAnchor.constraint(equalTo: poster.centerXAnchor),
+                playIcon.centerYAnchor.constraint(equalTo: poster.centerYAnchor),
+                playIcon.widthAnchor.constraint(equalToConstant: 30),
+                playIcon.heightAnchor.constraint(equalToConstant: 30)
+            ])
+        }
         
+        return card
+    }
+
+    private func normalizedProjects(from content: AnyCodable?) -> [[String: Any]] {
+        guard let value = content?.value else { return [] }
+
+        if let list = value as? [[String: Any]] {
+            return list
+        }
+
+        if let list = value as? [[String: AnyCodable]] {
+            return list.map { dict in
+                var normalized: [String: Any] = [:]
+                dict.forEach { key, value in normalized[key] = value.value }
+                return normalized
+            }
+        }
+
+        if let list = value as? [Any] {
+            return list.compactMap { item in
+                if let dict = item as? [String: Any] {
+                    return dict
+                }
+                if let dict = item as? [String: AnyCodable] {
+                    var normalized: [String: Any] = [:]
+                    dict.forEach { key, value in normalized[key] = value.value }
+                    return normalized
+                }
+                return nil
+            }
+        }
+
+        return []
+    }
+
+    private func extractMediaURLs(from dict: [String: Any]) -> [String] {
+        let possibleKeys = ["media_urls", "media", "assets", "files"]
+        var urls: [String] = []
+
+        for key in possibleKeys {
+            guard let raw = dict[key] else { continue }
+
+            if let values = raw as? [String] {
+                urls.append(contentsOf: values.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+                continue
+            }
+
+            if let values = raw as? [[String: Any]] {
+                urls.append(contentsOf: values.compactMap { mediaDict in
+                    let candidates = [
+                        mediaDict["url"] as? String,
+                        mediaDict["video_url"] as? String,
+                        mediaDict["media_url"] as? String,
+                        mediaDict["thumbnail_url"] as? String,
+                        mediaDict["poster_url"] as? String
+                    ]
+                    return candidates.compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.first
+                })
+                continue
+            }
+
+            if let values = raw as? [[String: AnyCodable]] {
+                urls.append(contentsOf: values.compactMap { mediaDict in
+                    let candidates = [
+                        mediaDict["url"]?.value as? String,
+                        mediaDict["video_url"]?.value as? String,
+                        mediaDict["media_url"]?.value as? String,
+                        mediaDict["thumbnail_url"]?.value as? String,
+                        mediaDict["poster_url"]?.value as? String
+                    ]
+                    return candidates.compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.first
+                })
+                continue
+            }
+
+            if let values = raw as? [Any] {
+                urls.append(contentsOf: values.compactMap { item in
+                    if let text = item as? String {
+                        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                    if let mediaDict = item as? [String: Any] {
+                        let candidates = [
+                            mediaDict["url"] as? String,
+                            mediaDict["video_url"] as? String,
+                            mediaDict["media_url"] as? String,
+                            mediaDict["thumbnail_url"] as? String,
+                            mediaDict["poster_url"] as? String
+                        ]
+                        return candidates.compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.first
+                    }
+                    if let mediaDict = item as? [String: AnyCodable] {
+                        let candidates = [
+                            mediaDict["url"]?.value as? String,
+                            mediaDict["video_url"]?.value as? String,
+                            mediaDict["media_url"]?.value as? String,
+                            mediaDict["thumbnail_url"]?.value as? String,
+                            mediaDict["poster_url"]?.value as? String
+                        ]
+                        return candidates.compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.first
+                    }
+                    return nil
+                })
+            }
+        }
+
+        return urls
+            .compactMap { resolvePortfolioMediaURL($0) }
+            .filter { !$0.isEmpty }
+    }
+
+    private func resolvePortfolioMediaURL(_ rawValue: String?) -> String? {
+        guard let rawValue else { return nil }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
+            return trimmed
+        }
+
+        let knownBuckets = ["portfolio-media", "portfolio-images", "videos", "portfolio_images"]
+        for bucket in knownBuckets {
+            let prefix = "\(bucket)/"
+            if trimmed.hasPrefix(prefix) {
+                let path = String(trimmed.dropFirst(prefix.count))
+                return try? supabase.storage.from(bucket).getPublicURL(path: path).absoluteString
+            }
+        }
+
+        if trimmed.contains(".") {
+            return try? supabase.storage.from("portfolio-media").getPublicURL(path: trimmed).absoluteString
+        }
+
+        return trimmed
+    }
+
+    private func makeProjectSectionCard(title: String, projects: [[String: Any]]) -> UIView {
+        let card = UIView()
+        card.translatesAutoresizingMaskIntoConstraints = false
+        card.backgroundColor = PDS.glass
+        card.layer.cornerRadius = 20
+        card.layer.borderWidth = 1
+        card.layer.borderColor = PDS.glassBorder.cgColor
+
+        let sectionTitle = UILabel()
+        sectionTitle.text = title
+        sectionTitle.font = .systemFont(ofSize: 11, weight: .bold)
+        sectionTitle.textColor = .white.withAlphaComponent(0.5)
+        sectionTitle.translatesAutoresizingMaskIntoConstraints = false
+
+        let scroll = UIScrollView()
+        scroll.showsHorizontalScrollIndicator = false
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        scroll.heightAnchor.constraint(equalToConstant: 214).isActive = true
+
+        let stack = UIStackView()
+        stack.axis = .horizontal
+        stack.spacing = 12
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        card.addSubview(sectionTitle)
+        card.addSubview(scroll)
+        scroll.addSubview(stack)
+
+        for project in projects {
+            stack.addArrangedSubview(makeProjectMediaCard(project))
+        }
+
+        NSLayoutConstraint.activate([
+            sectionTitle.topAnchor.constraint(equalTo: card.topAnchor, constant: 14),
+            sectionTitle.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
+            sectionTitle.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
+
+            scroll.topAnchor.constraint(equalTo: sectionTitle.bottomAnchor, constant: 10),
+            scroll.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
+            scroll.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -14),
+            scroll.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -14),
+
+            stack.topAnchor.constraint(equalTo: scroll.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: scroll.bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: scroll.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: scroll.trailingAnchor)
+        ])
+
         return card
     }
 
@@ -1093,6 +1298,7 @@ class PortfolioViewController: UIViewController {
         for item in media {
             let url  = item["url"] ?? ""
             let type = item["type"] ?? "image"
+            let resolvedURL = resolvePortfolioMediaURL(url) ?? url
             let iv = UIImageView()
             iv.contentMode = .scaleAspectFill
             iv.clipsToBounds = true
@@ -1101,9 +1307,9 @@ class PortfolioViewController: UIViewController {
             iv.translatesAutoresizingMaskIntoConstraints = false
             iv.widthAnchor.constraint(equalToConstant: 110).isActive = true
             iv.heightAnchor.constraint(equalToConstant: 140).isActive = true
-            if let _ = URL(string: url) {
+            if let _ = URL(string: resolvedURL) {
                 Task {
-                    let img = await ImageLoader.shared.image(from: url)
+                    let img = await ImageLoader.shared.image(from: resolvedURL)
                     await MainActor.run { iv.image = img }
                 }
             }
@@ -1118,6 +1324,11 @@ class PortfolioViewController: UIViewController {
                     icon.widthAnchor.constraint(equalToConstant: 28), icon.heightAnchor.constraint(equalToConstant: 28)
                 ])
             }
+
+            let tap = MediaTapGesture(target: self, action: #selector(mediaGalleryItemTapped(_:)))
+            tap.item = PortfolioMedia(url: resolvedURL, type: type)
+            iv.addGestureRecognizer(tap)
+            iv.isUserInteractionEnabled = true
             hStack.addArrangedSubview(iv)
         }
         
@@ -1136,6 +1347,22 @@ class PortfolioViewController: UIViewController {
             hStack.heightAnchor.constraint(equalTo: scroll.heightAnchor)
         ])
         return v
+    }
+
+    @objc private func mediaGalleryItemTapped(_ gesture: MediaTapGesture) {
+        guard let item = gesture.item else { return }
+
+        if item.type == "video", let url = URL(string: item.url) {
+            let player = AVPlayer(url: url)
+            let playerVC = AVPlayerViewController()
+            playerVC.player = player
+            present(playerVC, animated: true) { player.play() }
+        } else {
+            let vc = FullScreenImageViewController(imageURL: item.url)
+            vc.modalPresentationStyle = .overFullScreen
+            vc.modalTransitionStyle = .crossDissolve
+            present(vc, animated: true)
+        }
     }
 
     private func makeVitalsSection(_ p: PortfolioResponse) -> UIView {
@@ -1195,24 +1422,46 @@ class PortfolioViewController: UIViewController {
 
     private func makeExperienceSection(_ text: String) -> UIView {
         let v = UIView()
-        v.backgroundColor = .clear; v.translatesAutoresizingMaskIntoConstraints = false
+        v.backgroundColor = .white.withAlphaComponent(0.05)
+        v.layer.cornerRadius = 20
+        v.layer.borderWidth = 1
+        v.layer.borderColor = UIColor.white.withAlphaComponent(0.12).cgColor
+        v.translatesAutoresizingMaskIntoConstraints = false
         let title = UILabel()
         title.text = "BIOGRAPHY & EXPERIENCE"
         title.font = .systemFont(ofSize: 11, weight: .bold)
         title.textColor = .white.withAlphaComponent(0.5)
         title.translatesAutoresizingMaskIntoConstraints = false
         v.addSubview(title)
-        let body = UILabel(); body.text = text; body.font = .systemFont(ofSize: 14); body.textColor = .white.withAlphaComponent(0.8); body.numberOfLines = 0
+        let body = UILabel(); body.text = text; body.font = .systemFont(ofSize: 14); body.textColor = .white.withAlphaComponent(0.84); body.numberOfLines = 0
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineSpacing = 4
+        body.attributedText = NSAttributedString(
+            string: text,
+            attributes: [
+                .foregroundColor: UIColor.white.withAlphaComponent(0.84),
+                .font: UIFont.systemFont(ofSize: 14),
+                .paragraphStyle: paragraph
+            ]
+        )
         body.translatesAutoresizingMaskIntoConstraints = false
         v.addSubview(body)
         NSLayoutConstraint.activate([
-            title.topAnchor.constraint(equalTo: v.topAnchor), title.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 4),
+            title.topAnchor.constraint(equalTo: v.topAnchor, constant: 14),
+            title.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 16),
             body.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 10),
-            body.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 4),
-            body.trailingAnchor.constraint(equalTo: v.trailingAnchor, constant: -4),
-            body.bottomAnchor.constraint(equalTo: v.bottomAnchor)
+            body.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 16),
+            body.trailingAnchor.constraint(equalTo: v.trailingAnchor, constant: -16),
+            body.bottomAnchor.constraint(equalTo: v.bottomAnchor, constant: -16)
         ])
         return v
+    }
+
+    private func makeSectionSpacer(_ height: CGFloat = 14) -> UIView {
+        let spacer = UIView()
+        spacer.translatesAutoresizingMaskIntoConstraints = false
+        spacer.heightAnchor.constraint(equalToConstant: height).isActive = true
+        return spacer
     }
 }
 
@@ -1371,7 +1620,24 @@ class ImageLoader {
         guard let url = URL(string: urlString) else { return nil }
         
         let lower = urlString.lowercased()
-        if lower.hasSuffix(".mp4") || lower.hasSuffix(".mov") || lower.hasSuffix(".m4v") || urlString.contains("video") {
+        if lower.contains("youtube.com") || lower.contains("youtu.be") {
+            let pattern = "(?i)(?:youtube\\.com\\/(?:[^\\/]+\\/.+\\/|(?:v|e(?:mbed)?)\\/|.*[?&]v=)|youtu\\.be\\/)([^\"&?\\/\\s]{11})"
+            if let regex = try? NSRegularExpression(pattern: pattern, options: []),
+               let match = regex.firstMatch(in: urlString, options: [], range: NSRange(location: 0, length: urlString.utf16.count)),
+               let range = Range(match.range(at: 1), in: urlString) {
+                let videoId = String(urlString[range])
+                let thumbUrlStr = "https://img.youtube.com/vi/\(videoId)/hqdefault.jpg"
+                if let thumbUrl = URL(string: thumbUrlStr) {
+                    do {
+                        let (data, _) = try await URLSession.shared.data(from: thumbUrl)
+                        if let img = UIImage(data: data) {
+                            cache.setObject(img, forKey: urlString as NSString)
+                            return img
+                        }
+                    } catch {}
+                }
+            }
+        } else if lower.hasSuffix(".mp4") || lower.hasSuffix(".mov") || lower.hasSuffix(".m4v") || lower.contains("video") {
             // It's a video, generate thumbnail
             if let thumb = await generateThumbnail(url: url) {
                 cache.setObject(thumb, forKey: urlString as NSString)

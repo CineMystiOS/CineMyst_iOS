@@ -19,6 +19,22 @@ class JobDetailsViewController: UIViewController {
         lbl.textColor = CineMystTheme.ink
         return lbl
     }()
+
+    private let backButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.tintColor = CineMystTheme.brandPlum
+        button.backgroundColor = UIColor.white.withAlphaComponent(0.72)
+        button.layer.cornerRadius = 24
+        button.layer.borderWidth = 1
+        button.layer.borderColor = UIColor.white.withAlphaComponent(0.75).cgColor
+        button.setImage(UIImage(systemName: "chevron.left"), for: .normal)
+        button.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.16).cgColor
+        button.layer.shadowOpacity = 1
+        button.layer.shadowRadius = 20
+        button.layer.shadowOffset = CGSize(width: 0, height: 10)
+        return button
+    }()
     
     private let applyButton: UIButton = {
         let btn = UIButton(type: .system)
@@ -37,11 +53,13 @@ class JobDetailsViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = CineMystTheme.pinkPale
+        navigationItem.hidesBackButton = true
         setupBackground()
         setupScrollView()
         setupLayout()
         
         applyButton.addTarget(self, action: #selector(ctaTapped), for: .touchUpInside)
+        backButton.addTarget(self, action: #selector(backTapped), for: .touchUpInside)
         
         Task {
             await checkTaskStatus()
@@ -211,15 +229,22 @@ class JobDetailsViewController: UIViewController {
     }
     
     private func setupLayout() {
+        contentView.addSubview(backButton)
         contentView.addSubview(titleLabel)
         contentView.addSubview(applyButton)
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
         applyButton.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
-            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            
+            backButton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 6),
+            backButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            backButton.widthAnchor.constraint(equalToConstant: 48),
+            backButton.heightAnchor.constraint(equalToConstant: 48),
+
+            titleLabel.centerYAnchor.constraint(equalTo: backButton.centerYAnchor),
+            titleLabel.leadingAnchor.constraint(equalTo: backButton.trailingAnchor, constant: 8),
+            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+
             applyButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             applyButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             applyButton.heightAnchor.constraint(equalToConstant: 54),
@@ -231,30 +256,52 @@ class JobDetailsViewController: UIViewController {
         contentView.subviews.forEach { if $0 is UIStackView && $0 != titleLabel { $0.removeFromSuperview() } }
         let cardStack = UIStackView()
         cardStack.axis = .vertical
-        cardStack.spacing = 28
+        cardStack.spacing = 18
         contentView.addSubview(cardStack)
         cardStack.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            cardStack.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 30),
+            cardStack.topAnchor.constraint(equalTo: backButton.bottomAnchor, constant: 16),
             cardStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             cardStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            cardStack.bottomAnchor.constraint(equalTo: applyButton.topAnchor, constant: -40)
+            cardStack.bottomAnchor.constraint(equalTo: applyButton.topAnchor, constant: -30)
         ])
         
         if let job = job {
-            cardStack.addArrangedSubview(makeCard(title: job.title ?? "Untitled", body: job.description ?? "No description."))
+            cardStack.addArrangedSubview(makeHeroCard(for: job))
             if let req = job.requirements, !req.isEmpty { cardStack.addArrangedSubview(makeRequirementsCard(requirements: req)) }
-            cardStack.addArrangedSubview(makeCard(title: "Compensation", body: "₹\(job.ratePerDay ?? 0)/day"))
-            let deadline = job.applicationDeadline != nil ? "By \(DateFormatter.localizedString(from: job.applicationDeadline!, dateStyle: .medium, timeStyle: .none))" : "No deadline."
-            cardStack.addArrangedSubview(makeCard(title: "Deadline", body: deadline))
+            let infoRow = UIStackView(arrangedSubviews: [
+                makeMetricCard(title: "Compensation", body: "₹\(job.ratePerDay ?? 0)/day", icon: "banknote"),
+                makeMetricCard(
+                    title: "Deadline",
+                    body: job.applicationDeadline != nil
+                        ? DateFormatter.localizedString(from: job.applicationDeadline!, dateStyle: .medium, timeStyle: .none)
+                        : "No deadline",
+                    icon: "calendar"
+                )
+            ])
+            infoRow.axis = .horizontal
+            infoRow.spacing = 14
+            infoRow.distribution = .fillEqually
+            cardStack.addArrangedSubview(infoRow)
         }
     }
 
-    private func makeCard(title: String, body: String) -> UIView {
-        let card = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialLight))
-        card.contentView.backgroundColor = UIColor.white.withAlphaComponent(0.44)
+    private func makeGlassCard() -> UIVisualEffectView {
+        let card = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialLight))
+        card.contentView.backgroundColor = UIColor.white.withAlphaComponent(0.46)
         card.layer.cornerRadius = 20
+        card.layer.borderWidth = 1
+        card.layer.borderColor = UIColor.white.withAlphaComponent(0.68).cgColor
         card.clipsToBounds = true
+        card.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.09).cgColor
+        card.layer.shadowOpacity = 1
+        card.layer.shadowRadius = 24
+        card.layer.shadowOffset = CGSize(width: 0, height: 14)
+        return card
+    }
+
+    private func makeCard(title: String, body: String) -> UIView {
+        let card = makeGlassCard()
         let titleLabel = UILabel(); titleLabel.text = title; titleLabel.font = .systemFont(ofSize: 19, weight: .bold); titleLabel.textColor = CineMystTheme.ink
         let bodyLabel = UILabel(); bodyLabel.text = body; bodyLabel.numberOfLines = 0; bodyLabel.font = UIFont.systemFont(ofSize: 15); bodyLabel.textColor = CineMystTheme.ink.withAlphaComponent(0.7)
         let stack = UIStackView(arrangedSubviews: [titleLabel, bodyLabel]); stack.axis = .vertical; stack.spacing = 8
@@ -268,11 +315,124 @@ class JobDetailsViewController: UIViewController {
         return card
     }
 
+    private func makeHeroCard(for job: Job) -> UIView {
+        let card = makeGlassCard()
+
+        let eyebrow = UILabel()
+        eyebrow.text = "Role Brief"
+        eyebrow.font = .systemFont(ofSize: 11, weight: .bold)
+        eyebrow.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.72)
+
+        let title = UILabel()
+        title.text = job.title ?? "Untitled"
+        title.font = .systemFont(ofSize: 22, weight: .bold)
+        title.textColor = CineMystTheme.ink
+        title.numberOfLines = 0
+
+        let description = UILabel()
+        description.text = job.description ?? "No description available."
+        description.font = .systemFont(ofSize: 16, weight: .medium)
+        description.textColor = CineMystTheme.ink.withAlphaComponent(0.72)
+        description.numberOfLines = 0
+
+        let chipRow = UIStackView()
+        chipRow.axis = .horizontal
+        chipRow.spacing = 8
+
+        if let location = job.location, !location.isEmpty {
+            chipRow.addArrangedSubview(makeInfoChip(text: location, icon: "mappin.and.ellipse"))
+        }
+        if let jobType = job.jobType, !jobType.isEmpty {
+            chipRow.addArrangedSubview(makeInfoChip(text: jobType, icon: "sparkles"))
+        }
+        let stack = UIStackView(arrangedSubviews: [eyebrow, title, description, chipRow])
+        stack.axis = .vertical
+        stack.spacing = 10
+        stack.alignment = .leading
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        card.contentView.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: card.contentView.topAnchor, constant: 18),
+            stack.leadingAnchor.constraint(equalTo: card.contentView.leadingAnchor, constant: 18),
+            stack.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor, constant: -18),
+            stack.bottomAnchor.constraint(equalTo: card.contentView.bottomAnchor, constant: -18)
+        ])
+        return card
+    }
+
+    private func makeMetricCard(title: String, body: String, icon: String) -> UIView {
+        let card = makeGlassCard()
+
+        let iconView = UIImageView(image: UIImage(systemName: icon))
+        iconView.tintColor = CineMystTheme.brandPlum
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.setContentHuggingPriority(.required, for: .horizontal)
+
+        let titleLabel = UILabel()
+        titleLabel.text = title
+        titleLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        titleLabel.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.8)
+
+        let bodyLabel = UILabel()
+        bodyLabel.text = body
+        bodyLabel.numberOfLines = 0
+        bodyLabel.font = .systemFont(ofSize: 18, weight: .bold)
+        bodyLabel.textColor = CineMystTheme.ink
+
+        let titleRow = UIStackView(arrangedSubviews: [iconView, titleLabel])
+        titleRow.axis = .horizontal
+        titleRow.alignment = .center
+        titleRow.spacing = 6
+        
+        let containerStack = UIStackView(arrangedSubviews: [titleRow, bodyLabel])
+        containerStack.axis = .vertical
+        containerStack.alignment = .leading
+        containerStack.spacing = 8
+        containerStack.translatesAutoresizingMaskIntoConstraints = false
+
+        card.contentView.addSubview(containerStack)
+        NSLayoutConstraint.activate([
+            containerStack.topAnchor.constraint(equalTo: card.contentView.topAnchor, constant: 18),
+            containerStack.leadingAnchor.constraint(equalTo: card.contentView.leadingAnchor, constant: 18),
+            containerStack.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor, constant: -18),
+            containerStack.bottomAnchor.constraint(equalTo: card.contentView.bottomAnchor, constant: -18)
+        ])
+        return card
+    }
+
+    private func makeInfoChip(text: String, icon: String) -> UIView {
+        let chip = UIView()
+        chip.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.08)
+        chip.layer.cornerRadius = 14
+        chip.layer.borderWidth = 1
+        chip.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.14).cgColor
+
+        let iconView = UIImageView(image: UIImage(systemName: icon))
+        iconView.tintColor = CineMystTheme.brandPlum.withAlphaComponent(0.82)
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+
+        let label = UILabel()
+        label.text = text
+        label.font = .systemFont(ofSize: 12, weight: .semibold)
+        label.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.82)
+
+        let stack = UIStackView(arrangedSubviews: [iconView, label])
+        stack.axis = .horizontal
+        stack.spacing = 6
+        stack.alignment = .center
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        chip.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: chip.topAnchor, constant: 8),
+            stack.bottomAnchor.constraint(equalTo: chip.bottomAnchor, constant: -8),
+            stack.leadingAnchor.constraint(equalTo: chip.leadingAnchor, constant: 10),
+            stack.trailingAnchor.constraint(equalTo: chip.trailingAnchor, constant: -10)
+        ])
+        return chip
+    }
+
     private func makeRequirementsCard(requirements: String) -> UIView {
-        let card = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialLight))
-        card.contentView.backgroundColor = UIColor.white.withAlphaComponent(0.44)
-        card.layer.cornerRadius = 20
-        card.clipsToBounds = true
+        let card = makeGlassCard()
         let title = UILabel(); title.text = "Requirements"; title.font = .systemFont(ofSize: 19, weight: .bold); title.textColor = CineMystTheme.ink
         let body = UILabel(); body.text = requirements; body.numberOfLines = 0; body.font = UIFont.systemFont(ofSize: 15); body.textColor = CineMystTheme.ink.withAlphaComponent(0.7)
         let stack = UIStackView(arrangedSubviews: [title, body]); stack.axis = .vertical; stack.spacing = 10
@@ -284,5 +444,9 @@ class JobDetailsViewController: UIViewController {
             stack.bottomAnchor.constraint(equalTo: card.contentView.bottomAnchor, constant: -18)
         ])
         return card
+    }
+
+    @objc private func backTapped() {
+        navigationController?.popViewController(animated: true)
     }
 }

@@ -249,7 +249,7 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            titleBar.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 16),
+            titleBar.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
             titleBar.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             titleBar.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             
@@ -457,9 +457,9 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
                             card.configure(
                                 image: profileImage ?? UIImage(named: "avatar_placeholder"),
                                 title: job.title ?? "Untitled",
-                                company: productionHouse,
+                                company: job.companyName.flatMap { $0.isEmpty ? nil : $0 } ?? productionHouse,
                                 location: job.location ?? "Remote",
-                                salary: "₹ \(job.ratePerDay ?? 0)/day",
+                                salary: (job.ratePerDay ?? 0) > 0 ? "₹ \(job.ratePerDay!)/day" : "Negotiable",
                                 daysLeft: job.daysLeftText,
                                 tag: job.jobType ?? "Film",
                                 appliedCount: "\(applicationCount) applied",
@@ -520,16 +520,24 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
         do {
             struct CastingProfile: Codable {
                 let companyName: String?
-                enum CodingKeys: String, CodingKey { case companyName = "company_name" }
+                let productionHouse: String?
+                enum CodingKeys: String, CodingKey { 
+                    case companyName = "company_name" 
+                    case productionHouse = "production_house"
+                }
             }
             let profile: CastingProfile = try await supabase
                 .from("casting_profiles")
-                .select("company_name")
+                .select("company_name, production_house")
                 .eq("id", value: directorId.uuidString)
                 .single()
                 .execute()
                 .value
-            if let name = profile.companyName, !name.isEmpty { companyName = name }
+            if let prodHouse = profile.productionHouse, !prodHouse.isEmpty {
+                companyName = prodHouse
+            } else if let name = profile.companyName, !name.isEmpty {
+                companyName = name
+            }
         } catch { print("⚠️ Could not fetch company name: \(error)") }
         
         var profilePictureUrl: String?
@@ -739,7 +747,9 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
                     
                     await MainActor.run {
                         let hasTask = associatedTask != nil
-                        card.configure(image: profileImage ?? UIImage(named: "avatar_placeholder"), title: job.title ?? "Untitled", company: productionHouse, location: job.location ?? "Remote", salary: "₹ \(job.ratePerDay ?? 0)/day", daysLeft: job.daysLeftText, tag: job.jobType ?? "Film", appliedCount: "\(applicationCount) applied", hasTask: hasTask)
+                        let companyToUse = job.companyName.flatMap { $0.isEmpty ? nil : $0 } ?? productionHouse
+                        let rateString = (job.ratePerDay ?? 0) > 0 ? "₹ \(job.ratePerDay!)/day" : "Negotiable"
+                        card.configure(image: profileImage ?? UIImage(named: "avatar_placeholder"), title: job.title ?? "Untitled", company: companyToUse, location: job.location ?? "Remote", salary: rateString, daysLeft: job.daysLeftText, tag: job.jobType ?? "Film", appliedCount: "\(applicationCount) applied", hasTask: hasTask)
                         card.onApplyTap = { [weak self] in
                             if let task = associatedTask {
                                 let vc = TaskDetailsViewController()
@@ -849,4 +859,3 @@ private final class GradientWordmarkView: UIView {
         textLayer.frame = bounds
     }
 }
-

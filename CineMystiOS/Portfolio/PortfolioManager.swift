@@ -159,6 +159,7 @@ class PortfolioManager {
             "production_company": item.production_company ?? "",
             "genre": item.genre ?? "", "description": item.description ?? "",
             "poster_url": item.poster_url ?? "",
+            "media_urls": item.media_urls ?? [],
             "id": UUID().uuidString
         ]
         currentItems.append(newItem)
@@ -174,6 +175,7 @@ class PortfolioManager {
         let title: String; let year: Int; let role: String?
         let production_company: String?; let genre: String?; let description: String?
         let poster_url: String?
+        let media_urls: [String]?
     }
 }
 

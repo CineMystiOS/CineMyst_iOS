@@ -378,9 +378,10 @@ class AboutSectionView: UIView {
 
     let skillsChipsStack: UIStackView = {
         let sv = UIStackView()
-        sv.axis         = .horizontal
+        sv.axis         = .vertical
         sv.spacing      = 8
-        sv.distribution = .fillProportionally
+        sv.distribution = .fill
+        sv.alignment    = .leading
         sv.translatesAutoresizingMaskIntoConstraints = false
         return sv
     }()
@@ -390,6 +391,7 @@ class AboutSectionView: UIView {
         l.text      = "—"
         l.font      = UIFont.systemFont(ofSize: 14, weight: .semibold)
         l.textColor = ActorProfileDS.deepPlum
+        l.numberOfLines = 1
         return l
     }()
 
@@ -398,6 +400,7 @@ class AboutSectionView: UIView {
         l.text      = "—"
         l.font      = UIFont.systemFont(ofSize: 14, weight: .semibold)
         l.textColor = ActorProfileDS.deepPlum
+        l.numberOfLines = 1
         return l
     }()
 
@@ -472,8 +475,7 @@ class AboutSectionView: UIView {
 
             skillsChipsStack.topAnchor.constraint(equalTo: specialtiesHeader.bottomAnchor, constant: 8),
             skillsChipsStack.leftAnchor.constraint(equalTo: leftAnchor, constant: 16),
-            skillsChipsStack.rightAnchor.constraint(lessThanOrEqualTo: rightAnchor, constant: -16),
-            skillsChipsStack.heightAnchor.constraint(equalToConstant: 28),
+            skillsChipsStack.rightAnchor.constraint(equalTo: rightAnchor, constant: -16),
 
             infoStack.topAnchor.constraint(equalTo: skillsChipsStack.bottomAnchor, constant: 16),
             infoStack.leftAnchor.constraint(equalTo: leftAnchor, constant: 16),
@@ -484,21 +486,14 @@ class AboutSectionView: UIView {
 
     func setSkills(_ skills: [String]) {
         skillsChipsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        let list = skills.isEmpty ? ["No specialties listed"] : skills
-        for skill in list {
-            let chip = UILabel()
-            chip.text           = skill
-            chip.font           = UIFont.systemFont(ofSize: 13, weight: .semibold)
-            chip.textColor      = skills.isEmpty ? .gray : ActorProfileDS.deepPlum
-            chip.backgroundColor = skills.isEmpty ? .clear : ActorProfileDS.palePink
-            chip.layer.cornerRadius = 12
-            chip.clipsToBounds  = true
-            chip.textAlignment  = .center
-            chip.numberOfLines  = 1
-            chip.translatesAutoresizingMaskIntoConstraints = false
-            chip.heightAnchor.constraint(equalToConstant: 28).isActive = true
-            skillsChipsStack.addArrangedSubview(chip)
-        }
+        let text = skills.isEmpty ? "No specialties listed" : skills.joined(separator: ", ")
+        let label = UILabel()
+        label.text = text
+        label.font = UIFont.systemFont(ofSize: 14, weight: .regular)
+        label.textColor = .gray
+        label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
+        skillsChipsStack.addArrangedSubview(label)
     }
 }
 
@@ -1202,7 +1197,8 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
         if let aboutView = contentStackView.arrangedSubviews.compactMap({ $0 as? AboutSectionView }).first {
             aboutView.bioLabel.text = data.profile.bio.flatMap { $0.isEmpty ? nil : $0 } ?? "No bio available."
             aboutView.setSkills(data.artistProfile?.skills ?? [])
-            aboutView.locationValueLabel.text   = data.profile.location.flatMap { $0.isEmpty ? nil : $0 } ?? "Not specified"
+            let locText = data.profile.location.flatMap { $0.isEmpty ? nil : $0 } ?? "Not specified"
+            aboutView.locationValueLabel.text = locText.components(separatedBy: ",").last?.trimmingCharacters(in: .whitespaces) ?? locText
             if let yrs = data.artistProfile?.yearsOfExperience {
                 aboutView.experienceValueLabel.text = yrs == 1 ? "1 year" : "\(yrs)+ years"
             } else {
