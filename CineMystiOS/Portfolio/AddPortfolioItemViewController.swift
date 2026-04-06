@@ -8,13 +8,22 @@
 import UIKit
 import PhotosUI
 import UniformTypeIdentifiers
+import Supabase
+
+private enum PDS {
+    static let gradStart  = UIColor(red: 0.07, green: 0.04, blue: 0.18, alpha: 1)
+    static let gradEnd    = UIColor(red: 0.28, green: 0.08, blue: 0.28, alpha: 1)
+    static let accent     = UIColor(red: 0.95, green: 0.42, blue: 0.47, alpha: 1)
+    static let glass      = UIColor.white.withAlphaComponent(0.06)
+    static let glassBorder = UIColor.white.withAlphaComponent(0.12)
+}
 
 class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate, PHPickerViewControllerDelegate {
     
     // MARK: - Properties
     var portfolioId: String = ""
     var itemType: PortfolioItemType = .film
-    var onItemAdded: ((PortfolioItem) -> Void)?
+    var onItemAdded: ((PortfolioItemData) -> Void)?
     private var selectedImage: UIImage?
     private var uploadedImageUrl: String?
     
@@ -40,12 +49,19 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        setupGradient()
         
         setupNavigationBar()
         setupScrollView()
         setupUI()
         layoutUI()
+    }
+
+    private func setupGradient() {
+        let grad = CAGradientLayer()
+        grad.colors = [PDS.gradStart.cgColor, PDS.gradEnd.cgColor]
+        grad.frame = view.bounds
+        view.layer.insertSublayer(grad, at: 0)
     }
     
     // MARK: - Setup Navigation
@@ -77,30 +93,34 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
     
     private func setupUI() {
         // Image Container
-        imageContainer.backgroundColor = .systemGray6
-        imageContainer.layer.cornerRadius = 12
+        imageContainer.backgroundColor = PDS.glass
+        imageContainer.layer.cornerRadius = 20
+        imageContainer.layer.borderWidth = 1
+        imageContainer.layer.borderColor = PDS.glassBorder.cgColor
         imageContainer.translatesAutoresizingMaskIntoConstraints = false
         
         // Image Preview
         imagePreview.contentMode = .scaleAspectFill
         imagePreview.clipsToBounds = true
-        imagePreview.layer.cornerRadius = 12
+        imagePreview.layer.cornerRadius = 20
         imagePreview.isHidden = true
         imagePreview.translatesAutoresizingMaskIntoConstraints = false
         
         // Upload Button
-        uploadButton.setTitle("📱 Upload Photo or Video", for: .normal)
-        uploadButton.backgroundColor = UIColor(named: "AccentColor") ?? UIColor(red: 0.3, green: 0.1, blue: 0.2, alpha: 1.0)
+        uploadButton.setTitle("📱 UPLOAD MEDIA", for: .normal)
+        uploadButton.backgroundColor = .white.withAlphaComponent(0.08)
         uploadButton.setTitleColor(.white, for: .normal)
-        uploadButton.layer.cornerRadius = 10
-        uploadButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
+        uploadButton.layer.cornerRadius = 12
+        uploadButton.layer.borderWidth = 1
+        uploadButton.layer.borderColor = UIColor.white.withAlphaComponent(0.2).cgColor
+        uploadButton.titleLabel?.font = .systemFont(ofSize: 13, weight: .bold)
         uploadButton.addTarget(self, action: #selector(uploadImageTapped), for: .touchUpInside)
         uploadButton.translatesAutoresizingMaskIntoConstraints = false
         
         // Upload Progress Label
-        uploadProgressLabel.text = "No image selected"
-        uploadProgressLabel.font = .systemFont(ofSize: 13)
-        uploadProgressLabel.textColor = .secondaryLabel
+        uploadProgressLabel.text = "Tap to select poster or reel"
+        uploadProgressLabel.font = .systemFont(ofSize: 12)
+        uploadProgressLabel.textColor = .white.withAlphaComponent(0.5)
         uploadProgressLabel.textAlignment = .center
         uploadProgressLabel.translatesAutoresizingMaskIntoConstraints = false
         
@@ -108,50 +128,41 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
         imageContainer.addSubview(uploadButton)
         imageContainer.addSubview(uploadProgressLabel)
         
-        // Title
-        titleField.placeholder = "Title (e.g., Veer-Zaara)"
-        titleField.borderStyle = .roundedRect
-        titleField.font = .systemFont(ofSize: 16)
-        titleField.translatesAutoresizingMaskIntoConstraints = false
-        
-        // Year
-        yearField.placeholder = "Year (e.g., 2023)"
-        yearField.borderStyle = .roundedRect
-        yearField.font = .systemFont(ofSize: 16)
-        yearField.keyboardType = .numberPad
-        yearField.translatesAutoresizingMaskIntoConstraints = false
-        
-        // Role
-        roleField.placeholder = "Your Role (e.g., Lead Actor)"
-        roleField.borderStyle = .roundedRect
-        roleField.font = .systemFont(ofSize: 16)
-        roleField.translatesAutoresizingMaskIntoConstraints = false
-        
-        // Production Company
-        productionField.placeholder = "Production Company"
-        productionField.borderStyle = .roundedRect
-        productionField.font = .systemFont(ofSize: 16)
-        productionField.translatesAutoresizingMaskIntoConstraints = false
-        
-        // Genre
-        genreField.placeholder = "Genre (e.g., Drama, Comedy)"
-        genreField.borderStyle = .roundedRect
-        genreField.font = .systemFont(ofSize: 16)
-        genreField.translatesAutoresizingMaskIntoConstraints = false
+        func styleField(_ f: UITextField, placeholder: String) {
+            f.attributedPlaceholder = NSAttributedString(string: placeholder, attributes: [.foregroundColor: UIColor.white.withAlphaComponent(0.4)])
+            f.textColor = .white
+            f.backgroundColor = PDS.glass
+            f.layer.cornerRadius = 12
+            f.layer.borderWidth = 1
+            f.layer.borderColor = PDS.glassBorder.cgColor
+            f.font = .systemFont(ofSize: 15)
+            f.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 14, height: 44))
+            f.leftViewMode = .always
+            f.translatesAutoresizingMaskIntoConstraints = false
+        }
+
+        styleField(titleField, placeholder: "TITLE (E.G. VEER-ZAARA)")
+        styleField(yearField, placeholder: "YEAR (E.G. 2023)")
+        styleField(roleField, placeholder: "YOUR ROLE (E.G. LEAD ACTOR)")
+        styleField(productionField, placeholder: "PRODUCTION COMPANY")
+        styleField(genreField, placeholder: "GENRE (E.G. DRAMA, COMEDY)")
         
         // Description
-        descriptionView.font = .systemFont(ofSize: 16)
-        descriptionView.layer.borderColor = UIColor.systemGray3.cgColor
+        descriptionView.font = .systemFont(ofSize: 15)
+        descriptionView.textColor = .white
+        descriptionView.backgroundColor = PDS.glass
+        descriptionView.layer.cornerRadius = 12
         descriptionView.layer.borderWidth = 1
-        descriptionView.layer.cornerRadius = 6
+        descriptionView.layer.borderColor = PDS.glassBorder.cgColor
+        descriptionView.textContainerInset = UIEdgeInsets(top: 10, left: 8, bottom: 10, right: 8)
         descriptionView.translatesAutoresizingMaskIntoConstraints = false
         
         // Save Button
-        saveButton.setTitle("Add \(itemType.displayName)", for: .normal)
-        saveButton.backgroundColor = UIColor(named: "AccentColor") ?? UIColor(red: 0.3, green: 0.1, blue: 0.2, alpha: 1.0)
+        saveButton.setTitle("ADD \(itemType.displayName.uppercased())", for: .normal)
+        saveButton.backgroundColor = PDS.accent
         saveButton.setTitleColor(.white, for: .normal)
-        saveButton.layer.cornerRadius = 10
-        saveButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
+        saveButton.layer.cornerRadius = 25
+        saveButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .bold)
         saveButton.addTarget(self, action: #selector(saveItem), for: .touchUpInside)
         saveButton.translatesAutoresizingMaskIntoConstraints = false
         
@@ -354,36 +365,28 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
             return
         }
         
-        saveButton.isEnabled = false
+        saveButton.isEnabled = false // DECOUPLED: We don't save to database here anymore.
+        // We just pass the data back to the caller (PortfolioViewController) 
+        // who handles the secure actor_portfolios save.
+        let itemData = PortfolioItemData(
+            title: title,
+            subtitle: .none,
+            role: roleField.text?.isEmpty == true ? nil : roleField.text,
+            year: year,
+            type: itemType.rawValue,
+            productionCompany: productionField.text?.isEmpty == true ? nil : productionField.text,
+            genre: genreField.text?.isEmpty == true ? nil : genreField.text,
+            durationMinutes: .none,
+            description: descriptionView.text?.isEmpty == true ? nil : descriptionView.text,
+            posterUrl: uploadedImageUrl,
+            mediaUrls: .none
+        )
         
         Task {
-            do {
-                let item = try await PortfolioManager.shared.addPortfolioItem(
-                    portfolioId: portfolioId,
-                    type: itemType,
-                    year: year,
-                    title: title,
-                    subtitle: nil,
-                    role: roleField.text?.isEmpty ?? true ? nil : roleField.text,
-                    productionCompany: productionField.text?.isEmpty ?? true ? nil : productionField.text,
-                    genre: genreField.text?.isEmpty ?? true ? nil : genreField.text,
-                    durationMinutes: nil,
-                    description: descriptionView.text?.isEmpty ?? true ? nil : descriptionView.text,
-                    posterUrl: uploadedImageUrl,
-                    trailerUrl: nil,
-                    mediaUrls: nil
-                )
-                
-                await MainActor.run {
-                    self.saveButton.isEnabled = true
-                    self.onItemAdded?(item)
-                    self.navigationController?.popViewController(animated: true)
-                }
-            } catch {
-                await MainActor.run {
-                    self.saveButton.isEnabled = true
-                    self.showAlert(title: "Error", message: "Failed to save item: \(error.localizedDescription)")
-                }
+            await MainActor.run {
+                self.saveButton.isEnabled = true
+                self.onItemAdded?(itemData)
+                self.navigationController?.popViewController(animated: true)
             }
         }
     }

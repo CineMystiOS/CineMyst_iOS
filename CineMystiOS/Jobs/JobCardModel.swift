@@ -10,6 +10,8 @@ struct JobCardModel: Equatable {
     let statusText: String
     let statusColor: UIColor
     let applicationsCount: Int
+    let profilePictureUrl: String?
+    let directorId: UUID?
 
     var isBookmarked: Bool {
             BookmarkManager.shared.isBookmarked(id)
@@ -24,7 +26,9 @@ struct JobCardModel: Equatable {
          type: String,
          statusText: String,
          statusColor: UIColor,
-         applicationsCount: Int) {
+         applicationsCount: Int,
+         profilePictureUrl: String? = nil,
+         directorId: UUID? = nil) {
         
         self.id = id
         self.title = title
@@ -35,6 +39,8 @@ struct JobCardModel: Equatable {
         self.statusText = statusText
         self.statusColor = statusColor
         self.applicationsCount = applicationsCount
+        self.profilePictureUrl = profilePictureUrl
+        self.directorId = directorId
     }
 
     // MARK: - Seeds

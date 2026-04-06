@@ -256,27 +256,49 @@ final class HomeDashboardViewController: UIViewController {
 
         // MARK: - Search
         let search = UISearchController(searchResultsController: nil)
-        search.searchBar.placeholder = "Search posts or jobs"
         search.obscuresBackgroundDuringPresentation = false
         search.searchResultsUpdater = self
         search.searchBar.delegate = self
-        let searchField = search.searchBar.searchTextField
-        searchField.backgroundColor = UIColor.white.withAlphaComponent(0.34)
+        search.hidesNavigationBarDuringPresentation = false
+        
+        let bar = search.searchBar
+        bar.placeholder = "Search creators, posts or jobs"
+        bar.searchBarStyle = .minimal
+        bar.autocapitalizationType = .none
+        
+        let searchField = bar.searchTextField
+        searchField.backgroundColor = .white.withAlphaComponent(0.85)
+        searchField.font = .systemFont(ofSize: 14, weight: .medium)
         searchField.textColor = CineMystTheme.ink
         searchField.tintColor = CineMystTheme.brandPlum
+        
+        // Compact height and refined edges
+        searchField.heightAnchor.constraint(equalToConstant: 30).isActive = true
         searchField.layer.cornerRadius = 18
-        searchField.layer.borderWidth = 1
-        searchField.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.18).cgColor
-        searchField.layer.shadowColor = UIColor.black.withAlphaComponent(0.08).cgColor
-        searchField.layer.shadowOpacity = 1
-        searchField.layer.shadowRadius = 18
-        searchField.layer.shadowOffset = CGSize(width: 0, height: 8)
-        searchField.attributedPlaceholder = NSAttributedString(
-            string: "Search posts or jobs",
-            attributes: [.foregroundColor: CineMystTheme.ink.withAlphaComponent(0.4)]
-        )
-        searchField.leftView?.tintColor = CineMystTheme.ink.withAlphaComponent(0.55)
+        searchField.layer.masksToBounds = true
+        searchField.layer.borderWidth = 1.0
+        searchField.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.08).cgColor
+        
+        // Shadow and depth logic
+        bar.layer.shadowColor = CineMystTheme.brandPlum.cgColor
+        bar.layer.shadowOpacity = 0.05
+        bar.layer.shadowRadius = 12
+        bar.layer.shadowOffset = CGSize(width: 0, height: 4)
+        
+        // Custom placeholder and icons
+        let placeholderAttr: [NSAttributedString.Key: Any] = [
+            .foregroundColor: CineMystTheme.ink.withAlphaComponent(0.35),
+            .font: UIFont.systemFont(ofSize: 14, weight: .regular)
+        ]
+        searchField.attributedPlaceholder = NSAttributedString(string: "Search creators, posts...", attributes: placeholderAttr)
+        
+        if let glassIcon = searchField.leftView as? UIImageView {
+            glassIcon.tintColor = CineMystTheme.brandPlum.withAlphaComponent(0.6)
+            glassIcon.image = UIImage(systemName: "magnifyingglass", withConfiguration: UIImage.SymbolConfiguration(weight: .semibold))
+        }
+        
         navigationItem.searchController = search
+        navigationItem.hidesSearchBarWhenScrolling = false
         definesPresentationContext = true
 
         // MARK: - Appearance

@@ -260,13 +260,28 @@ class PostedJobsDashboardViewController: UIViewController {
                     }
                 }
                 
+                // Fetch profile pictures for all jobs before rendering
+                var jobsWithProfiles: [(job: Job, profilePictureUrl: String?)] = []
+                for job in displayJobs {
+                    var profilePictureUrl: String? = nil
+                    if let directorId = job.directorId {
+                        do {
+                            let directorProfile = try await ProfileService.shared.fetchUserProfile(userId: directorId)
+                            profilePictureUrl = directorProfile.profile.profilePictureUrl
+                        } catch {
+                            print("⚠️ Failed to fetch director profile: \(error)")
+                        }
+                    }
+                    jobsWithProfiles.append((job: job, profilePictureUrl: profilePictureUrl))
+                }
+                
                 await MainActor.run {
                     guard let self = self else { return }
                     
                     self.stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
                     
-                    for job in displayJobs {
-                        let jobCardModel = job.toJobCardModel(applicationsCount: 0)
+                    for (job, profilePictureUrl) in jobsWithProfiles {
+                        let jobCardModel = job.toJobCardModel(applicationsCount: 0, profilePictureUrl: profilePictureUrl)
                         let card = JobTrackCardView()
                         
                         let isCompleted = index == 2
@@ -286,7 +301,7 @@ class PostedJobsDashboardViewController: UIViewController {
                         self.stackView.addArrangedSubview(card)
                     }
                     
-                    if jobs.isEmpty {
+                    if displayJobs.isEmpty {
                         print("ℹ️ No jobs to display in \(sectionName)")
                     }
                 }

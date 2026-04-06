@@ -56,14 +56,8 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
         return sb
     }()
     
-    // Title bar
-    private let titleLabel: UILabel = {
-        let l = UILabel()
-        l.text = "Explore Castings"
-        l.font = .systemFont(ofSize: 28, weight: .bold)
-        l.textColor = CineMystTheme.ink
-        return l
-    }()
+    // Title bar with gradient
+    private lazy var titleLabel = GradientWordmarkView(text: "Explore Castings")
     private let subtitleLabel: UILabel = {
         let l = UILabel()
         l.text = "Discover your next role"
@@ -273,36 +267,46 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
         searchBar.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            searchBarContainer.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 18),
+            searchBarContainer.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 24),
             searchBarContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             searchBarContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            searchBarContainer.heightAnchor.constraint(equalToConstant: 58),
+            searchBarContainer.heightAnchor.constraint(equalToConstant: 46),
             
-            searchBar.centerYAnchor.constraint(equalTo: searchBarContainer.centerYAnchor),
+            searchBar.topAnchor.constraint(equalTo: searchBarContainer.topAnchor),
             searchBar.leadingAnchor.constraint(equalTo: searchBarContainer.leadingAnchor),
             searchBar.trailingAnchor.constraint(equalTo: searchBarContainer.trailingAnchor),
+            searchBar.bottomAnchor.constraint(equalTo: searchBarContainer.bottomAnchor),
         ])
 
         let textField = searchBar.searchTextField
-        textField.backgroundColor = UIColor.white.withAlphaComponent(0.84)
-        textField.layer.cornerRadius = 24
+        textField.backgroundColor = UIColor.white.withAlphaComponent(0.85)
+        textField.layer.cornerRadius = 20
         textField.layer.masksToBounds = true
-        textField.layer.borderWidth = 1.2
-        textField.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.2).cgColor
+        textField.layer.borderWidth = 0.8
+        textField.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.08).cgColor
+        textField.heightAnchor.constraint(equalToConstant: 40).isActive = true
         
-        // Add shadow and border to the container since textField masksToBounds is often needed for radius
+        // Add shadow to the container
         searchBarContainer.backgroundColor = .clear
-        searchBarContainer.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.12).cgColor
-        searchBarContainer.layer.shadowOpacity = 1
-        searchBarContainer.layer.shadowRadius = 18
-        searchBarContainer.layer.shadowOffset = CGSize(width: 0, height: 8)
+        searchBarContainer.layer.shadowColor = CineMystTheme.brandPlum.cgColor
+        searchBarContainer.layer.shadowOpacity = 0.05
+        searchBarContainer.layer.shadowRadius = 12
+        searchBarContainer.layer.shadowOffset = CGSize(width: 0, height: 4)
         
         textField.textColor = CineMystTheme.ink
         textField.tintColor = CineMystTheme.brandPlum
+        textField.font = .systemFont(ofSize: 14, weight: .medium)
+        
+        // Match home screen placeholder
+        let placeholderAttr: [NSAttributedString.Key: Any] = [
+            .foregroundColor: CineMystTheme.ink.withAlphaComponent(0.35),
+            .font: UIFont.systemFont(ofSize: 14, weight: .regular)
+        ]
+        textField.attributedPlaceholder = NSAttributedString(string: "Search castings", attributes: placeholderAttr)
         
         // Fix magnification icon color
         if let iconView = textField.leftView as? UIImageView {
-            iconView.tintColor = CineMystTheme.brandPlum.withAlphaComponent(0.5)
+            iconView.tintColor = CineMystTheme.brandPlum.withAlphaComponent(0.6)
         }
     }
     
@@ -311,7 +315,7 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
         postButtonsStack.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            postButtonsStack.topAnchor.constraint(equalTo: searchBarContainer.bottomAnchor, constant: 16),
+            postButtonsStack.topAnchor.constraint(equalTo: searchBarContainer.bottomAnchor, constant: 24),
             postButtonsStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             postButtonsStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             postButtonsStack.heightAnchor.constraint(equalToConstant: 44)
@@ -434,10 +438,24 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
                         let applicationCount = await self.fetchApplicationCount(jobId: job.id)
                         let associatedTask = try? await JobsService.shared.fetchTaskForJob(jobId: job.id)
                         
+                        // Fetch director profile picture
+                        var profileImage: UIImage? = nil
+                        if let directorId = job.directorId {
+                            do {
+                                let directorProfile = try await ProfileService.shared.fetchUserProfile(userId: directorId)
+                                if let urlString = directorProfile.profile.profilePictureUrl, let url = URL(string: urlString) {
+                                    let (data, _) = try await URLSession.shared.data(from: url)
+                                    profileImage = UIImage(data: data)
+                                }
+                            } catch {
+                                print("⚠️ Failed to fetch director profile picture: \(error)")
+                            }
+                        }
+                        
                         await MainActor.run {
                             let hasTask = associatedTask != nil
                             card.configure(
-                                image: UIImage(named: "avatar_placeholder"),
+                                image: profileImage ?? UIImage(named: "avatar_placeholder"),
                                 title: job.title ?? "Untitled",
                                 company: productionHouse,
                                 location: job.location ?? "Remote",
@@ -699,15 +717,29 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
             self.jobListStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
             for job in self.filteredJobs {
                 let card = JobCardView()
-                // Configure card logic same as addJobCards... (Shortened for brevity but keeping same structure)
                 Task {
                     let directorUuid = job.directorId ?? UUID()
                     let (productionHouse, _) = await self.fetchProductionHouse(directorId: directorUuid)
                     let applicationCount = await self.fetchApplicationCount(jobId: job.id)
                     let associatedTask = try? await JobsService.shared.fetchTaskForJob(jobId: job.id)
+                    
+                    // Fetch director profile picture
+                    var profileImage: UIImage? = nil
+                    if let directorId = job.directorId {
+                        do {
+                            let directorProfile = try await ProfileService.shared.fetchUserProfile(userId: directorId)
+                            if let urlString = directorProfile.profile.profilePictureUrl, let url = URL(string: urlString) {
+                                let (data, _) = try await URLSession.shared.data(from: url)
+                                profileImage = UIImage(data: data)
+                            }
+                        } catch {
+                            print("⚠️ Failed to fetch director profile picture: \(error)")
+                        }
+                    }
+                    
                     await MainActor.run {
                         let hasTask = associatedTask != nil
-                        card.configure(image: UIImage(named: "avatar_placeholder"), title: job.title ?? "Untitled", company: productionHouse, location: job.location ?? "Remote", salary: "₹ \(job.ratePerDay ?? 0)/day", daysLeft: job.daysLeftText, tag: job.jobType ?? "Film", appliedCount: "\(applicationCount) applied", hasTask: hasTask)
+                        card.configure(image: profileImage ?? UIImage(named: "avatar_placeholder"), title: job.title ?? "Untitled", company: productionHouse, location: job.location ?? "Remote", salary: "₹ \(job.ratePerDay ?? 0)/day", daysLeft: job.daysLeftText, tag: job.jobType ?? "Film", appliedCount: "\(applicationCount) applied", hasTask: hasTask)
                         card.onApplyTap = { [weak self] in
                             if let task = associatedTask {
                                 let vc = TaskDetailsViewController()
@@ -748,6 +780,73 @@ extension JobsViewController: UISearchBarDelegate {
     }
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         searchBar.resignFirstResponder()
+    }
+}
+
+// MARK: - Gradient Wordmark View (matching home screen style)
+private final class GradientWordmarkView: UIView {
+    private let text: String
+    private let sizingLabel = UILabel()
+    private let gradientLayer = CAGradientLayer()
+    private let textLayer = CATextLayer()
+
+    init(text: String) {
+        self.text = text
+        super.init(frame: .zero)
+
+        let font = UIFont.systemFont(ofSize: 26, weight: .bold)
+        let leadingFont = UIFont.systemFont(ofSize: 30, weight: .bold)
+        sizingLabel.text = text
+        sizingLabel.font = font
+
+        gradientLayer.colors = [
+            CineMystTheme.deepPlum.cgColor,
+            CineMystTheme.brandPlum.cgColor,
+            CineMystTheme.pink.cgColor
+        ]
+        gradientLayer.locations = [0, 0.55, 1]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0.5)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 0.5)
+
+        let attributed = NSMutableAttributedString(
+            string: text,
+            attributes: [
+                .font: font
+            ]
+        )
+        if !text.isEmpty {
+            attributed.addAttribute(.font, value: leadingFont, range: NSRange(location: 0, length: 1))
+            attributed.addAttribute(.baselineOffset, value: -1, range: NSRange(location: 0, length: 1))
+        }
+        textLayer.string = attributed
+        textLayer.contentsScale = UIScreen.main.scale
+        textLayer.alignmentMode = .left
+        textLayer.truncationMode = .none
+        textLayer.isWrapped = false
+
+        layer.addSublayer(gradientLayer)
+        gradientLayer.mask = textLayer
+
+        layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.22).cgColor
+        layer.shadowOpacity = 1
+        layer.shadowRadius = 10
+        layer.shadowOffset = CGSize(width: 0, height: 4)
+
+        isUserInteractionEnabled = false
+        backgroundColor = .clear
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var intrinsicContentSize: CGSize {
+        let baseSize = sizingLabel.intrinsicContentSize
+        return CGSize(width: ceil(baseSize.width + 10), height: ceil(max(baseSize.height, 34)))
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        gradientLayer.frame = bounds
+        textLayer.frame = bounds
     }
 }
 

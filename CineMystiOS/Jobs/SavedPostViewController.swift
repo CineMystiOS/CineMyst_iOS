@@ -122,17 +122,35 @@ class SavedPostViewController: UIViewController {
         for job in bookmarkedJobs {
             let card = JobCardView()
             card.translatesAutoresizingMaskIntoConstraints = false
-
-            card.configure(
-                image: UIImage(named: "rani2"),
-                title: job.title ?? "Untitled Job",
-                company: job.companyName ?? "CineMyst Production",
-                location: job.location ?? "Remote",
-                salary: "₹ \(job.ratePerDay ?? 0)/day",
-                daysLeft: job.daysLeftText,
-                tag: job.jobType ?? "Film",
-                appliedCount: "0 applied"
-            )
+            
+            Task {
+                // Fetch director profile picture
+                var profileImage: UIImage? = nil
+                if let directorId = job.directorId {
+                    do {
+                        let directorProfile = try await ProfileService.shared.fetchUserProfile(userId: directorId)
+                        if let urlString = directorProfile.profile.profilePictureUrl, let url = URL(string: urlString) {
+                            let (data, _) = try await URLSession.shared.data(from: url)
+                            profileImage = UIImage(data: data)
+                        }
+                    } catch {
+                        print("⚠️ Failed to fetch director profile picture: \(error)")
+                    }
+                }
+                
+                await MainActor.run {
+                    card.configure(
+                        image: profileImage ?? UIImage(named: "avatar_placeholder"),
+                        title: job.title ?? "Untitled Job",
+                        company: job.companyName ?? "CineMyst Production",
+                        location: job.location ?? "Remote",
+                        salary: "₹ \(job.ratePerDay ?? 0)/day",
+                        daysLeft: job.daysLeftText,
+                        tag: job.jobType ?? "Film",
+                        appliedCount: "0 applied"
+                    )
+                }
+            }
             
             // Set bookmark state
             card.updateBookmark(isBookmarked: true)

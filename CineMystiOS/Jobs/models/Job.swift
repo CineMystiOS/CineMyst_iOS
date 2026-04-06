@@ -42,7 +42,7 @@ struct Job: Codable, Identifiable {
 
 extension Job {
     
-    func toJobCardModel(applicationsCount: Int = 0) -> JobCardModel {
+    func toJobCardModel(applicationsCount: Int = 0, profilePictureUrl: String? = nil) -> JobCardModel {
         
         // MARK: - Status
         let statusText: String
@@ -75,7 +75,9 @@ extension Job {
             type: jobType ?? "Project",
             statusText: statusText,
             statusColor: statusColor,
-            applicationsCount: applicationsCount
+            applicationsCount: applicationsCount,
+            profilePictureUrl: profilePictureUrl,
+            directorId: directorId
         )
     }
 }

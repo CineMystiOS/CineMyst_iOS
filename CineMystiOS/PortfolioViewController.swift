@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import Supabase
 
 // MARK: - Design System
 private enum PDS {
@@ -25,7 +26,7 @@ private enum PDS {
 
 // MARK: - Section Model
 private struct PortfolioSection {
-    let icon: String
+    let icon: String?
     let title: String
     let types: [PortfolioItemType]
     var items: [PortfolioItem]
@@ -38,14 +39,12 @@ class PortfolioViewController: UIViewController {
     // MARK: - Public
     var isOwnProfile = false
     var portfolioId: String?
+    var targetUserId: String?
 
     // MARK: - State
     private var portfolio: PortfolioResponse?
     private var sections: [PortfolioSection] = [
-        PortfolioSection(icon: "🎬", title: "Films & TV", types: [.film, .tvShow, .webseries], items: [], addType: .film),
-        PortfolioSection(icon: "🎭", title: "Theatre",   types: [.theatre],                   items: [], addType: .theatre),
-        PortfolioSection(icon: "📚", title: "Training",  types: [.workshop, .training],        items: [], addType: .workshop),
-        PortfolioSection(icon: "📢", title: "Commercials", types: [.commercial],               items: [], addType: .commercial),
+        // These will only be shown for users who use the 'portfolio_items' structured table
     ]
 
     // MARK: - UI
@@ -119,14 +118,23 @@ class PortfolioViewController: UIViewController {
         )
         navigationItem.leftBarButtonItem = backBtn
 
-        // Edit / share button for own profile
+        // Share / Edit buttons
+        let shareBtn = UIBarButtonItem(
+            image: UIImage(systemName: "square.and.arrow.up"),
+            style: .plain, target: self,
+            action: #selector(shareTapped)
+        )
+        
         if isOwnProfile {
-            let editBtn = UIBarButtonItem(
-                image: UIImage(systemName: "square.and.pencil"),
-                style: .plain, target: self,
-                action: #selector(editBasicInfoTapped)
-            )
-            navigationItem.rightBarButtonItem = editBtn
+            let editMenu = UIMenu(title: "Portfolio Options", children: [
+                UIAction(title: "Edit Details", image: UIImage(systemName: "pencil")) { [weak self] _ in self?.editBasicInfoTapped() },
+                UIAction(title: "Share Portfolio", image: UIImage(systemName: "link")) { [weak self] _ in self?.shareTapped() },
+                UIAction(title: "Export resume", image: UIImage(systemName: "doc.text")) { [weak self] _ in self?.exportTapped() }
+            ])
+            let moreBtn = UIBarButtonItem(image: UIImage(systemName: "ellipsis.circle"), menu: editMenu)
+            navigationItem.rightBarButtonItems = [moreBtn, shareBtn]
+        } else {
+            navigationItem.rightBarButtonItem = shareBtn
         }
     }
 
@@ -158,7 +166,7 @@ class PortfolioViewController: UIViewController {
     // MARK: - Hero Section
     private func setupHero() {
         heroView.translatesAutoresizingMaskIntoConstraints = false
-        heroView.heightAnchor.constraint(greaterThanOrEqualToConstant: 320).isActive = true
+        heroView.heightAnchor.constraint(greaterThanOrEqualToConstant: 240).isActive = true
         contentStack.addArrangedSubview(heroView)
 
         // Shimmering ring behind avatar
@@ -236,7 +244,7 @@ class PortfolioViewController: UIViewController {
 
         NSLayoutConstraint.activate([
             ringView.centerXAnchor.constraint(equalTo: heroView.centerXAnchor),
-            ringView.topAnchor.constraint(equalTo: heroView.topAnchor, constant: 80),
+            ringView.topAnchor.constraint(equalTo: heroView.topAnchor, constant: 40),
             ringView.widthAnchor.constraint(equalToConstant: 120),
             ringView.heightAnchor.constraint(equalToConstant: 120),
 
@@ -246,27 +254,27 @@ class PortfolioViewController: UIViewController {
             profileImageView.heightAnchor.constraint(equalToConstant: 104),
 
             badgeView.centerXAnchor.constraint(equalTo: heroView.centerXAnchor),
-            badgeView.topAnchor.constraint(equalTo: ringView.bottomAnchor, constant: 8),
+            badgeView.topAnchor.constraint(equalTo: ringView.bottomAnchor, constant: 4),
 
             nameLabel.topAnchor.constraint(equalTo: badgeView.bottomAnchor, constant: 10),
             nameLabel.leadingAnchor.constraint(equalTo: heroView.leadingAnchor, constant: 24),
             nameLabel.trailingAnchor.constraint(equalTo: heroView.trailingAnchor, constant: -24),
 
-            bioLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 8),
+            bioLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 4),
             bioLabel.leadingAnchor.constraint(equalTo: heroView.leadingAnchor, constant: 32),
             bioLabel.trailingAnchor.constraint(equalTo: heroView.trailingAnchor, constant: -32),
 
-            emailLabel.topAnchor.constraint(equalTo: bioLabel.bottomAnchor, constant: 6),
+            emailLabel.topAnchor.constraint(equalTo: bioLabel.bottomAnchor, constant: 4),
             emailLabel.centerXAnchor.constraint(equalTo: heroView.centerXAnchor),
 
-            socialStack.topAnchor.constraint(equalTo: emailLabel.bottomAnchor, constant: 14),
+            socialStack.topAnchor.constraint(equalTo: emailLabel.bottomAnchor, constant: 12),
             socialStack.centerXAnchor.constraint(equalTo: heroView.centerXAnchor),
 
-            statStack.topAnchor.constraint(equalTo: socialStack.bottomAnchor, constant: 16),
+            statStack.topAnchor.constraint(equalTo: socialStack.bottomAnchor, constant: 12),
             statStack.leadingAnchor.constraint(equalTo: heroView.leadingAnchor, constant: 24),
             statStack.trailingAnchor.constraint(equalTo: heroView.trailingAnchor, constant: -24),
             statStack.heightAnchor.constraint(equalToConstant: 60),
-            statStack.bottomAnchor.constraint(equalTo: heroView.bottomAnchor, constant: -20),
+            statStack.bottomAnchor.constraint(equalTo: heroView.bottomAnchor, constant: -14),
         ])
     }
 
@@ -291,7 +299,14 @@ class PortfolioViewController: UIViewController {
         loadingIndicator.startAnimating()
         Task {
             do {
+                let session = try? await AuthManager.shared.currentSession()
+                let currentUid = session?.user.id.uuidString.lowercased()
+
                 let userId = try await resolveUserId()
+                let targetId = userId.lowercased()
+                
+                // Determine if this is the user's own profile
+                await MainActor.run { self.isOwnProfile = (targetId == currentUid) }
 
                 // Fetch portfolio header - Try portfolios table first
                 var portfolioResp = try await supabase
@@ -303,27 +318,43 @@ class PortfolioViewController: UIViewController {
 
                 var portfolios = try JSONDecoder().decode([PortfolioResponse].self, from: portfolioResp.data)
                 
-                // If not found in portfolios, try actor_portfolios table
-                if portfolios.isEmpty {
-                    print("ℹ️ Portfolio not found in 'portfolios', checking 'actor_portfolios'...")
-                    portfolioResp = try await supabase
-                        .from("actor_portfolios")
-                        .select()
-                        .eq("user_id", value: userId)
-                        .execute()
-                    
-                    // We need to map ActorPortfolio to PortfolioResponse or handle it
-                    // For now, we'll try to decode it as PortfolioResponse (they share basic fields)
-                    portfolios = try JSONDecoder().decode([PortfolioResponse].self, from: portfolioResp.data)
+                // Also check actor_portfolios table - Actors often have detailed casting data here
+                print("ℹ️ Checking actor_portfolios for userId: \(userId)")
+                let actorResp = try await supabase
+                    .from("actor_portfolios")
+                    .select()
+                    .eq("user_id", value: userId)
+                    .execute()
+                
+                let actorPortfolios = try JSONDecoder().decode([PortfolioResponse].self, from: actorResp.data)
+                
+                // Merge logic: Combine project history with casting meta
+                var finalP: PortfolioResponse? = nil
+                var structuredId: String? = nil
+                
+                if let mainP = portfolios.first {
+                    finalP = mainP
+                    structuredId = mainP.id
                 }
                 
-                guard let p = portfolios.first else { 
+                if let actorP = actorPortfolios.first {
+                    if finalP == nil {
+                        finalP = actorP
+                    } else {
+                        // We found both. Use actorP for stats/media but keep structuredId for items
+                        finalP = actorP
+                    }
+                }
+
+                guard let p = finalP else { 
                     print("❌ No portfolio found in either table for userId: \(userId)")
                     throw NSError(domain: "Portfolio", code: 404) 
                 }
 
-                // Fetch items
-                let allItems = try await PortfolioManager.shared.fetchPortfolioItems(portfolioId: p.id)
+                // Fetch items (use structuredId if available, else p.id)
+                let fetchId = structuredId ?? p.id
+                print("📦 Fetching items for portfolioId: \(fetchId)")
+                let allItems = try await PortfolioManager.shared.fetchPortfolioItems(portfolioId: fetchId)
 
                 await MainActor.run {
                     self.portfolio = p
@@ -346,6 +377,8 @@ class PortfolioViewController: UIViewController {
             struct Wrap: Codable { let user_id: String }
             let r = try await supabase.from("portfolios").select("user_id").eq("id", value: pid).single().execute()
             return try JSONDecoder().decode(Wrap.self, from: r.data).user_id
+        } else if let uid = targetUserId {
+            return uid
         } else {
             guard let session = try await AuthManager.shared.currentSession() else {
                 throw NSError(domain: "Auth", code: 401)
@@ -358,10 +391,15 @@ class PortfolioViewController: UIViewController {
     private func updateHero(with p: PortfolioResponse) {
         nameLabel.text = p.full_name ?? p.stage_name ?? "Portfolio"
         bioLabel.text  = p.bio
-        // contact_email is not stored in PortfolioResponse — skip or show id
         emailLabel.isHidden = true
 
-        if let url = p.profile_picture_url.flatMap(URL.init) {
+        // Avatar resolution: 1. p.profile_picture_url -> 2. first image from mediaItems
+        var avatarUrl = p.profile_picture_url
+        if (avatarUrl == nil || avatarUrl?.isEmpty == true) {
+            avatarUrl = p.mediaItems.first(where: { $0["type"] == "image" })?["url"]
+        }
+
+        if let url = avatarUrl.flatMap(URL.init) {
             loadRemoteImage(url: url, into: profileImageView)
         }
 
@@ -374,29 +412,78 @@ class PortfolioViewController: UIViewController {
 
     // MARK: - Build Sections
     private func buildSections(items: [PortfolioItem]) {
+        guard let p = portfolio else { return }
+        
         // Remove old sections (keep hero + divider = first 2 views)
         while contentStack.arrangedSubviews.count > 2 {
             contentStack.arrangedSubviews.last?.removeFromSuperview()
         }
 
-        // Distribute items into sections
+        // --- 1. MEDIA GALLERY (from actor_portfolios) ---
+        let galleryItems = p.mediaItems
+        if !galleryItems.isEmpty {
+            contentStack.addArrangedSubview(makeMediaGallerySection(galleryItems))
+        }
+
+        // --- 2. VITAL STATISTICS / PHYSICAL TRAITS ---
+        if p.height_cm != nil || p.bust != nil || p.skin_tone != nil {
+            contentStack.addArrangedSubview(makeVitalsSection(p))
+        }
+
+        // --- 3. PROJECT HISTORY SECTIONS ---
         for i in 0..<sections.count {
             sections[i].items = items.filter { sections[i].types.contains($0.type) }
         }
+        
+        let hasGlobalItems = !items.isEmpty
+        if isOwnProfile || hasGlobalItems {
+            rebuildStatBar(items: items)
+        } else {
+            statStack.isHidden = true
+        }
 
-        // Stat bar
-        rebuildStatBar(items: items)
+        // Add specialized actor sections from actor_portfolios columns if they hold text or JSON
+        let actorSections: [(String, AnyCodable?)] = [
+            ("FILMS & TV", p.movies),
+            ("THEATRE", p.theatre),
+            ("ADS & COMMERCIALS", p.advertisement),
+            ("WEB SERIES", p.web_series),
+            ("TV SERIALS", p.tv_serials),
+            ("TELEVISION COMMERCIALS", p.tvc)
+        ]
+        
+        for (idx, (title, content)) in actorSections.enumerated() {
+            let formattedList = content?.value as? [[String: Any]] ?? []
+            if !formattedList.isEmpty {
+                let sectionHeader = UILabel(); sectionHeader.text = title; sectionHeader.font = .systemFont(ofSize: 11, weight: .bold); sectionHeader.textColor = .white.withAlphaComponent(0.5); sectionHeader.translatesAutoresizingMaskIntoConstraints = false
+                contentStack.addArrangedSubview(sectionHeader)
+                
+                let scroll = UIScrollView(); scroll.showsHorizontalScrollIndicator = false; scroll.translatesAutoresizingMaskIntoConstraints = false; scroll.heightAnchor.constraint(equalToConstant: 220).isActive = true
+                let stack = UIStackView(); stack.axis = .horizontal; stack.spacing = 12; stack.translatesAutoresizingMaskIntoConstraints = false
+                scroll.addSubview(stack)
+                NSLayoutConstraint.activate([
+                    stack.topAnchor.constraint(equalTo: scroll.topAnchor), stack.bottomAnchor.constraint(equalTo: scroll.bottomAnchor),
+                    stack.leadingAnchor.constraint(equalTo: scroll.leadingAnchor), stack.trailingAnchor.constraint(equalTo: scroll.trailingAnchor)
+                ])
+                
+                for project in formattedList {
+                    stack.addArrangedSubview(makeProjectMediaCard(project))
+                }
+                contentStack.addArrangedSubview(scroll)
+            } else if isOwnProfile {
+                contentStack.addArrangedSubview(makeEmptyActorSection(title: title, tag: idx))
+            }
+        }
 
-        // Build each section card
-        for (idx, section) in sections.enumerated() {
-            let sectionView = buildSectionCard(section: section, index: idx)
-            contentStack.addArrangedSubview(sectionView)
+        // --- 4. BIOGRAPHY / ADDITIONAL EXPERIENCE ---
+        if let exp = p.previous_experience, !exp.isEmpty {
+            contentStack.addArrangedSubview(makeExperienceSection(exp))
         }
 
         // Bottom padding
         let pad = UIView()
         pad.translatesAutoresizingMaskIntoConstraints = false
-        pad.heightAnchor.constraint(equalToConstant: 60).isActive = true
+        pad.heightAnchor.constraint(equalToConstant: 80).isActive = true
         contentStack.addArrangedSubview(pad)
     }
 
@@ -632,22 +719,143 @@ class PortfolioViewController: UIViewController {
 
     @objc private func editBasicInfoTapped() {
         guard let p = portfolio else { return }
-        let alert = UIAlertController(title: "Edit Portfolio Info", message: "What would you like to update?", preferredStyle: .actionSheet)
-        alert.addAction(UIAlertAction(title: "View/Edit Details", style: .default) { [weak self] _ in
-            self?.openBasicInfoEditor(portfolio: p)
-        })
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        present(alert, animated: true)
+        openBasicInfoEditor(portfolio: p)
+    }
+
+    @objc private func shareTapped() {
+        guard let p = portfolio else { return }
+        let name = p.full_name ?? p.stage_name ?? "Artist"
+        let shareText = "Check out \(name)'s portfolio on CineMyst 🎬\n\nhttps://cinemyst.com/portfolio/\(p.id)"
+        
+        let activityVC = UIActivityViewController(activityItems: [shareText], applicationActivities: nil)
+        
+        // iPad support
+        if let popover = activityVC.popoverPresentationController {
+            popover.barButtonItem = navigationItem.rightBarButtonItem
+        }
+        
+        present(activityVC, animated: true)
+    }
+
+    @objc private func exportTapped() {
+        guard let p = portfolio else { return }
+        
+        // Generate a text-based resume/export summary
+        var exportContent = "CINEMYST PORTFOLIO: \(p.full_name?.uppercased() ?? "ARTIST")\n"
+        exportContent += "====================================\n\n"
+        if let bio = p.bio { exportContent += "BIO: \(bio)\n\n" }
+        
+        for section in sections {
+            if !section.items.isEmpty {
+                exportContent += "【 \(section.title.uppercased()) 】\n"
+                for item in section.items {
+                    exportContent += "- \(item.title) (\(item.year))"
+                    if let role = item.role { exportContent += " as \(role)" }
+                    exportContent += "\n"
+                }
+                exportContent += "\n"
+            }
+        }
+        
+        exportContent += "Generated via CineMyst 🎬"
+        
+        let activityVC = UIActivityViewController(activityItems: [exportContent], applicationActivities: nil)
+        if let popover = activityVC.popoverPresentationController {
+            popover.barButtonItem = navigationItem.rightBarButtonItem
+        }
+        present(activityVC, animated: true)
     }
 
     @objc private func addItemTapped(_ sender: UIButton) {
-        guard let p = portfolio else { return }
-        let section = sections[sender.tag]
-        let addVC = AddPortfolioItemViewController()
-        addVC.portfolioId = p.id
-        addVC.itemType    = section.addType
-        addVC.onItemAdded = { [weak self] _ in self?.fetchPortfolioData() }
-        navigationController?.pushViewController(addVC, animated: true)
+        Task {
+            do {
+                guard let session = try? await AuthManager.shared.currentSession() else { throw NSError(domain: "Auth", code: 401) }
+                let myUid = session.user.id.uuidString.lowercased()
+                
+                let categories = ["movies", "theatre", "advertisement", "web_series", "tv_serials", "tvc"]
+                let category = categories[sender.tag]
+                
+                await MainActor.run {
+                    let addVC = AddPortfolioItemViewController()
+                    addVC.onItemAdded = { [weak self] item in
+                        Task {
+                            do {
+                                // SECURE ACTOR PERSISTENCE
+                                try await PortfolioManager.shared.addActorProject(
+                                    userId: myUid,
+                                    category: category,
+                                    item: PortfolioManager.PortfolioItemInsert(
+                                        title: item.title, year: item.year, role: item.role,
+                                        production_company: item.productionCompany,
+                                        genre: item.genre, description: item.description,
+                                        poster_url: item.posterUrl
+                                    )
+                                )
+                                print("✅ Artist project saved successfully, refreshing UI...")
+                                await MainActor.run { 
+                                    self?.fetchPortfolioData() 
+                                }
+                            } catch {
+                                print("❌ Failed to save artist project: \(error)")
+                                await MainActor.run {
+                                    let a = UIAlertController(title: "Save Error", message: error.localizedDescription, preferredStyle: .alert)
+                                    a.addAction(UIAlertAction(title: "OK", style: .default))
+                                    self?.present(a, animated: true)
+                                }
+                            }
+                        }
+                    }
+                    self.navigationController?.pushViewController(addVC, animated: true)
+                }
+            } catch {
+                await MainActor.run {
+                    let a = UIAlertController(title: "Security Violation", message: error.localizedDescription, preferredStyle: .alert)
+                    a.addAction(UIAlertAction(title: "OK", style: .default))
+                    self.present(a, animated: true)
+                }
+            }
+        }
+    }
+
+    private func makeEmptyActorSection(title: String, tag: Int) -> UIView {
+        let card = UIView(); card.translatesAutoresizingMaskIntoConstraints = false
+        card.backgroundColor = PDS.glass; card.layer.cornerRadius = 20
+        card.layer.borderWidth = 1; card.layer.borderColor = PDS.glassBorder.cgColor
+        
+        let header = UILabel(); header.text = title.uppercased(); header.font = .systemFont(ofSize: 11, weight: .bold); header.textColor = .white.withAlphaComponent(0.5); header.translatesAutoresizingMaskIntoConstraints = false
+        let addBtn = UIButton(type: .system); addBtn.setTitle("+ Add Content", for: .normal); addBtn.setTitleColor(PDS.accent, for: .normal); addBtn.titleLabel?.font = .systemFont(ofSize: 12, weight: .bold); addBtn.translatesAutoresizingMaskIntoConstraints = false
+        addBtn.tag = tag // CRITICAL FIX: Set section tag
+        addBtn.addTarget(self, action: #selector(addItemTapped(_:)), for: .touchUpInside)
+        
+        card.addSubview(header); card.addSubview(addBtn)
+        NSLayoutConstraint.activate([
+            header.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
+            header.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
+            addBtn.centerYAnchor.constraint(equalTo: header.centerYAnchor),
+            addBtn.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
+            card.bottomAnchor.constraint(equalTo: header.bottomAnchor, constant: 16)
+        ])
+        return card
+    }
+
+    private func makeTextCard(title: String, body: String) -> UIView {
+        let card = UIView(); card.translatesAutoresizingMaskIntoConstraints = false
+        card.backgroundColor = PDS.glass; card.layer.cornerRadius = 20
+        card.layer.borderWidth = 1; card.layer.borderColor = PDS.glassBorder.cgColor
+        
+        let header = UILabel(); header.text = title.uppercased(); header.font = .systemFont(ofSize: 11, weight: .bold); header.textColor = .white.withAlphaComponent(0.5); header.translatesAutoresizingMaskIntoConstraints = false
+        let textLbl = UILabel(); textLbl.text = body; textLbl.font = .systemFont(ofSize: 14); textLbl.textColor = .white; textLbl.numberOfLines = 0; textLbl.translatesAutoresizingMaskIntoConstraints = false
+        
+        card.addSubview(header); card.addSubview(textLbl)
+        NSLayoutConstraint.activate([
+            header.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
+            header.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
+            textLbl.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 10),
+            textLbl.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
+            textLbl.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
+            textLbl.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: 16)
+        ])
+        return card
     }
 
     private func openBasicInfoEditor(portfolio: PortfolioResponse) {
@@ -669,7 +877,73 @@ class PortfolioViewController: UIViewController {
         }
     }
 
-    // MARK: - UI Helpers
+    private func makeProjectMediaCard(_ dict: [String: Any]) -> UIView {
+        let card = UIView(); card.translatesAutoresizingMaskIntoConstraints = false
+        card.widthAnchor.constraint(equalToConstant: 160).isActive = true
+        card.backgroundColor = PDS.glass; card.layer.cornerRadius = 20; card.clipsToBounds = true
+        card.layer.borderWidth = 1; card.layer.borderColor = PDS.glassBorder.cgColor
+        
+        let poster = UIImageView(); poster.contentMode = .scaleAspectFill; poster.clipsToBounds = true; poster.translatesAutoresizingMaskIntoConstraints = false
+        if let url = dict["poster_url"] as? String, !url.isEmpty {
+            Task { poster.image = await ImageLoader.shared.image(from: url) }
+        } else { poster.backgroundColor = .white.withAlphaComponent(0.05) }
+        
+        let title = UILabel(); title.text = dict["title"] as? String; title.font = .systemFont(ofSize: 12, weight: .bold); title.textColor = .white; title.translatesAutoresizingMaskIntoConstraints = false
+        let role  = UILabel(); role.text  = dict["role"] as? String;  role.font  = .systemFont(ofSize: 11); role.textColor = .white.withAlphaComponent(0.7); role.translatesAutoresizingMaskIntoConstraints = false
+        
+        card.addSubview(poster); card.addSubview(title); card.addSubview(role)
+        NSLayoutConstraint.activate([
+            poster.topAnchor.constraint(equalTo: card.topAnchor),
+            poster.leadingAnchor.constraint(equalTo: card.leadingAnchor),
+            poster.trailingAnchor.constraint(equalTo: card.trailingAnchor),
+            poster.heightAnchor.constraint(equalToConstant: 160),
+            
+            title.topAnchor.constraint(equalTo: poster.bottomAnchor, constant: 10),
+            title.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 12),
+            title.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -12),
+            
+            role.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 2),
+            role.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 12),
+            role.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -12),
+            role.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -12)
+        ])
+        
+        // If it's a video, add a play indicator
+        let playIcon = UIImageView(image: UIImage(systemName: "play.circle.fill"))
+        playIcon.tintColor = .white; playIcon.translatesAutoresizingMaskIntoConstraints = false; playIcon.alpha = 0.8
+        card.addSubview(playIcon)
+        NSLayoutConstraint.activate([
+            playIcon.centerXAnchor.constraint(equalTo: poster.centerXAnchor),
+            playIcon.centerYAnchor.constraint(equalTo: poster.centerYAnchor),
+            playIcon.widthAnchor.constraint(equalToConstant: 30),
+            playIcon.heightAnchor.constraint(equalToConstant: 30)
+        ])
+        
+        return card
+    }
+
+    private func formatProjectContent(_ content: AnyCodable?) -> String {
+        guard let value = content?.value else { return "" }
+        
+        if let text = value as? String, !text.isEmpty {
+            return text
+        }
+        
+        // Handle structured JSON array
+        if let list = value as? [[String: Any]] {
+            return list.map { dict in
+                let title = dict["title"] as? String ?? "Untitled"
+                let year  = (dict["year"] as? Int).map { String($0) } ?? "..."
+                let role  = dict["role"] as? String
+                var res = "• \(title) (\(year))"
+                if let r = role, !r.isEmpty { res += " as \(r)" }
+                return res
+            }.joined(separator: "\n")
+        }
+        
+        return ""
+    }
+
     private func makeGlassTag(icon: String, text: String, color: UIColor) -> UIView {
         let v = UIView()
         v.translatesAutoresizingMaskIntoConstraints = false
@@ -789,24 +1063,175 @@ class PortfolioViewController: UIViewController {
         a.addAction(UIAlertAction(title: "OK", style: .default))
         present(a, animated: true)
     }
+
+    private func makeMediaGallerySection(_ media: [[String: String]]) -> UIView {
+        let v = UIView()
+        v.backgroundColor = .white.withAlphaComponent(0.04)
+        v.layer.cornerRadius = 20
+        v.layer.borderWidth = 1
+        v.layer.borderColor = UIColor.white.withAlphaComponent(0.12).cgColor
+        v.translatesAutoresizingMaskIntoConstraints = false
+        
+        let title = UILabel()
+        title.text = "PHOTOS & VIDEOS"
+        title.font = .systemFont(ofSize: 11, weight: .bold)
+        title.textColor = .white.withAlphaComponent(0.5)
+        title.translatesAutoresizingMaskIntoConstraints = false
+        v.addSubview(title)
+        
+        let scroll = UIScrollView()
+        scroll.showsHorizontalScrollIndicator = false
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        v.addSubview(scroll)
+        
+        let hStack = UIStackView()
+        hStack.axis = .horizontal
+        hStack.spacing = 12
+        hStack.translatesAutoresizingMaskIntoConstraints = false
+        scroll.addSubview(hStack)
+        
+        for item in media {
+            let url  = item["url"] ?? ""
+            let type = item["type"] ?? "image"
+            let iv = UIImageView()
+            iv.contentMode = .scaleAspectFill
+            iv.clipsToBounds = true
+            iv.layer.cornerRadius = 12
+            iv.backgroundColor = .white.withAlphaComponent(0.05)
+            iv.translatesAutoresizingMaskIntoConstraints = false
+            iv.widthAnchor.constraint(equalToConstant: 110).isActive = true
+            iv.heightAnchor.constraint(equalToConstant: 140).isActive = true
+            if let _ = URL(string: url) {
+                Task {
+                    let img = await ImageLoader.shared.image(from: url)
+                    await MainActor.run { iv.image = img }
+                }
+            }
+            
+            if type == "video" {
+                let icon = UIImageView(image: UIImage(systemName: "play.circle.fill"))
+                icon.tintColor = .white; icon.translatesAutoresizingMaskIntoConstraints = false
+                iv.addSubview(icon)
+                NSLayoutConstraint.activate([
+                    icon.centerXAnchor.constraint(equalTo: iv.centerXAnchor),
+                    icon.centerYAnchor.constraint(equalTo: iv.centerYAnchor),
+                    icon.widthAnchor.constraint(equalToConstant: 28), icon.heightAnchor.constraint(equalToConstant: 28)
+                ])
+            }
+            hStack.addArrangedSubview(iv)
+        }
+        
+        NSLayoutConstraint.activate([
+            title.topAnchor.constraint(equalTo: v.topAnchor, constant: 12),
+            title.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 16),
+            
+            scroll.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 10),
+            scroll.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 14),
+            scroll.trailingAnchor.constraint(equalTo: v.trailingAnchor, constant: -14),
+            scroll.bottomAnchor.constraint(equalTo: v.bottomAnchor, constant: -12),
+            scroll.heightAnchor.constraint(equalToConstant: 140),
+            
+            hStack.topAnchor.constraint(equalTo: scroll.topAnchor), hStack.bottomAnchor.constraint(equalTo: scroll.bottomAnchor),
+            hStack.leadingAnchor.constraint(equalTo: scroll.leadingAnchor), hStack.trailingAnchor.constraint(equalTo: scroll.trailingAnchor),
+            hStack.heightAnchor.constraint(equalTo: scroll.heightAnchor)
+        ])
+        return v
+    }
+
+    private func makeVitalsSection(_ p: PortfolioResponse) -> UIView {
+        let v = UIView()
+        v.backgroundColor = .white.withAlphaComponent(0.05)
+        v.layer.cornerRadius = 20
+        v.layer.borderWidth = 1
+        v.layer.borderColor = UIColor.white.withAlphaComponent(0.12).cgColor
+        v.translatesAutoresizingMaskIntoConstraints = false
+        
+        let title = UILabel()
+        title.text = "VITAL STATISTICS"
+        title.font = .systemFont(ofSize: 11, weight: .bold)
+        title.textColor = .white.withAlphaComponent(0.5)
+        title.translatesAutoresizingMaskIntoConstraints = false
+        v.addSubview(title)
+        
+        let grid = UIStackView()
+        grid.axis = .vertical; grid.spacing = 14; grid.translatesAutoresizingMaskIntoConstraints = false
+        v.addSubview(grid)
+        
+        func row(_ l1: String, _ v1: String?, _ l2: String, _ v2: String?) -> UIStackView {
+            let s = UIStackView()
+            s.axis = .horizontal; s.distribution = .fillEqually
+            func item(_ l: String, _ val: String?) -> UIView {
+                let cnt = UIView(); let ll = UILabel(); let vv = UILabel()
+                ll.text = l.uppercased(); ll.font = .systemFont(ofSize: 9, weight: .bold); ll.textColor = .white.withAlphaComponent(0.4)
+                vv.text = val ?? "—"; vv.font = .systemFont(ofSize: 14, weight: .semibold); vv.textColor = .white
+                ll.translatesAutoresizingMaskIntoConstraints = false; vv.translatesAutoresizingMaskIntoConstraints = false
+                cnt.addSubview(ll); cnt.addSubview(vv)
+                NSLayoutConstraint.activate([
+                    ll.topAnchor.constraint(equalTo: cnt.topAnchor), ll.leadingAnchor.constraint(equalTo: cnt.leadingAnchor),
+                    vv.topAnchor.constraint(equalTo: ll.bottomAnchor, constant: 4),
+                    vv.leadingAnchor.constraint(equalTo: cnt.leadingAnchor), vv.bottomAnchor.constraint(equalTo: cnt.bottomAnchor)
+                ])
+                return cnt
+            }
+            s.addArrangedSubview(item(l1, v1)); s.addArrangedSubview(item(l2, v2))
+            return s
+        }
+        
+        grid.addArrangedSubview(row("Age", p.age, "Sex", p.sex))
+        grid.addArrangedSubview(row("Height", p.height_cm, "Weight", p.weight_kg))
+        grid.addArrangedSubview(row("Bust/Waist/Hips", "\(p.bust ?? "—")/\(p.waist ?? "—")/\(p.hips ?? "—")", "Skin Tone", p.skin_tone))
+        grid.addArrangedSubview(row("Eye Color", p.eye_color, "Hair Color", p.hair_color))
+        
+        NSLayoutConstraint.activate([
+            title.topAnchor.constraint(equalTo: v.topAnchor, constant: 14),
+            title.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 16),
+            grid.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 12),
+            grid.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 16),
+            grid.trailingAnchor.constraint(equalTo: v.trailingAnchor, constant: -16),
+            grid.bottomAnchor.constraint(equalTo: v.bottomAnchor, constant: -14)
+        ])
+        return v
+    }
+
+    private func makeExperienceSection(_ text: String) -> UIView {
+        let v = UIView()
+        v.backgroundColor = .clear; v.translatesAutoresizingMaskIntoConstraints = false
+        let title = UILabel()
+        title.text = "BIOGRAPHY & EXPERIENCE"
+        title.font = .systemFont(ofSize: 11, weight: .bold)
+        title.textColor = .white.withAlphaComponent(0.5)
+        title.translatesAutoresizingMaskIntoConstraints = false
+        v.addSubview(title)
+        let body = UILabel(); body.text = text; body.font = .systemFont(ofSize: 14); body.textColor = .white.withAlphaComponent(0.8); body.numberOfLines = 0
+        body.translatesAutoresizingMaskIntoConstraints = false
+        v.addSubview(body)
+        NSLayoutConstraint.activate([
+            title.topAnchor.constraint(equalTo: v.topAnchor), title.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 4),
+            body.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 10),
+            body.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 4),
+            body.trailingAnchor.constraint(equalTo: v.trailingAnchor, constant: -4),
+            body.bottomAnchor.constraint(equalTo: v.bottomAnchor)
+        ])
+        return v
+    }
 }
 
 // MARK: - Basic Info Editor (lightweight inline editor)
 class PortfolioBasicInfoEditViewController: UIViewController {
-
+    
     var onSaved: (() -> Void)?
     private let portfolio: PortfolioResponse
     private let bioField = UITextView()
     private let instagramField = UITextField()
     private let youtubeField = UITextField()
     private let imdbField = UITextField()
-
+    
     init(portfolio: PortfolioResponse) {
         self.portfolio = portfolio
         super.init(nibName: nil, bundle: nil)
     }
     required init?(coder: NSCoder) { fatalError() }
-
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
@@ -815,7 +1240,7 @@ class PortfolioBasicInfoEditViewController: UIViewController {
         navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .save,   target: self, action: #selector(saveTapped))
         buildUI()
     }
-
+    
     private func buildUI() {
         let scroll = UIScrollView(); scroll.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scroll)
@@ -832,7 +1257,7 @@ class PortfolioBasicInfoEditViewController: UIViewController {
             content.bottomAnchor.constraint(equalTo: scroll.bottomAnchor),
             content.widthAnchor.constraint(equalTo: scroll.widthAnchor),
         ])
-
+        
         func sectionHeader(_ text: String) -> UILabel {
             let l = UILabel(); l.text = text
             l.font = .systemFont(ofSize: 12, weight: .semibold)
@@ -840,7 +1265,7 @@ class PortfolioBasicInfoEditViewController: UIViewController {
             l.translatesAutoresizingMaskIntoConstraints = false
             return l
         }
-
+        
         let bioHeader = sectionHeader("BIO")
         bioField.text = portfolio.bio ?? ""
         bioField.font = .systemFont(ofSize: 15)
@@ -848,7 +1273,7 @@ class PortfolioBasicInfoEditViewController: UIViewController {
         bioField.layer.cornerRadius = 10
         bioField.textContainerInset = UIEdgeInsets(top: 12, left: 10, bottom: 12, right: 10)
         bioField.translatesAutoresizingMaskIntoConstraints = false
-
+        
         let socialHeader = sectionHeader("SOCIAL LINKS")
         let fields: [(UITextField, String?, String)] = [
             (instagramField, portfolio.instagram_url, "📱  Instagram URL"),
@@ -869,9 +1294,9 @@ class PortfolioBasicInfoEditViewController: UIViewController {
             f.translatesAutoresizingMaskIntoConstraints = false
             f.heightAnchor.constraint(equalToConstant: 44).isActive = true
         }
-
+        
         [bioHeader, bioField, socialHeader, instagramField, youtubeField, imdbField].forEach { content.addSubview($0) }
-
+        
         NSLayoutConstraint.activate([
             bioHeader.topAnchor.constraint(equalTo: content.topAnchor, constant: 24),
             bioHeader.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
@@ -893,9 +1318,9 @@ class PortfolioBasicInfoEditViewController: UIViewController {
             imdbField.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -40),
         ])
     }
-
+    
     @objc private func cancelTapped() { dismiss(animated: true) }
-
+    
     @objc private func saveTapped() {
         Task {
             do {
@@ -916,7 +1341,7 @@ class PortfolioBasicInfoEditViewController: UIViewController {
                     .update(update)
                     .eq("id", value: portfolio.id)
                     .execute()
-
+                
                 await MainActor.run {
                     self.onSaved?()
                     self.dismiss(animated: true)
@@ -925,6 +1350,59 @@ class PortfolioBasicInfoEditViewController: UIViewController {
                 let a = UIAlertController(title: "Error", message: error.localizedDescription, preferredStyle: .alert)
                 a.addAction(UIAlertAction(title: "OK", style: .default))
                 present(a, animated: true)
+            }
+        }
+    }
+}
+
+// MARK: - Image Loader Helper
+import AVFoundation
+
+class ImageLoader {
+    static let shared = ImageLoader()
+    private init() {}
+    
+    // Cache to prevent redundant processing
+    private let cache = NSCache<NSString, UIImage>()
+    
+    func image(from urlString: String) async -> UIImage? {
+        if let cached = cache.object(forKey: urlString as NSString) { return cached }
+        
+        guard let url = URL(string: urlString) else { return nil }
+        
+        let lower = urlString.lowercased()
+        if lower.hasSuffix(".mp4") || lower.hasSuffix(".mov") || lower.hasSuffix(".m4v") || urlString.contains("video") {
+            // It's a video, generate thumbnail
+            if let thumb = await generateThumbnail(url: url) {
+                cache.setObject(thumb, forKey: urlString as NSString)
+                return thumb
+            }
+        }
+        
+        // Default image loading
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let img = UIImage(data: data) {
+                cache.setObject(img, forKey: urlString as NSString)
+                return img
+            }
+        } catch {}
+        return nil
+    }
+    
+    private func generateThumbnail(url: URL) async -> UIImage? {
+        let asset = AVAsset(url: url)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        let time = CMTime(seconds: 1, preferredTimescale: 60)
+        
+        return await withCheckedContinuation { res in
+            generator.generateCGImagesAsynchronously(forTimes: [NSValue(time: time)]) { _, image, _, _, _ in
+                if let cgImage = image {
+                    res.resume(returning: UIImage(cgImage: cgImage))
+                } else {
+                    res.resume(returning: nil)
+                }
             }
         }
     }

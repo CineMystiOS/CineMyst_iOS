@@ -3,6 +3,7 @@ import UIKit
 class JobTrackCardView: UIView {
     
     // MARK: - UI Elements
+    private let profileImageView = UIImageView()
     private let titleLabel = UILabel()
     private let companyLabel = UILabel()
     
@@ -40,6 +41,13 @@ class JobTrackCardView: UIView {
         layer.shadowOpacity = 0.08
         layer.shadowOffset = CGSize(width: 0, height: 2)
         layer.shadowRadius = 4
+        
+        // Profile image setup
+        profileImageView.contentMode = .scaleAspectFill
+        profileImageView.clipsToBounds = true
+        profileImageView.layer.cornerRadius = 24
+        profileImageView.backgroundColor = UIColor(white: 0.95, alpha: 1)
+        profileImageView.translatesAutoresizingMaskIntoConstraints = false
         
         // Fonts & Colors
         titleLabel.font = .boldSystemFont(ofSize: 16)
@@ -97,9 +105,24 @@ class JobTrackCardView: UIView {
         buttonsStack.axis = .horizontal
         buttonsStack.spacing = 12
         
-        let container = UIStackView(arrangedSubviews: [
+        // Header with profile image, title and company
+        let headerStack = UIStackView(arrangedSubviews: [
             titleLabel,
-            companyLabel,
+            companyLabel
+        ])
+        headerStack.axis = .vertical
+        headerStack.spacing = 4
+        
+        let topStack = UIStackView(arrangedSubviews: [
+            profileImageView,
+            headerStack
+        ])
+        topStack.axis = .horizontal
+        topStack.spacing = 12
+        topStack.alignment = .center
+        
+        let container = UIStackView(arrangedSubviews: [
+            topStack,
             infoStack,
             buttonsStack
         ])
@@ -111,6 +134,8 @@ class JobTrackCardView: UIView {
         container.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
+            profileImageView.widthAnchor.constraint(equalToConstant: 48),
+            profileImageView.heightAnchor.constraint(equalToConstant: 48),
             container.topAnchor.constraint(equalTo: topAnchor, constant: 16),
             container.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
             container.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
@@ -138,6 +163,32 @@ class JobTrackCardView: UIView {
             viewApplicationsBtn.setTitle(title, for: .normal)
         } else {
             viewApplicationsBtn.setTitle("View Applications", for: .normal)
+        }
+        
+        // Load profile picture
+        if let urlString = job.profilePictureUrl, let url = URL(string: urlString) {
+            loadImage(url: url)
+        } else {
+            profileImageView.image = UIImage(systemName: "person.fill")
+            profileImageView.tintColor = .systemGray
+        }
+    }
+    
+    private func loadImage(url: URL) {
+        // Load image from URL asynchronously
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                let image = UIImage(data: data)
+                await MainActor.run {
+                    self.profileImageView.image = image
+                }
+            } catch {
+                await MainActor.run {
+                    self.profileImageView.image = UIImage(systemName: "person.fill")
+                    self.profileImageView.tintColor = .systemGray
+                }
+            }
         }
     }
     

@@ -1155,10 +1155,11 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
             // Buttons: own profile → edit controls; other → connect
             card.avatarEditButton.isHidden    = !isOwnProfile
             card.editProfileButton.isHidden   = !isOwnProfile
-            card.editPortfolioButton.isHidden = !isOwnProfile
-            card.connectButton.isHidden       = isOwnProfile
 
             if isOwnProfile {
+                card.editPortfolioButton.isHidden = false
+                card.connectButton.isHidden       = true
+                
                 card.avatarEditButton.removeTarget(nil, action: nil, for: .allEvents)
                 card.avatarEditButton.addTarget(self, action: #selector(editProfileImageTapped), for: .touchUpInside)
                 card.editProfileButton.removeTarget(nil, action: nil, for: .allEvents)
@@ -1175,9 +1176,20 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
                 }
                 card.editPortfolioButton.setTitle(btnTitle, for: .normal)
             } else {
+                card.connectButton.isHidden = false
                 card.connectButton.removeTarget(nil, action: nil, for: .allEvents)
                 card.connectButton.addTarget(self, action: #selector(connectTapped), for: .touchUpInside)
                 updateConnectButton(card.connectButton)
+                
+                // Show "View Portfolio" only if connected
+                if connectionState == "connected" {
+                    card.editPortfolioButton.isHidden = false
+                    card.editPortfolioButton.setTitle("View Portfolio", for: .normal)
+                    card.editPortfolioButton.removeTarget(nil, action: nil, for: .allEvents)
+                    card.editPortfolioButton.addTarget(self, action: #selector(editPortfolioTapped), for: .touchUpInside)
+                } else {
+                    card.editPortfolioButton.isHidden = true
+                }
             }
         }
 
@@ -1324,17 +1336,25 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
             return
         }
 
-        if hasPortfolio {
-            let vc = ActorPortfolioDetailViewController()
-            vc.isOwnProfile = true
+        // If user is connected OR it's their own profile, show the redesigned portfolio screen.
+        if isOwnProfile || connectionState == "connected" {
+            let vc = PortfolioViewController()
+            vc.isOwnProfile = isOwnProfile
+            if !isOwnProfile {
+                let uid = profileData?.profile.id ?? userId
+                vc.targetUserId = uid?.uuidString
+            }
             let nav = UINavigationController(rootViewController: vc)
             nav.modalPresentationStyle = .fullScreen
             present(nav, animated: true)
         } else {
-            let vc = PortfolioCreationViewController()
-            let nav = UINavigationController(rootViewController: vc)
-            nav.modalPresentationStyle = .fullScreen
-            present(nav, animated: true)
+            // Probably should show creation only for self
+            if isOwnProfile {
+                let vc = PortfolioCreationViewController()
+                let nav = UINavigationController(rootViewController: vc)
+                nav.modalPresentationStyle = .fullScreen
+                present(nav, animated: true)
+            }
         }
     }
 

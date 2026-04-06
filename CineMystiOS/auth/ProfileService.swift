@@ -305,6 +305,10 @@ class ProfileService {
                     role: item.role,
                     year: item.year,
                     type: item.type,
+                    productionCompany: item.production_company,
+                    genre: item.genre,
+                    durationMinutes: item.duration_minutes,
+                    description: item.description,
                     posterUrl: item.poster_url,
                     mediaUrls: item.media_urls
                 )
@@ -359,6 +363,70 @@ struct PortfolioResponse: Codable {
     let website_url: String?
     let bio: String?
     let profile_picture_url: String?
+    
+    // Casting fields (from actor_portfolios)
+    let age: String?
+    let height_cm: String?
+    let weight_kg: String?
+    let sex: String?
+    let bust: String?
+    let waist: String?
+    let hips: String?
+    let skin_tone: String?
+    let eye_color: String?
+    let hair_color: String?
+    let body_type: String?
+    let shoe_size: String?
+    let languages: String?
+    let previous_experience: String?
+    let movies: AnyCodable?
+    let tvc: AnyCodable?
+    let tv_serials: AnyCodable?
+    let theatre: AnyCodable?
+    let advertisement: AnyCodable?
+    let web_series: AnyCodable?
+    let media_urls: AnyCodable?
+    
+    // Helper to get media as dicts
+    var mediaItems: [[String: String]] {
+        if let array = media_urls?.value as? [[String: String]] {
+            return array
+        }
+        // Fallback for different JSON serialization
+        if let anyArray = media_urls?.value as? [[String: Any]] {
+            return anyArray.map { dict in
+                var newDict: [String: String] = [:]
+                for (k, v) in dict { newDict[k] = "\(v)" }
+                return newDict
+            }
+        }
+        return []
+    }
+}
+
+// Simple AnyCodable-like wrapper if not available, or use Any
+struct AnyCodable: Codable {
+    let value: Any
+    init(_ value: Any) { self.value = value }
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let x = try? container.decode(Bool.self) { value = x }
+        else if let x = try? container.decode(Int.self) { value = x }
+        else if let x = try? container.decode(Double.self) { value = x }
+        else if let x = try? container.decode(String.self) { value = x }
+        else if let x = try? container.decode([AnyCodable].self) { value = x.map { $0.value } }
+        else if let x = try? container.decode([String: AnyCodable].self) { value = x.mapValues { $0.value } }
+        else { throw DecodingError.dataCorruptedError(in: container, debugDescription: "Not a codable value") }
+    }
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        if let x = value as? Bool { try container.encode(x) }
+        else if let x = value as? Int { try container.encode(x) }
+        else if let x = value as? Double { try container.encode(x) }
+        else if let x = value as? String { try container.encode(x) }
+        else if let x = value as? [Any] { try container.encode(x.map { AnyCodable($0) }) }
+        else if let x = value as? [String: Any] { try container.encode(x.mapValues { AnyCodable($0) }) }
+    }
 }
 
 struct PortfolioItemResponse: Codable {
@@ -369,6 +437,10 @@ struct PortfolioItemResponse: Codable {
     let role: String?
     let year: Int
     let type: String
+    let production_company: String?
+    let genre: String?
+    let duration_minutes: Int?
+    let description: String?
     let poster_url: String?
     let trailer_url: String?
     let media_urls: [String]?
@@ -388,6 +460,10 @@ struct PortfolioItemData {
     let role: String?
     let year: Int
     let type: String
+    let productionCompany: String?
+    let genre: String?
+    let durationMinutes: Int?
+    let description: String?
     let posterUrl: String?
     let mediaUrls: [String]?
 }

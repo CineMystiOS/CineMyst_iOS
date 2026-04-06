@@ -136,17 +136,44 @@ class PortfolioManager {
     }
 
     
-    // MARK: - Delete Portfolio Item
-    func deletePortfolioItem(itemId: String) async throws {
-        print("🗑️ Deleting portfolio item: \(itemId)")
+    // MARK: - Add Actor Project (Structured into actor_portfolios)
+    func addActorProject(
+        userId: String,
+        category: String, // "movies", "theatre", etc.
+        item: PortfolioItemInsert
+    ) async throws {
+        print("📝 Appending actor project to \(category) for \(userId)")
         
-        try await client
-            .from("portfolio_items")
-            .delete()
-            .eq("id", value: itemId)
+        let resp = try await client.from("actor_portfolios").select().eq("user_id", value: userId).single().execute()
+        let dict = try JSONSerialization.jsonObject(with: resp.data) as? [String: Any]
+        
+        var currentItems: [[String: Any]] = []
+        if let jsonString = dict?[category] as? String, let data = jsonString.data(using: .utf8) {
+            currentItems = (try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]) ?? []
+        } else if let jsonArray = dict?[category] as? [[String: Any]] {
+            currentItems = jsonArray
+        }
+        
+        let newItem: [String: Any] = [
+            "title": item.title, "year": item.year, "role": item.role ?? "",
+            "production_company": item.production_company ?? "",
+            "genre": item.genre ?? "", "description": item.description ?? "",
+            "poster_url": item.poster_url ?? "",
+            "id": UUID().uuidString
+        ]
+        currentItems.append(newItem)
+        // 4. Upsert back to profile using AnyCodable dictionary for flexibility
+        let updateData = [category: AnyCodable(currentItems)]
+        try await client.from("actor_portfolios")
+            .update(updateData)
+            .eq("user_id", value: userId)
             .execute()
-        
-        print("✅ Portfolio item deleted")
+    }
+
+    struct PortfolioItemInsert: Codable {
+        let title: String; let year: Int; let role: String?
+        let production_company: String?; let genre: String?; let description: String?
+        let poster_url: String?
     }
 }
 
