@@ -76,6 +76,17 @@ class PostedJobsDashboardViewController: UIViewController {
         sv.spacing = 16
         return sv
     }()
+    
+    private let loader = UIActivityIndicatorView(style: .medium)
+    private let emptyStateLabel: UILabel = {
+        let lbl = UILabel()
+        lbl.text = "No jobs found in this section"
+        lbl.textColor = .gray
+        lbl.textAlignment = .center
+        lbl.font = .systemFont(ofSize: 14)
+        lbl.isHidden = true
+        return lbl
+    }()
 
     // MARK: - View Lifecycle
     override func viewDidLoad() {
@@ -140,7 +151,8 @@ class PostedJobsDashboardViewController: UIViewController {
         view.addSubview(subtitleLabel)
         view.addSubview(scrollView)
         scrollView.addSubview(stackView)
-        scrollView.backgroundColor = .clear
+        view.addSubview(loader)
+        view.addSubview(emptyStateLabel)
 
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         postJobButton.translatesAutoresizingMaskIntoConstraints = false
@@ -148,6 +160,8 @@ class PostedJobsDashboardViewController: UIViewController {
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         stackView.translatesAutoresizingMaskIntoConstraints = false
+        loader.translatesAutoresizingMaskIntoConstraints = false
+        emptyStateLabel.translatesAutoresizingMaskIntoConstraints = false
 
         NSLayoutConstraint.activate([
 
@@ -179,7 +193,15 @@ class PostedJobsDashboardViewController: UIViewController {
             stackView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: 16),
             stackView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -16),
             stackView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
-            stackView.widthAnchor.constraint(equalTo: scrollView.widthAnchor, constant: -32)
+            stackView.widthAnchor.constraint(equalTo: scrollView.widthAnchor, constant: -32),
+            
+            loader.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            loader.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            
+            emptyStateLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            emptyStateLabel.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 100),
+            emptyStateLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 40),
+            emptyStateLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -40)
         ])
     }
 
@@ -206,32 +228,47 @@ class PostedJobsDashboardViewController: UIViewController {
         print("📱 Loading \(sectionName) section...")
         
         currentTask = Task { [weak self] in
+            guard let self = self else { return }
+            
+            await MainActor.run {
+                self.loader.startAnimating()
+                self.emptyStateLabel.isHidden = true
+                self.stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+            }
+            
+            guard let userId = supabase.auth.currentUser?.id else {
+                print("❌ User not authenticated")
+                await MainActor.run { self.loader.stopAnimating() }
+                return
+            }
+            
+            let status: Job.JobStatus?
+            switch index {
+            case 0: status = .active
+            case 1: status = .pending
+            case 2: status = .completed
+            default: status = nil
+            }
+            
             do {
-                guard let userId = supabase.auth.currentUser?.id else {
-                    print("❌ User not authenticated")
-                    return
-                }
-                
-                let status: Job.JobStatus?
-                switch index {
-                case 0: status = .active
-                case 1: status = .pending
-                case 2: status = .completed
-                default: status = nil
-                }
-                
-                print("🔍 Fetching jobs with status: \(status?.rawValue ?? "all")")
-                
+                print("🔍 Fetching jobs with status: \(status?.rawValue ?? "all") for director: \(userId.uuidString)")
                 let jobs = try await JobsService.shared.fetchJobsByDirector(directorId: userId, status: status)
-                
                 print("✅ Found \(jobs.count) jobs for \(sectionName)")
                 
                 var displayJobs = jobs
                 
+                // Fetch director profile ONCE as all these jobs are by the same director
+                var profilePictureUrl: String? = nil
+                do {
+                    let directorProfile = try await ProfileService.shared.fetchUserProfile(userId: userId)
+                    profilePictureUrl = directorProfile.profile.profilePictureUrl
+                } catch {
+                    print("⚠️ Failed to fetch director profile: \(error)")
+                }
+                
                 // DATA HEALING: If we are in Active Jobs, check if any should actually be Pending
                 if index == 0 {
                     for job in jobs {
-                        // Check if this job has any shortlisted or selected applications
                         do {
                             let shortlistedCount: Int = try await supabase
                                 .from("applications")
@@ -242,71 +279,48 @@ class PostedJobsDashboardViewController: UIViewController {
                                 .count ?? 0
                             
                             if shortlistedCount > 0 {
-                                print("🛠 Auto-healing job \(job.id.uuidString.prefix(8)): Moving to PENDING as it has \(shortlistedCount) shortlisted candidates.")
-                                try await supabase
-                                    .from("jobs")
-                                    .update(["status": "pending"])
-                                    .eq("id", value: job.id.uuidString)
-                                    .execute()
-                                
-                                // Remove from local display list for Active section
+                                print("🛠 Auto-healing job \(job.id.uuidString.prefix(8)): Moving to PENDING")
+                                _ = try? await supabase.from("jobs").update(["status": "pending"]).eq("id", value: job.id.uuidString).execute()
                                 if let idx = displayJobs.firstIndex(where: { $0.id == job.id }) {
                                     displayJobs.remove(at: idx)
                                 }
                             }
-                        } catch {
-                            print("⚠️ Failed to check/heal job status: \(error)")
-                        }
+                        } catch {}
                     }
-                }
-                
-                // Fetch profile pictures for all jobs before rendering
-                var jobsWithProfiles: [(job: Job, profilePictureUrl: String?)] = []
-                for job in displayJobs {
-                    var profilePictureUrl: String? = nil
-                    if let directorId = job.directorId {
-                        do {
-                            let directorProfile = try await ProfileService.shared.fetchUserProfile(userId: directorId)
-                            profilePictureUrl = directorProfile.profile.profilePictureUrl
-                        } catch {
-                            print("⚠️ Failed to fetch director profile: \(error)")
-                        }
-                    }
-                    jobsWithProfiles.append((job: job, profilePictureUrl: profilePictureUrl))
                 }
                 
                 await MainActor.run {
-                    guard let self = self else { return }
-                    
-                    self.stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
-                    
-                    for (job, profilePictureUrl) in jobsWithProfiles {
-                        let jobCardModel = job.toJobCardModel(applicationsCount: 0, profilePictureUrl: profilePictureUrl)
-                        let card = JobTrackCardView()
-                        
-                        let isCompleted = index == 2
-                        let buttonTitle = isCompleted ? "View Selected" : "View Applications"
-                        
-                        card.configure(with: jobCardModel, buttonTitle: buttonTitle)
-                        card.onViewApplicationsTapped = { [weak self] in
-                            if isCompleted {
-                                let vc = ActorProfileViewController()
-                                self?.navigationController?.pushViewController(vc, animated: true)
-                            } else {
-                                let vc = SwipeScreenViewController()
-                                vc.job = job
-                                self?.navigationController?.pushViewController(vc, animated: true)
-                            }
-                        }
-                        self.stackView.addArrangedSubview(card)
-                    }
+                    self.loader.stopAnimating()
                     
                     if displayJobs.isEmpty {
-                        print("ℹ️ No jobs to display in \(sectionName)")
+                        self.emptyStateLabel.isHidden = false
+                        self.emptyStateLabel.text = "No \(sectionName.lowercased()) postings yet."
+                    } else {
+                        self.emptyStateLabel.isHidden = true
+                        for job in displayJobs {
+                            let jobCardModel = job.toJobCardModel(applicationsCount: 0, profilePictureUrl: profilePictureUrl)
+                            let card = JobTrackCardView()
+                            let isCompleted = index == 2
+                            let buttonTitle = isCompleted ? "View Selected" : "View Applications"
+                            
+                            card.configure(with: jobCardModel, buttonTitle: buttonTitle)
+                            card.onViewApplicationsTapped = { [weak self] in
+                                if isCompleted {
+                                    let vc = ActorProfileViewController()
+                                    self?.navigationController?.pushViewController(vc, animated: true)
+                                } else {
+                                    let vc = SwipeScreenViewController()
+                                    vc.job = job
+                                    self?.navigationController?.pushViewController(vc, animated: true)
+                                }
+                            }
+                            self.stackView.addArrangedSubview(card)
+                        }
                     }
                 }
             } catch {
                 print("❌ Error loading director jobs: \(error)")
+                await MainActor.run { self.loader.stopAnimating() }
             }
         }
     }

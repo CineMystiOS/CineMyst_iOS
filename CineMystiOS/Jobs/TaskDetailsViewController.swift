@@ -849,7 +849,7 @@ final class TaskDetailsViewController: UIViewController {
                 .getPublicURL(path: fileName).absoluteString
             print("✅ Video uploaded to: \(publicURL)")
             
-            // Step 1: Find existing application (portfolio_submitted status)
+            // Step 1: Find existing application
             let applications: [Application] = try await supabase
                 .from("applications")
                 .select()
@@ -858,30 +858,55 @@ final class TaskDetailsViewController: UIViewController {
                 .execute()
                 .value
             
-            guard let application = applications.first else {
-                showAlert(title: "Error", message: "No application found. Please submit portfolio first.")
-                return
+            let application: Application
+            if let existing = applications.first {
+                print("✅ Found existing application: \(existing.id.uuidString)")
+                // Step 2: Create updated application with new status
+                let updated = Application(
+                    id: existing.id,
+                    jobId: existing.jobId,
+                    actorId: existing.actorId,
+                    status: .taskSubmitted,
+                    portfolioUrl: existing.portfolioUrl,
+                    portfolioSubmittedAt: existing.portfolioSubmittedAt,
+                    appliedAt: existing.appliedAt,
+                    updatedAt: Date()
+                )
+                
+                application = try await supabase
+                    .from("applications")
+                    .update(updated)
+                    .eq("id", value: existing.id.uuidString)
+                    .select()
+                    .single()
+                    .execute()
+                    .value
+            } else {
+                print("🆕 No application found, creating a new one...")
+                // AUTO-SUBMIT PORTFOLIO: Use portfolio from profile or metadata
+                let portfolioUrl = castingProfile?.portfolioWebsite ?? currentUser.userMetadata["portfolio_url"] as? String
+                
+                let newApp = Application(
+                    id: UUID(),
+                    jobId: job.id,
+                    actorId: actorId,
+                    status: .taskSubmitted, // Directly set to taskSubmitted as we are submitting a task
+                    portfolioUrl: portfolioUrl,
+                    portfolioSubmittedAt: Date(),
+                    appliedAt: Date(),
+                    updatedAt: Date()
+                )
+                
+                application = try await supabase
+                    .from("applications")
+                    .insert(newApp)
+                    .select()
+                    .single()
+                    .execute()
+                    .value
             }
             
-            // Step 2: Create updated application with new status
-            let updatedApplication = Application(
-                id: application.id,
-                jobId: application.jobId,
-                actorId: application.actorId,
-                status: .taskSubmitted,
-                portfolioUrl: application.portfolioUrl,
-                portfolioSubmittedAt: application.portfolioSubmittedAt,
-                appliedAt: application.appliedAt,
-                updatedAt: Date()
-            )
-            
-            let _: Application = try await supabase
-                .from("applications")
-                .update(updatedApplication)
-                .eq("id", value: application.id.uuidString)
-                .single()
-                .execute()
-                .value
+            print("✅ Application \(application.id.uuidString) is now at status: \(application.status.rawValue)")
             
             // Step 3: Get task for this job (from 'tasks' table)
             var jobTaskId: UUID? = nil

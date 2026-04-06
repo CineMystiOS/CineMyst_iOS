@@ -69,7 +69,7 @@ extension Job {
         return JobCardModel(
             id: id,
             title: title ?? "Untitled Job",
-            company: companyName ?? "CineMyst Production",
+            company: companyName ?? "Production House",
             location: location ?? "Remote/TBD",
             rate: "₹\(ratePerDay ?? 0)/day",
             type: jobType ?? "Project",

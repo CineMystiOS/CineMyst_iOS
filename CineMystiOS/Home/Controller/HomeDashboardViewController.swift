@@ -2058,8 +2058,15 @@ final class CastingFeedCell: UITableViewCell {
     }
 
     func configure(with job: Job) {
-        avatarLabel.text = String((job.companyName ?? "CM").prefix(3)).uppercased()
-        posterName.text = job.companyName ?? "CineMyst Production"
+        Task {
+            let directorId = job.directorId ?? UUID()
+            let (productionHouse, _) = await self.fetchProductionHouse(directorId: directorId)
+            
+            await MainActor.run {
+                self.avatarLabel.text = String((productionHouse != "Production House" ? productionHouse : (job.companyName ?? "CM")).prefix(3)).uppercased()
+                self.posterName.text = (productionHouse != "Production House" && !productionHouse.isEmpty) ? productionHouse : (job.companyName ?? "CineMyst Production")
+            }
+        }
         roleMeta.text = job.jobType ?? "Project"
         timeMeta.text = "2h"
         captionLabel.text = "CASTING CALL: \(job.title ?? "Untitled"). \(job.description ?? "")"
@@ -2077,6 +2084,50 @@ final class CastingFeedCell: UITableViewCell {
         UIView.animate(withDuration: 0.12, animations: { self.applyButton.transform = CGAffineTransform(scaleX: 0.88, y: 0.88) }) { _ in
             UIView.animate(withDuration: 0.18, delay: 0, usingSpringWithDamping: 0.5, initialSpringVelocity: 6) { self.applyButton.transform = .identity }
         }
+    }
+    
+    private func fetchProductionHouse(directorId: UUID) async -> (companyName: String, profilePictureUrl: String?) {
+        var companyName = "Production House"
+        do {
+            struct CastingProfile: Codable {
+                let companyName: String?
+                let productionHouse: String?
+                enum CodingKeys: String, CodingKey { 
+                    case companyName = "company_name" 
+                    case productionHouse = "production_house"
+                }
+            }
+            let profile: CastingProfile = try await supabase
+                .from("casting_profiles")
+                .select("company_name, production_house")
+                .eq("id", value: directorId.uuidString)
+                .single()
+                .execute()
+                .value
+            if let prodHouse = profile.productionHouse, !prodHouse.isEmpty {
+                companyName = prodHouse
+            } else if let name = profile.companyName, !name.isEmpty {
+                companyName = name
+            }
+        } catch { print("⚠️ Could not fetch company name: \(error)") }
+        
+        var profilePictureUrl: String?
+        do {
+            struct Profile: Codable {
+                let profilePictureUrl: String?
+                enum CodingKeys: String, CodingKey { case profilePictureUrl = "profile_picture_url" }
+            }
+            let profile: Profile = try await supabase
+                .from("profiles")
+                .select("profile_picture_url")
+                .eq("id", value: directorId.uuidString)
+                .single()
+                .execute()
+                .value
+            profilePictureUrl = profile.profilePictureUrl
+        } catch { print("⚠️ Could not fetch profile picture: \(error)") }
+        
+        return (companyName, profilePictureUrl)
     }
 }
 

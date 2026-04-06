@@ -8,6 +8,7 @@ class CandidateCardView: UIView {
     private var player: AVPlayer?
     private var playerLayer: AVPlayerLayer?
     var onProfileTapped: (() -> Void)?
+    var onPortfolioTapped: (() -> Void)?
     var applicationId: UUID { model.applicationId }
     var actorId: UUID { model.actorId }
 
@@ -78,14 +79,15 @@ class CandidateCardView: UIView {
         return iv
     }()
 
-    private let submittedBtn: UIButton = {
+    private let portfolioBtn: UIButton = {
         let btn = UIButton(type: .system)
-        btn.setTitle("Task Submitted", for: .normal)
-        btn.titleLabel?.font = .systemFont(ofSize: 12)
-        btn.backgroundColor = UIColor.white.withAlphaComponent(0.2)
+        btn.setTitle("Portfolio", for: .normal)
+        btn.titleLabel?.font = .systemFont(ofSize: 12, weight: .bold)
+        btn.backgroundColor = UIColor(red: 90/255, green: 20/255, blue: 90/255, alpha: 1.0)
         btn.setTitleColor(.white, for: .normal)
         btn.layer.cornerRadius = 10
         btn.translatesAutoresizingMaskIntoConstraints = false
+        btn.isUserInteractionEnabled = true
         return btn
     }()
 
@@ -149,6 +151,10 @@ class CandidateCardView: UIView {
                 profileImageView.tintColor = .systemGray
             }
         }
+        
+        // Always enable portfolio button so user can see in-app portfolio
+        portfolioBtn.alpha = 1.0
+        portfolioBtn.isEnabled = true
     }
     
     private func loadImage(from url: URL) {
@@ -179,19 +185,20 @@ class CandidateCardView: UIView {
         // GRADIENT
         gradientLayer.colors = [
             UIColor.clear.cgColor,
-            UIColor.black.withAlphaComponent(0.8).cgColor
+            UIColor.black.withAlphaComponent(0.85).cgColor
         ]
         gradientLayer.locations = [0.4, 1.0]
-        layer.addSublayer(gradientLayer)
+        layer.insertSublayer(gradientLayer, at: 0) // Ensure it's at the back
 
         // TEXT OVER VIDEO
         addSubview(nameLabel)
         addSubview(verifyIcon)
         addSubview(locationLabel)
         addSubview(experienceLabel)
-        addSubview(submittedBtn)
+        addSubview(portfolioBtn)
         addSubview(profileBtn)
         profileBtn.addTarget(self, action: #selector(profileButtonTapped), for: .touchUpInside)
+        portfolioBtn.addTarget(self, action: #selector(portfolioButtonTapped), for: .touchUpInside)
 
         nameLabel.text = model.name
         locationLabel.text = model.location
@@ -225,15 +232,15 @@ class CandidateCardView: UIView {
             locationLabel.bottomAnchor.constraint(equalTo: experienceLabel.topAnchor, constant: -6),
 
             experienceLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
-            experienceLabel.bottomAnchor.constraint(equalTo: submittedBtn.topAnchor, constant: -12),
+            experienceLabel.bottomAnchor.constraint(equalTo: portfolioBtn.topAnchor, constant: -12),
 
-            submittedBtn.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
-            submittedBtn.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -20),
-            submittedBtn.widthAnchor.constraint(equalToConstant: 120),
-            submittedBtn.heightAnchor.constraint(equalToConstant: 32),
+            portfolioBtn.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
+            portfolioBtn.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -20),
+            portfolioBtn.widthAnchor.constraint(equalToConstant: 120),
+            portfolioBtn.heightAnchor.constraint(equalToConstant: 32),
 
-            profileBtn.leadingAnchor.constraint(equalTo: submittedBtn.trailingAnchor, constant: 12),
-            profileBtn.centerYAnchor.constraint(equalTo: submittedBtn.centerYAnchor),
+            profileBtn.leadingAnchor.constraint(equalTo: portfolioBtn.trailingAnchor, constant: 12),
+            profileBtn.centerYAnchor.constraint(equalTo: portfolioBtn.centerYAnchor),
             profileBtn.widthAnchor.constraint(equalToConstant: 120),
             profileBtn.heightAnchor.constraint(equalToConstant: 32)
         ])
@@ -241,6 +248,10 @@ class CandidateCardView: UIView {
 
     @objc private func profileButtonTapped() {
         onProfileTapped?()
+    }
+
+    @objc private func portfolioButtonTapped() {
+        onPortfolioTapped?()
     }
 
     override func layoutSubviews() {

@@ -38,6 +38,7 @@ class PostJobViewController: UIViewController {
     private let statusLabelView = UILabel()
     private var currentStatus: String = "pending"
     private var hasProfile: Bool = false
+    private var userProductionHouse: String?
     
     private let deadlineDatePicker: UIDatePicker = {
         let picker = UIDatePicker()
@@ -267,6 +268,7 @@ class PostJobViewController: UIViewController {
                 
                 await MainActor.run {
                     self.currentStatus = casting.status ?? "pending"
+                    self.userProductionHouse = casting.productionHouse ?? casting.companyName
                     self.hasProfile = true
                     self.updateStatusUI()
                 }
@@ -363,7 +365,7 @@ class PostJobViewController: UIViewController {
             id: UUID(),
             directorId: userId,
             title: projectTitleTextField?.text,
-            companyName: "CineMyst Production",
+            companyName: userProductionHouse ?? "CineMyst Production",
             location: "Mumbai",
             ratePerDay: rate,
             jobType: selectedGenre,

@@ -138,11 +138,14 @@ class SavedPostViewController: UIViewController {
                     }
                 }
                 
+                let directorId = job.directorId ?? UUID()
+                let productionHouse = await self.fetchProductionHouse(directorId: directorId)
+                
                 await MainActor.run {
                     card.configure(
                         image: profileImage ?? UIImage(named: "avatar_placeholder"),
                         title: job.title ?? "Untitled Job",
-                        company: job.companyName ?? "CineMyst Production",
+                        company: (productionHouse != "Production House" && !productionHouse.isEmpty) ? productionHouse : (job.companyName ?? "CineMyst Production"),
                         location: job.location ?? "Remote",
                         salary: "₹ \(job.ratePerDay ?? 0)/day",
                         daysLeft: job.daysLeftText,
@@ -228,5 +231,32 @@ class SavedPostViewController: UIViewController {
         NSLayoutConstraint.activate([
             errorLabel.centerYAnchor.constraint(equalTo: scrollView.centerYAnchor)
         ])
+    }
+    
+    private func fetchProductionHouse(directorId: UUID) async -> String {
+        var companyName = "Production House"
+        do {
+            struct CastingProfile: Codable {
+                let companyName: String?
+                let productionHouse: String?
+                enum CodingKeys: String, CodingKey { 
+                    case companyName = "company_name" 
+                    case productionHouse = "production_house"
+                }
+            }
+            let profile: CastingProfile = try await supabase
+                .from("casting_profiles")
+                .select("company_name, production_house")
+                .eq("id", value: directorId.uuidString)
+                .single()
+                .execute()
+                .value
+            if let prodHouse = profile.productionHouse, !prodHouse.isEmpty {
+                companyName = prodHouse
+            } else if let name = profile.companyName, !name.isEmpty {
+                companyName = name
+            }
+        } catch { print("⚠️ Could not fetch company name: \(error)") }
+        return companyName
     }
 }

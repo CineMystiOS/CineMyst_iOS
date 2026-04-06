@@ -395,7 +395,8 @@ class SwipeScreenViewController: UIViewController {
                                 videoURL: nil,
                                 profileImageUrl: profileImageUrl,
                                 location: "India",
-                                experience: "Portfolio Submitted"
+                                experience: "Portfolio Submitted",
+                                portfolioURL: app.portfolioUrl
                             )
                         }
                         
@@ -408,7 +409,8 @@ class SwipeScreenViewController: UIViewController {
                             videoURL: URL(string: videoURL),
                             profileImageUrl: profileImageUrl,
                             location: "India",
-                            experience: "Task Submitted"
+                            experience: "Task Submitted",
+                            portfolioURL: app.portfolioUrl
                         )
                     } else {
                         // No task submission - show profile image
@@ -421,7 +423,8 @@ class SwipeScreenViewController: UIViewController {
                             videoURL: nil,
                             profileImageUrl: profileImageUrl,
                             location: "India",
-                            experience: "Portfolio Submitted"
+                            experience: "Portfolio Submitted",
+                            portfolioURL: app.portfolioUrl
                         )
                     }
                 }
@@ -482,6 +485,14 @@ class SwipeScreenViewController: UIViewController {
             profileVC.hidesBottomBarWhenPushed = true
             self?.navigationController?.pushViewController(profileVC, animated: true)
         }
+        card.onPortfolioTapped = { [weak self] in
+            let portfolioVC = PortfolioViewController()
+            portfolioVC.targetUserId = model.actorId.uuidString
+            portfolioVC.isOwnProfile = false
+            let nav = UINavigationController(rootViewController: portfolioVC)
+            nav.modalPresentationStyle = .fullScreen
+            self?.present(nav, animated: true)
+        }
         addPanGesture(to: card)
         return card
     }
@@ -524,6 +535,7 @@ class SwipeScreenViewController: UIViewController {
 
     private func addPanGesture(to card: UIView) {
         let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
+        pan.cancelsTouchesInView = false
         card.addGestureRecognizer(pan)
     }
 

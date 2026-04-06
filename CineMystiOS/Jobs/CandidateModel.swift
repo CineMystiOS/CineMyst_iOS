@@ -9,4 +9,5 @@ struct CandidateModel {
     let profileImageUrl: String?
     let location: String
     let experience: String
+    let portfolioURL: String?
 }

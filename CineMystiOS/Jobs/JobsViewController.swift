@@ -457,7 +457,7 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
                             card.configure(
                                 image: profileImage ?? UIImage(named: "avatar_placeholder"),
                                 title: job.title ?? "Untitled",
-                                company: job.companyName.flatMap { $0.isEmpty ? nil : $0 } ?? productionHouse,
+                                company: (productionHouse != "Production House" && !productionHouse.isEmpty) ? productionHouse : (job.companyName.flatMap { $0.isEmpty ? nil : $0 } ?? "CineMyst Production"),
                                 location: job.location ?? "Remote",
                                 salary: (job.ratePerDay ?? 0) > 0 ? "₹ \(job.ratePerDay!)/day" : "Negotiable",
                                 daysLeft: job.daysLeftText,
@@ -747,7 +747,7 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
                     
                     await MainActor.run {
                         let hasTask = associatedTask != nil
-                        let companyToUse = job.companyName.flatMap { $0.isEmpty ? nil : $0 } ?? productionHouse
+                        let companyToUse = (productionHouse != "Production House" && !productionHouse.isEmpty) ? productionHouse : (job.companyName.flatMap { $0.isEmpty ? nil : $0 } ?? "CineMyst Production")
                         let rateString = (job.ratePerDay ?? 0) > 0 ? "₹ \(job.ratePerDay!)/day" : "Negotiable"
                         card.configure(image: profileImage ?? UIImage(named: "avatar_placeholder"), title: job.title ?? "Untitled", company: companyToUse, location: job.location ?? "Remote", salary: rateString, daysLeft: job.daysLeftText, tag: job.jobType ?? "Film", appliedCount: "\(applicationCount) applied", hasTask: hasTask)
                         card.onApplyTap = { [weak self] in
