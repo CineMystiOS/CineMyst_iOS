@@ -1678,10 +1678,6 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
         profileCard.heightAnchor.constraint(equalToConstant: 430).isActive = true
         contentStackView.addArrangedSubview(profileCard)
 
-        let statsView = ProfessionalStatsView()
-        statsView.heightAnchor.constraint(equalToConstant: 146).isActive = true
-        contentStackView.addArrangedSubview(statsView)
-
         contentStackView.addArrangedSubview(AboutSectionView())
 
         let galleryHeader = GalleryHeaderView()
