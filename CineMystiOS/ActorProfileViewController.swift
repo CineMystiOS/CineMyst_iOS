@@ -55,6 +55,7 @@ class ActorProfileCardView: UIView {
     let bannerImageView    = UIImageView()
     let profileImageView   = UIImageView()
     let nameLabel          = UILabel()
+    let verifiedBadge      = UIImageView()
     let roleLabel          = UILabel()
     let connectionsLabel   = UILabel()
     let editPortfolioButton = GradientButton(type: .system)
@@ -125,9 +126,16 @@ class ActorProfileCardView: UIView {
         // Name Label
         nameLabel.font      = UIFont.systemFont(ofSize: 26, weight: .bold)
         nameLabel.textColor = ActorProfileDS.deepPlum
-        nameLabel.textAlignment = .center
         nameLabel.translatesAutoresizingMaskIntoConstraints = false
         addSubview(nameLabel)
+
+        // Verified Badge
+        verifiedBadge.image = UIImage(systemName: "checkmark.seal.fill")
+        verifiedBadge.tintColor = .systemBlue
+        verifiedBadge.contentMode = .scaleAspectFit
+        verifiedBadge.isHidden = true
+        verifiedBadge.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(verifiedBadge)
 
         // Role Label
         roleLabel.font      = UIFont.systemFont(ofSize: 15, weight: .medium)
@@ -217,8 +225,12 @@ class ActorProfileCardView: UIView {
             avatarEditButton.heightAnchor.constraint(equalToConstant: 34),
 
             nameLabel.topAnchor.constraint(equalTo: profileImageView.bottomAnchor, constant: 18),
-            nameLabel.leftAnchor.constraint(equalTo: leftAnchor, constant: 16),
-            nameLabel.rightAnchor.constraint(equalTo: rightAnchor, constant: -16),
+            nameLabel.centerXAnchor.constraint(equalTo: centerXAnchor, constant: -12),
+
+            verifiedBadge.centerYAnchor.constraint(equalTo: nameLabel.centerYAnchor),
+            verifiedBadge.leadingAnchor.constraint(equalTo: nameLabel.trailingAnchor, constant: 4),
+            verifiedBadge.widthAnchor.constraint(equalToConstant: 20),
+            verifiedBadge.heightAnchor.constraint(equalToConstant: 20),
 
             roleLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 4),
             roleLabel.leftAnchor.constraint(equalTo: leftAnchor, constant: 16),
@@ -1020,6 +1032,7 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
     private var isOwnProfile: Bool   = true
     /// "none" | "pending" | "connected"
     private var connectionState: String = "none"
+    private var isVerifiedCasting: Bool = false
     private var selectedMediaTab: MediaTab = .gallery
 
     // Image editing (own profile only)
@@ -1092,7 +1105,9 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
                 self.posts         = try await ProfileService.shared.fetchUserPosts(userId: combined.profile.id)
                 self.userFlicks    = try await self.fetchUserFlicks(userId: combined.profile.id)
                 self.hasPortfolio  = await ProfileService.shared.hasPortfolio(userId: combined.profile.id)
-                self.hasCastingPortfolio = await self.fetchHasCastingPortfolio(userId: combined.profile.id)
+                let castingProfile = await self.fetchCastingProfile(userId: combined.profile.id)
+                self.hasCastingPortfolio = (castingProfile != nil)
+                self.isVerifiedCasting = (castingProfile?.status == "verified")
 
                 // Determine own vs other profile
                 let currentUserId  = try await AuthManager.shared.currentSession()?.user.id
@@ -1126,6 +1141,7 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
         // --- Profile Card ---
         if let card = contentStackView.arrangedSubviews.first as? ActorProfileCardView {
             card.nameLabel.text        = data.profile.fullName ?? data.profile.username ?? "Profile"
+            card.verifiedBadge.isHidden = !isVerifiedCasting
             card.roleLabel.text        = formatRoleLabel(data)
             card.connectionsLabel.text = "\(data.profile.connectionCount)"
 
@@ -1440,10 +1456,20 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
 
     private func formatRoleLabel(_ data: UserProfileData) -> String {
         var parts: [String] = []
-        if let username = data.profile.username { parts.append("@\(username)") }
-        if let roles = data.artistProfile?.primaryRoles, !roles.isEmpty {
-            parts.append(roles.joined(separator: ", "))
+        if let username = data.profile.username { 
+            parts.append("@\(username)") 
         }
+        
+        if hasCastingPortfolio {
+            parts.append("I cast")
+        } else if let roles = data.artistProfile?.primaryRoles, !roles.isEmpty {
+            parts.append(roles.joined(separator: ", "))
+        } else if let role = data.profile.role, !role.isEmpty {
+            parts.append(role)
+        } else {
+            parts.append("Actor") // Default fallback
+        }
+        
         return parts.joined(separator: " • ")
     }
 
@@ -1488,23 +1514,18 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
         return try JSONDecoder().decode([Flick].self, from: response.data)
     }
 
-    private func fetchHasCastingPortfolio(userId: UUID) async -> Bool {
-        struct ExistingCastingProfile: Decodable {
-            let id: String
-        }
-
+    private func fetchCastingProfile(userId: UUID) async -> CastingProfileRecord? {
         do {
-            let rows: [ExistingCastingProfile] = try await supabase
+            let profile: CastingProfileRecord = try await supabase
                 .from("casting_profiles")
-                .select("id")
+                .select()
                 .eq("id", value: userId.uuidString)
-                .limit(1)
+                .single()
                 .execute()
                 .value
-            return !rows.isEmpty
+            return profile
         } catch {
-            print("⚠️ Failed checking casting profile existence: \(error)")
-            return false
+            return nil
         }
     }
 

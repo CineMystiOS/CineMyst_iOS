@@ -1,6 +1,8 @@
 
 import UIKit
 import AVFoundation
+import UniformTypeIdentifiers
+import PhotosUI
 
 // MARK: - Reels View Controller
 final class ReelsViewController: UIViewController {
@@ -140,7 +142,17 @@ final class ReelsViewController: UIViewController {
         createButtonContainer.layer.addSublayer(fabGradient)
         
         createButtonContainer.addSubview(createButton)
-        createButton.addTarget(self, action: #selector(createFlickTapped), for: .touchUpInside)
+        
+        let recordAction = UIAction(title: "Record Video", image: UIImage(systemName: "video.fill")) { [weak self] _ in
+            self?.openCamera()
+        }
+        let uploadAction = UIAction(title: "Upload from Library", image: UIImage(systemName: "photo.on.rectangle.angled")) { [weak self] _ in
+            self?.openLibrary()
+        }
+        
+        let menu = UIMenu(title: "", children: [recordAction, uploadAction])
+        createButton.menu = menu
+        createButton.showsMenuAsPrimaryAction = true
 
         NSLayoutConstraint.activate([
             createButtonContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
@@ -155,10 +167,22 @@ final class ReelsViewController: UIViewController {
         ])
     }
     
-    @objc private func createFlickTapped() {
-        let uploadVC = FlickUploadViewController()
-        uploadVC.modalPresentationStyle = .fullScreen
-        present(uploadVC, animated: true)
+    // MARK: - Photo/Video Actions
+    private func openCamera() {
+        let cameraVC = CameraViewController()
+        cameraVC.modalPresentationStyle = .fullScreen
+        present(cameraVC, animated: true)
+    }
+    
+    private func openLibrary() {
+        var configuration = PHPickerConfiguration()
+        configuration.filter = .videos
+        configuration.selectionLimit = 1
+        configuration.preferredAssetRepresentationMode = .current
+        
+        let picker = PHPickerViewController(configuration: configuration)
+        picker.delegate = self
+        present(picker, animated: true)
     }
     
     // MARK: - Data Loading
@@ -479,6 +503,41 @@ extension ReelsViewController: ReelCellDelegate {
         }
         profileVC.hidesBottomBarWhenPushed = true
         navigationController?.pushViewController(profileVC, animated: true)
+    }
+}
+
+// MARK: - PHPickerViewControllerDelegate
+extension ReelsViewController: PHPickerViewControllerDelegate {
+
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        picker.dismiss(animated: true)
+        
+        guard let result = results.first else { return }
+        
+        // Show processing indicator if needed
+        result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { [weak self] url, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("❌ Failed to load video: \(error.localizedDescription)")
+                return
+            }
+            
+            guard let url = url else { return }
+            
+            // Copy file immediately
+            let tempURL = URL(fileURLWithPath: NSTemporaryDirectory() + UUID().uuidString + ".mov")
+            do {
+                try FileManager.default.copyItem(at: url, to: tempURL)
+                DispatchQueue.main.async {
+                    let composer = FlickComposerViewController(videoURL: tempURL)
+                    composer.modalPresentationStyle = .fullScreen
+                    self.present(composer, animated: true)
+                }
+            } catch {
+                print("❌ Failed to copy video: \(error)")
+            }
+        }
     }
 }
 

@@ -15,6 +15,25 @@ fileprivate func makeShadow(on view: UIView, radius: CGFloat = 8, yOffset: CGFlo
     view.layer.masksToBounds = false
 }
 
+// MARK: - Gradient Button Helper
+fileprivate class CineMystGradientButton: UIButton {
+    private let gradientLayer = CAGradientLayer()
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        gradientLayer.frame = bounds
+        gradientLayer.cornerRadius = layer.cornerRadius
+    }
+    func setupGradient(colors: [UIColor]) {
+        gradientLayer.colors = colors.map { $0.cgColor }
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 1)
+        gradientLayer.cornerRadius = layer.cornerRadius
+        if gradientLayer.superlayer == nil {
+            layer.insertSublayer(gradientLayer, at: 0)
+        }
+    }
+}
+
 // MARK: - JobsViewController
 final class JobsViewController: UIViewController, UIScrollViewDelegate {
     
@@ -31,7 +50,7 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
     // Search Bar
     private let searchBar: UISearchBar = {
         let sb = UISearchBar()
-        sb.placeholder = "Search jobs"
+        sb.placeholder = "Search castings"
         sb.searchBarStyle = .minimal
         sb.backgroundImage = UIImage()
         return sb
@@ -40,7 +59,7 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
     // Title bar
     private let titleLabel: UILabel = {
         let l = UILabel()
-        l.text = "Explore Jobs"
+        l.text = "Explore Castings"
         l.font = .systemFont(ofSize: 28, weight: .bold)
         l.textColor = CineMystTheme.ink
         return l
@@ -249,31 +268,42 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
     private func setupSearchBar() {
         contentView.addSubview(searchBarContainer)
         searchBarContainer.translatesAutoresizingMaskIntoConstraints = false
-        searchBarContainer.backgroundColor = UIColor.white.withAlphaComponent(0.38)
-        searchBarContainer.layer.cornerRadius = 18
-        searchBarContainer.layer.borderWidth = 1
-        searchBarContainer.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.15).cgColor
-        makeShadow(on: searchBarContainer, radius: 18, yOffset: 8, opacity: 0.08)
         
         searchBarContainer.addSubview(searchBar)
         searchBar.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            searchBarContainer.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 16),
+            searchBarContainer.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 18),
             searchBarContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             searchBarContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            searchBarContainer.heightAnchor.constraint(equalToConstant: 52),
+            searchBarContainer.heightAnchor.constraint(equalToConstant: 58),
             
-            searchBar.topAnchor.constraint(equalTo: searchBarContainer.topAnchor),
+            searchBar.centerYAnchor.constraint(equalTo: searchBarContainer.centerYAnchor),
             searchBar.leadingAnchor.constraint(equalTo: searchBarContainer.leadingAnchor),
             searchBar.trailingAnchor.constraint(equalTo: searchBarContainer.trailingAnchor),
-            searchBar.bottomAnchor.constraint(equalTo: searchBarContainer.bottomAnchor)
         ])
 
         let textField = searchBar.searchTextField
-        textField.backgroundColor = .clear
+        textField.backgroundColor = UIColor.white.withAlphaComponent(0.84)
+        textField.layer.cornerRadius = 24
+        textField.layer.masksToBounds = true
+        textField.layer.borderWidth = 1.2
+        textField.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.2).cgColor
+        
+        // Add shadow and border to the container since textField masksToBounds is often needed for radius
+        searchBarContainer.backgroundColor = .clear
+        searchBarContainer.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.12).cgColor
+        searchBarContainer.layer.shadowOpacity = 1
+        searchBarContainer.layer.shadowRadius = 18
+        searchBarContainer.layer.shadowOffset = CGSize(width: 0, height: 8)
+        
         textField.textColor = CineMystTheme.ink
         textField.tintColor = CineMystTheme.brandPlum
+        
+        // Fix magnification icon color
+        if let iconView = textField.leftView as? UIImageView {
+            iconView.tintColor = CineMystTheme.brandPlum.withAlphaComponent(0.5)
+        }
     }
     
     private func setupPostButtons() {
@@ -287,21 +317,39 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
             postButtonsStack.heightAnchor.constraint(equalToConstant: 44)
         ])
         
-        let titles = ["Post Job", "My Jobs", "Posted"]
+        let titles = ["Add a role", "Applied", "Posted"]
         for t in titles {
-            let btn = UIButton(type: .system)
+            let btn: UIButton
+            if t == "Add a role" {
+                let gBtn = CineMystGradientButton(type: .system)
+                gBtn.setupGradient(colors: [
+                    UIColor(red: 0x43/255, green: 0x16/255, blue: 0x31/255, alpha: 1),
+                    UIColor(red: 0x6B/255, green: 0x20/255, blue: 0x50/255, alpha: 1)
+                ])
+                btn = gBtn
+                btn.setTitleColor(.white, for: .normal)
+                btn.layer.borderWidth = 0
+            } else {
+                btn = UIButton(type: .system)
+                btn.backgroundColor = .white
+                btn.setTitleColor(CineMystTheme.brandPlum, for: .normal)
+                btn.layer.borderWidth = 1.6
+                btn.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.12).cgColor
+            }
+            
             btn.setTitle(t, for: .normal)
-            btn.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .medium)
-            btn.setTitleColor(CineMystTheme.brandPlum, for: .normal)
-            btn.layer.cornerRadius = 14
-            btn.backgroundColor = UIColor.white.withAlphaComponent(0.54)
-            btn.layer.borderWidth = 1
-            btn.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.12).cgColor
-            makeShadow(on: btn, radius: 16, yOffset: 8, opacity: 0.08)
+            btn.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .bold)
+            btn.layer.cornerRadius = 18
+            
+            // Aesthetic Shadow
+            btn.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.14).cgColor
+            btn.layer.shadowOpacity = 1
+            btn.layer.shadowRadius = 16
+            btn.layer.shadowOffset = CGSize(width: 0, height: 10)
             
             switch t {
-            case "Post Job": btn.addTarget(self, action: #selector(postJobTapped), for: .touchUpInside)
-            case "My Jobs": btn.addTarget(self, action: #selector(myJobsTapped), for: .touchUpInside)
+            case "Add a role": btn.addTarget(self, action: #selector(postJobTapped), for: .touchUpInside)
+            case "Applied": btn.addTarget(self, action: #selector(myJobsTapped), for: .touchUpInside)
             case "Posted": btn.addTarget(self, action: #selector(didTapPosted), for: .touchUpInside)
             default: break
             }
@@ -430,6 +478,18 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
                     card.updateBookmark(isBookmarked: isBookmarked)
                     
                     self.jobListStack.addArrangedSubview(card)
+                    
+                    // Initial state for animation
+                    card.alpha = 0
+                    card.transform = CGAffineTransform(translationX: 0, y: 30)
+                }
+                
+                // Staggered entrance animation
+                for (index, card) in self.jobListStack.arrangedSubviews.enumerated() {
+                    UIView.animate(withDuration: 0.6, delay: Double(index) * 0.1, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5, options: .curveEaseOut) {
+                        card.alpha = 1
+                        card.transform = .identity
+                    }
                 }
             }
         } catch {

@@ -78,7 +78,7 @@ class PostJobViewController: UIViewController {
     }
 
     private func setupNavBar() {
-        title = "Post a job"
+        title = "Add a role"
         navigationController?.navigationBar.tintColor = CineMystTheme.brandPlum
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             image: UIImage(systemName: "chevron.left"),
@@ -281,10 +281,10 @@ class PostJobViewController: UIViewController {
 
     private func updateStatusUI() {
         if currentStatus == "verified" {
-            statusLabelView.text = "Verified Account ✅"
+            statusLabelView.text = "Verified Account"
             statusLabelView.textColor = .systemGreen
         } else {
-            statusLabelView.text = "Verification Pending ⏳"
+            statusLabelView.text = "Verification Pending"
             statusLabelView.textColor = .systemOrange
         }
     }

@@ -55,10 +55,25 @@ class JobCardView: UIView {
         
         if hasTask {
             applyButton.setTitle("Go to Task", for: .normal)
-            applyButton.backgroundColor = CineMystTheme.accent
+            applyButton.backgroundColor = .white
+            applyButton.setTitleColor(CineMystTheme.brandPlum, for: .normal)
+            applyButton.layer.borderWidth = 1.6
+            applyButton.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.24).cgColor
+            
+            // Aesthetic Shadow
+            applyButton.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.18).cgColor
+            applyButton.layer.shadowOpacity = 1
+            applyButton.layer.shadowRadius = 14
+            applyButton.layer.shadowOffset = CGSize(width: 0, height: 6)
         } else {
             applyButton.setTitle("Apply Now", for: .normal)
             applyButton.backgroundColor = CineMystTheme.brandPlum
+            applyButton.setTitleColor(.white, for: .normal)
+            applyButton.layer.borderWidth = 0
+            applyButton.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.34).cgColor
+            applyButton.layer.shadowOpacity = 0.3
+            applyButton.layer.shadowRadius = 10
+            applyButton.layer.shadowOffset = CGSize(width: 0, height: 6)
         }
     }
 
