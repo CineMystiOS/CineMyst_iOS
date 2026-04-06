@@ -65,8 +65,8 @@ final class MentorCell: UICollectionViewCell {
         let l = UILabel()
         l.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
         l.textColor = MentorshipUI.brandPlum
-        l.numberOfLines = 2
-        l.lineBreakMode = .byWordWrapping
+        l.numberOfLines = 1
+        l.lineBreakMode = .byTruncatingTail
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
@@ -75,8 +75,8 @@ final class MentorCell: UICollectionViewCell {
         let l = UILabel()
         l.font = UIFont.systemFont(ofSize: 12, weight: .medium)
         l.textColor = MentorshipUI.mutedText
-        l.numberOfLines = 2
-        l.lineBreakMode = .byWordWrapping
+        l.numberOfLines = 1
+        l.lineBreakMode = .byTruncatingTail
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
@@ -109,15 +109,6 @@ final class MentorCell: UICollectionViewCell {
         return s
     }()
 
-    private lazy var textStack: UIStackView = {
-        let stack = UIStackView(arrangedSubviews: [nameLabel, rolePriceRow])
-        stack.axis = .vertical
-        stack.spacing = 5
-        stack.alignment = .leading
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        return stack
-    }()
-
     override init(frame: CGRect) {
         super.init(frame: frame)
         contentView.backgroundColor = .clear
@@ -125,7 +116,8 @@ final class MentorCell: UICollectionViewCell {
 
         cardView.addSubview(imageContainerView)
         imageContainerView.addSubview(photoView)
-        cardView.addSubview(textStack)
+        cardView.addSubview(nameLabel)
+        cardView.addSubview(rolePriceRow)
         priceChipView.addSubview(priceLabel)
 
         nameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -158,10 +150,16 @@ final class MentorCell: UICollectionViewCell {
             photoView.trailingAnchor.constraint(equalTo: imageContainerView.trailingAnchor),
             photoView.bottomAnchor.constraint(equalTo: imageContainerView.bottomAnchor),
 
-            textStack.topAnchor.constraint(equalTo: imageContainerView.bottomAnchor, constant: 10),
-            textStack.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 11),
-            textStack.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -11),
-            textStack.bottomAnchor.constraint(lessThanOrEqualTo: cardView.bottomAnchor, constant: -10),
+            nameLabel.topAnchor.constraint(equalTo: imageContainerView.bottomAnchor, constant: 10),
+            nameLabel.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 11),
+            nameLabel.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -11),
+            nameLabel.heightAnchor.constraint(equalToConstant: 18),
+
+            rolePriceRow.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 11),
+            rolePriceRow.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -11),
+            rolePriceRow.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -11),
+            rolePriceRow.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 6),
+            rolePriceRow.heightAnchor.constraint(equalToConstant: 24),
 
             priceLabel.topAnchor.constraint(equalTo: priceChipView.topAnchor, constant: 5),
             priceLabel.leadingAnchor.constraint(equalTo: priceChipView.leadingAnchor, constant: 8),
