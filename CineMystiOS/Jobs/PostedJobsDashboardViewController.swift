@@ -18,7 +18,7 @@ class PostedJobsDashboardViewController: UIViewController {
 
     private let titleLabel: UILabel = {
         let lbl = UILabel()
-        lbl.text = "My Jobs and Tasks"
+        lbl.text = "Posted Castings"
         lbl.font = .systemFont(ofSize: 26, weight: .bold)
         lbl.textColor = CineMystTheme.ink
         return lbl
@@ -26,7 +26,7 @@ class PostedJobsDashboardViewController: UIViewController {
 
     private lazy var postJobButton: UIButton = {
         let btn = UIButton(type: .system)
-        btn.setTitle("Post job", for: .normal)
+        btn.setTitle("Add a role", for: .normal)
         btn.setTitleColor(.white, for: .normal)
         btn.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
         btn.layer.cornerRadius = 16
@@ -43,7 +43,7 @@ class PostedJobsDashboardViewController: UIViewController {
     }()
 
     private let segmentedControl: UISegmentedControl = {
-        let sc = UISegmentedControl(items: ["Active Jobs", "Pending", "Completed"])
+        let sc = UISegmentedControl(items: ["Active", "Pending", "Completed"])
         sc.selectedSegmentIndex = 0
         sc.backgroundColor = UIColor.white.withAlphaComponent(0.5)
         sc.selectedSegmentTintColor = CineMystTheme.brandPlum
