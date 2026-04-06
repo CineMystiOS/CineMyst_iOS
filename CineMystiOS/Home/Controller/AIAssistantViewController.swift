@@ -284,17 +284,32 @@ final class AIAssistantViewController: UIViewController, UITableViewDataSource, 
             guard let self else { return }
             do {
                 let userId = try await self.resolveCurrentUserId()
-                try await self.chatService.streamMessage(
-                    userId: userId,
-                    conversationId: self.conversationId,
-                    message: text
-                ) { [weak self] delta in
-                    guard let self else { return }
-                    guard !delta.isEmpty else { return }
-                    if let lastIndex = self.messages.indices.last {
-                        self.messages[lastIndex].text += delta
+                do {
+                    try await self.chatService.streamMessage(
+                        userId: userId,
+                        conversationId: self.conversationId,
+                        message: text
+                    ) { [weak self] delta in
+                        guard let self else { return }
+                        guard !delta.isEmpty else { return }
+                        if let lastIndex = self.messages.indices.last {
+                            self.messages[lastIndex].text += delta
+                        }
+                        self.reloadMessages(animated: false)
                     }
-                    self.reloadMessages(animated: false)
+                } catch {
+                    let fallbackReply = try await self.chatService.sendMessage(
+                        userId: userId,
+                        conversationId: self.conversationId,
+                        message: text
+                    )
+                    await MainActor.run {
+                        if let lastIndex = self.messages.indices.last, self.messages[lastIndex].isUser == false {
+                            self.messages[lastIndex].text = fallbackReply
+                        } else {
+                            self.messages.append((fallbackReply, false))
+                        }
+                    }
                 }
                 await MainActor.run {
                     self.isSending = false
@@ -395,8 +410,11 @@ final class AIAssistantViewController: UIViewController, UITableViewDataSource, 
     }
 
     private func userFacingMessage(for error: Error) -> String {
-        let message = (error as NSError).localizedDescription
-        return "I couldn't reach the CineMyst AI backend right now. Please try again in a moment.\n\nDetails: \(message)"
+        let message = (error as NSError).localizedDescription.lowercased()
+        if message.contains("syncqueryrequestbuilder") || message.contains("attribute 'select'") {
+            return "CineMyst AI is temporarily unavailable while the assistant service is updating. Please try again in a little while."
+        }
+        return "I couldn't reach the CineMyst AI backend right now. Please try again in a moment."
     }
 
     private func makeChip(title: String) -> UIView {
