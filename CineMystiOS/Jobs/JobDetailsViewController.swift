@@ -87,8 +87,8 @@ class JobDetailsViewController: UIViewController {
     private func updateCTAButton() {
         if associatedTask != nil {
             applyButton.setTitle("Go to Task", for: .normal)
-            applyButton.backgroundColor = CineMystTheme.accent
-            applyButton.layer.shadowColor = CineMystTheme.accent.withAlphaComponent(0.4).cgColor
+            applyButton.backgroundColor = CineMystTheme.brandPlum
+            applyButton.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.34).cgColor
         } else {
             applyButton.setTitle("Apply Now", for: .normal)
             applyButton.backgroundColor = CineMystTheme.brandPlum
