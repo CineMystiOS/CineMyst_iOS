@@ -8,7 +8,7 @@ struct ApplicationCard {
     let name: String
     let location: String
     let timeAgo: String
-    let profileImage: String
+    let profileImageURL: String?   // Real URL from Supabase
     var isConnected: Bool
     var hasSubmittedTask: Bool
     var isShortlisted: Bool
@@ -695,23 +695,24 @@ class ApplicationsViewController: UIViewController {
                     }
                 }
                 
-                // Fetch user profiles
-                var userProfiles: [UUID: String] = [:]
+                // Fetch user profiles with name + avatar
+                var userNames: [UUID: String] = [:]
+                var userAvatars: [UUID: String] = [:]
                 for app in dbApplications {
-                    if let name = try? await self.fetchUserName(userId: app.actorId) {
-                        userProfiles[app.actorId] = name
-                    }
+                    let result = await self.fetchUserNameAndAvatar(userId: app.actorId)
+                    userNames[app.actorId] = result.name
+                    userAvatars[app.actorId] = result.avatarURL
                 }
                 
-                // Convert to ApplicationCard with real names
+                // Convert to ApplicationCard with real names and photos
                 self.applications = dbApplications.map { app in
                     ApplicationCard(
                         id: app.id.uuidString,
                         actorId: app.actorId,
-                        name: userProfiles[app.actorId] ?? "User \(app.actorId.uuidString.prefix(8))",
+                        name: userNames[app.actorId] ?? "User \(app.actorId.uuidString.prefix(8))",
                         location: "India",
                         timeAgo: self.timeAgoString(from: app.appliedAt),
-                        profileImage: "avatar_placeholder",
+                        profileImageURL: userAvatars[app.actorId],
                         isConnected: false,
                         hasSubmittedTask: app.status == .taskSubmitted || app.status == .selected || app.status == .shortlisted,
                         isShortlisted: app.status == .shortlisted || app.status == .selected
@@ -733,32 +734,34 @@ class ApplicationsViewController: UIViewController {
         }
     }
     
-    private func fetchUserName(userId: UUID) async throws -> String {
+    private func fetchUserNameAndAvatar(userId: UUID) async -> (name: String, avatarURL: String?) {
         struct UserProfile: Codable {
             let fullName: String?
             let username: String?
-            
+            let avatarUrl: String?
+            let profilePictureUrl: String?
             enum CodingKeys: String, CodingKey {
                 case fullName = "full_name"
                 case username
+                case avatarUrl = "avatar_url"
+                case profilePictureUrl = "profile_picture_url"
             }
         }
-        
         do {
             let profile: UserProfile = try await supabase
                 .from("profiles")
-                .select()
+                .select("full_name, username, avatar_url, profile_picture_url")
                 .eq("id", value: userId.uuidString)
                 .single()
                 .execute()
                 .value
-            
             let name = profile.fullName ?? profile.username ?? "User \(userId.uuidString.prefix(8))"
-            print("✅ Fetched user \(userId.uuidString.prefix(8)): \(name)")
-            return name
+            let avatar = profile.avatarUrl ?? profile.profilePictureUrl
+            print("✅ Profile \(userId.uuidString.prefix(8)): \(name), avatar=\(avatar ?? "nil")")
+            return (name, avatar)
         } catch {
             print("⚠️ Could not fetch profile for \(userId.uuidString.prefix(8)): \(error)")
-            return "User \(userId.uuidString.prefix(8))"
+            return ("User \(userId.uuidString.prefix(8))", nil)
         }
     }
     
@@ -1190,47 +1193,10 @@ class ApplicationsViewController: UIViewController {
     
     private func navigateToPortfolio(actorId: UUID) {
         print("🎭 Navigating to portfolio for actor: \(actorId.uuidString)")
-        
-        // Fetch actor's portfolio and navigate
-        Task {
-            do {
-                struct ActorPortfolio: Codable {
-                    let id: String
-                    let userId: String
-                    
-                    enum CodingKeys: String, CodingKey {
-                        case id
-                        case userId = "user_id"
-                    }
-                }
-                
-                let portfolio: ActorPortfolio = try await supabase
-                    .from("portfolios") 
-                    .select("id, user_id")
-                    .eq("user_id", value: actorId.uuidString)
-                    .single()
-                    .execute()
-                    .value
-                
-                await MainActor.run {
-                    let portfolioVC = PortfolioViewController()
-                    portfolioVC.isOwnProfile = false
-                    portfolioVC.portfolioId = portfolio.id
-                    self.navigationController?.pushViewController(portfolioVC, animated: true)
-                }
-            } catch {
-                print("❌ Error loading portfolio: \(error)")
-                await MainActor.run {
-                    let alert = UIAlertController(
-                        title: "Portfolio Not Found",
-                        message: "This user hasn't created a portfolio yet.",
-                        preferredStyle: .alert
-                    )
-                    alert.addAction(UIAlertAction(title: "OK", style: .default))
-                    self.present(alert, animated: true)
-                }
-            }
-        }
+        let portfolioVC = PortfolioViewController()
+        portfolioVC.isOwnProfile = false
+        portfolioVC.targetUserId = actorId.uuidString
+        navigationController?.pushViewController(portfolioVC, animated: true)
     }
     
     private func viewSubmittedTask(applicationId: String) {
@@ -1552,12 +1518,17 @@ class ApplicationCell: UITableViewCell {
         let iv = UIImageView()
         iv.contentMode = .scaleAspectFill
         iv.clipsToBounds = true
-        iv.layer.cornerRadius = 32
-        iv.layer.borderWidth = 3
-        iv.layer.borderColor = UIColor(red: 0.95, green: 0.95, blue: 0.97, alpha: 1.0).cgColor
+        iv.layer.cornerRadius = 28
+        iv.layer.borderWidth = 2
+        iv.layer.borderColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.2).cgColor
+        iv.backgroundColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.07)
         iv.translatesAutoresizingMaskIntoConstraints = false
+        let config = UIImage.SymbolConfiguration(pointSize: 22, weight: .light)
+        iv.image = UIImage(systemName: "person.fill", withConfiguration: config)
+        iv.tintColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.35)
         return iv
     }()
+    
     
     private let nameLabel: UILabel = {
         let lbl = UILabel()
@@ -1569,9 +1540,12 @@ class ApplicationCell: UITableViewCell {
     
     private let portfolioLabel: UILabel = {
         let lbl = UILabel()
-        lbl.text = "View Portfolio"
-        lbl.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        lbl.text = "  View Portfolio →  "
+        lbl.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
         lbl.textColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1.0)
+        lbl.backgroundColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.09)
+        lbl.layer.cornerRadius = 8
+        lbl.clipsToBounds = true
         lbl.isUserInteractionEnabled = true
         lbl.translatesAutoresizingMaskIntoConstraints = false
         return lbl
@@ -1737,74 +1711,76 @@ class ApplicationCell: UITableViewCell {
         
         
         NSLayoutConstraint.activate([
-            // Card container constraints
+            // Card container
             cardContainerView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
             cardContainerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             cardContainerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             cardContainerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
-            
-            // Profile image - larger and more prominent
+
+            // Profile image — centered vertically in card
             profileImageView.leadingAnchor.constraint(equalTo: cardContainerView.leadingAnchor, constant: 16),
             profileImageView.centerYAnchor.constraint(equalTo: cardContainerView.centerYAnchor),
-            profileImageView.widthAnchor.constraint(equalToConstant: 64),
-            profileImageView.heightAnchor.constraint(equalToConstant: 64),
-            
-            nameLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 14),
-            nameLabel.leadingAnchor.constraint(equalTo: profileImageView.trailingAnchor, constant: 10),
-            
-            portfolioLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 2),
+            profileImageView.widthAnchor.constraint(equalToConstant: 56),
+            profileImageView.heightAnchor.constraint(equalToConstant: 56),
+
+            // Name — anchored to card top, not contentView
+            nameLabel.topAnchor.constraint(equalTo: cardContainerView.topAnchor, constant: 18),
+            nameLabel.leadingAnchor.constraint(equalTo: profileImageView.trailingAnchor, constant: 12),
+            nameLabel.trailingAnchor.constraint(equalTo: shortlistButton.leadingAnchor, constant: -10),
+
+            // Portfolio badge — just below name
+            portfolioLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 4),
             portfolioLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
-            
+
+            // Location row — below portfolio badge
             locationIcon.topAnchor.constraint(equalTo: portfolioLabel.bottomAnchor, constant: 6),
             locationIcon.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
             locationIcon.widthAnchor.constraint(equalToConstant: 12),
             locationIcon.heightAnchor.constraint(equalToConstant: 12),
-            
+
             locationLabel.centerYAnchor.constraint(equalTo: locationIcon.centerYAnchor),
             locationLabel.leadingAnchor.constraint(equalTo: locationIcon.trailingAnchor, constant: 4),
-            
+
             timeIcon.centerYAnchor.constraint(equalTo: locationIcon.centerYAnchor),
             timeIcon.leadingAnchor.constraint(equalTo: locationLabel.trailingAnchor, constant: 10),
             timeIcon.widthAnchor.constraint(equalToConstant: 12),
             timeIcon.heightAnchor.constraint(equalToConstant: 12),
-            
+
             timeLabel.centerYAnchor.constraint(equalTo: timeIcon.centerYAnchor),
             timeLabel.leadingAnchor.constraint(equalTo: timeIcon.trailingAnchor, constant: 4),
-            
-            
-            // Connected badge
-            connectedBadge.topAnchor.constraint(equalTo: locationIcon.bottomAnchor, constant: 8),
-            connectedBadge.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
-            connectedBadge.heightAnchor.constraint(equalToConstant: 24),
-            
-            connectedLabel.centerYAnchor.constraint(equalTo: connectedBadge.centerYAnchor),
-            connectedLabel.leadingAnchor.constraint(equalTo: connectedBadge.leadingAnchor, constant: 10),
-            connectedLabel.trailingAnchor.constraint(equalTo: connectedBadge.trailingAnchor, constant: -10),
-            
-            
-            // Task badge
-            taskBadge.topAnchor.constraint(equalTo: locationIcon.bottomAnchor, constant: 8),
-            taskBadge.heightAnchor.constraint(equalToConstant: 24),
-            
-            taskLabel.centerYAnchor.constraint(equalTo: taskBadge.centerYAnchor),
-            taskLabel.leadingAnchor.constraint(equalTo: taskBadge.leadingAnchor, constant: 10),
-            taskLabel.trailingAnchor.constraint(equalTo: taskBadge.trailingAnchor, constant: -10),
 
+            // Connected badge — below location row
+            connectedBadge.topAnchor.constraint(equalTo: locationIcon.bottomAnchor, constant: 6),
+            connectedBadge.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
+            connectedBadge.heightAnchor.constraint(equalToConstant: 22),
+            connectedBadge.bottomAnchor.constraint(lessThanOrEqualTo: cardContainerView.bottomAnchor, constant: -12),
+
+            connectedLabel.centerYAnchor.constraint(equalTo: connectedBadge.centerYAnchor),
+            connectedLabel.leadingAnchor.constraint(equalTo: connectedBadge.leadingAnchor, constant: 8),
+            connectedLabel.trailingAnchor.constraint(equalTo: connectedBadge.trailingAnchor, constant: -8),
+
+            // Task badge (hidden, but keep constraints valid)
+            taskBadge.topAnchor.constraint(equalTo: locationIcon.bottomAnchor, constant: 6),
+            taskBadge.heightAnchor.constraint(equalToConstant: 22),
+            taskLabel.centerYAnchor.constraint(equalTo: taskBadge.centerYAnchor),
+            taskLabel.leadingAnchor.constraint(equalTo: taskBadge.leadingAnchor, constant: 8),
+            taskLabel.trailingAnchor.constraint(equalTo: taskBadge.trailingAnchor, constant: -8),
+
+            // AI score button
             scoreButton.topAnchor.constraint(equalTo: cardContainerView.topAnchor, constant: 14),
-            scoreButton.trailingAnchor.constraint(equalTo: shortlistButton.leadingAnchor, constant: -10),
-            scoreButton.heightAnchor.constraint(equalToConstant: 28),
-            
-            
-            // Shortlist Button - modern floating style
+            scoreButton.trailingAnchor.constraint(equalTo: shortlistButton.leadingAnchor, constant: -8),
+            scoreButton.heightAnchor.constraint(equalToConstant: 26),
+
+            // Shortlist button — centered vertically in card
             shortlistButton.centerYAnchor.constraint(equalTo: cardContainerView.centerYAnchor),
             shortlistButton.trailingAnchor.constraint(equalTo: cardContainerView.trailingAnchor, constant: -16),
-            shortlistButton.widthAnchor.constraint(equalToConstant: 48),
-            shortlistButton.heightAnchor.constraint(equalToConstant: 48),
-            
+            shortlistButton.widthAnchor.constraint(equalToConstant: 44),
+            shortlistButton.heightAnchor.constraint(equalToConstant: 44),
+
             checkmarkIcon.centerXAnchor.constraint(equalTo: shortlistButton.centerXAnchor),
             checkmarkIcon.centerYAnchor.constraint(equalTo: shortlistButton.centerYAnchor),
             checkmarkIcon.widthAnchor.constraint(equalToConstant: 16),
-            checkmarkIcon.heightAnchor.constraint(equalToConstant: 16)
+            checkmarkIcon.heightAnchor.constraint(equalToConstant: 16),
         ])
         
         
@@ -1825,14 +1801,27 @@ class ApplicationCell: UITableViewCell {
         nameLabel.text = application.name
         locationLabel.text = application.location
         timeLabel.text = application.timeAgo
-        profileImageView.image = UIImage(named: application.profileImage)
         
+        // Reset to placeholder then async-load real photo
+        let placeholderConfig = UIImage.SymbolConfiguration(pointSize: 22, weight: .light)
+        profileImageView.image = UIImage(systemName: "person.fill", withConfiguration: placeholderConfig)
+        profileImageView.tintColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.35)
+        
+        if let urlStr = application.profileImageURL, !urlStr.isEmpty {
+            Task {
+                let img = await ImageLoader.shared.image(from: urlStr)
+                await MainActor.run {
+                    self.profileImageView.image = img
+                    self.profileImageView.tintColor = nil
+                }
+            }
+        }
         
         // Connected badge visibility
         connectedBadge.isHidden = !application.isConnected
         
         // Task badge visibility
-        taskBadge.isHidden = !application.hasSubmittedTask
+        taskBadge.isHidden = true // Task submitted status not shown
         
         if application.isConnected {
             taskLeadingWithoutConnected.isActive = false
@@ -1857,9 +1846,9 @@ class ApplicationCell: UITableViewCell {
             shortlistButton.layer.shadowOpacity = 0
             checkmarkIcon.tintColor = .white
         } else {
-            shortlistButton.backgroundColor = .white
-            shortlistButton.layer.shadowOpacity = 0.25
-            checkmarkIcon.tintColor = UIColor(red: 0.5, green: 0.2, blue: 0.8, alpha: 1.0)
+            shortlistButton.backgroundColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.07)
+            shortlistButton.layer.shadowOpacity = 0
+            checkmarkIcon.tintColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.5)
         }
     }
     

@@ -12,7 +12,7 @@ class JobsService {
         let response: [Job] = try await supabase
             .from("jobs")
             .select()
-            .eq("status", value: "active")
+            .in("status", values: ["active", "pending"])
             .order("created_at", ascending: false)
             .execute()
             .value

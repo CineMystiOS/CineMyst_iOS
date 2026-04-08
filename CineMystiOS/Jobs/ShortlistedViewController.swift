@@ -9,41 +9,51 @@ import Supabase
 struct ShortlistedCandidate {
     let actorId: UUID
     let name: String
-    let experience: String
     let location: String
     let daysAgo: String
     let isConnected: Bool
-    let isTaskSubmitted: Bool
-    let profileImage: UIImage?
+    let profileImageURL: String?
 }
-
 
 // MARK: - Custom Cell
 final class ShortlistedCell: UITableViewCell {
 
     static let id = "ShortlistedCell"
+    private let plum = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1)
+
+    // MARK: - Subviews
+    private let cardView: UIView = {
+        let v = UIView()
+        v.backgroundColor = .white
+        v.layer.cornerRadius = 18
+        v.layer.shadowColor = UIColor.black.cgColor
+        v.layer.shadowOpacity = 0.07
+        v.layer.shadowRadius = 10
+        v.layer.shadowOffset = CGSize(width: 0, height: 3)
+        v.layer.masksToBounds = false
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
 
     private let profileImageView: UIImageView = {
         let iv = UIImageView()
-        iv.layer.cornerRadius = 28
+        iv.layer.cornerRadius = 26
         iv.clipsToBounds = true
         iv.contentMode = .scaleAspectFill
+        iv.backgroundColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.07)
+        iv.layer.borderWidth = 2
+        iv.layer.borderColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.15).cgColor
+        let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .light)
+        iv.image = UIImage(systemName: "person.fill", withConfiguration: config)
+        iv.tintColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.35)
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
 
     private let nameLabel: UILabel = {
         let lbl = UILabel()
-        lbl.font = UIFont.boldSystemFont(ofSize: 16)
+        lbl.font = UIFont.systemFont(ofSize: 16, weight: .bold)
         lbl.textColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1)
-        lbl.translatesAutoresizingMaskIntoConstraints = false
-        return lbl
-    }()
-
-    private let experienceLabel: UILabel = {
-        let lbl = UILabel()
-        lbl.font = UIFont.systemFont(ofSize: 14)
-        lbl.textColor = .darkGray
         lbl.translatesAutoresizingMaskIntoConstraints = false
         return lbl
     }()
@@ -51,7 +61,7 @@ final class ShortlistedCell: UITableViewCell {
     private let locationLabel: UILabel = {
         let lbl = UILabel()
         lbl.font = UIFont.systemFont(ofSize: 13)
-        lbl.textColor = .gray
+        lbl.textColor = .secondaryLabel
         lbl.translatesAutoresizingMaskIntoConstraints = false
         return lbl
     }()
@@ -59,64 +69,32 @@ final class ShortlistedCell: UITableViewCell {
     private let clockLabel: UILabel = {
         let lbl = UILabel()
         lbl.font = UIFont.systemFont(ofSize: 13)
-        lbl.textColor = .gray
+        lbl.textColor = .secondaryLabel
         lbl.translatesAutoresizingMaskIntoConstraints = false
         return lbl
     }()
 
     private let connectedTag: UILabel = {
         let lbl = UILabel()
-        lbl.text = "Connected"
-        lbl.textColor = UIColor(red: 160/255, green: 80/255, blue: 235/255, alpha: 1)
+        lbl.text = "  Connected  "
+        lbl.textColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1)
         lbl.font = .systemFont(ofSize: 11, weight: .semibold)
         lbl.textAlignment = .center
-        lbl.backgroundColor = UIColor(red: 245/255, green: 235/255, blue: 255/255, alpha: 1)
-        lbl.layer.cornerRadius = 10
+        lbl.backgroundColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.09)
+        lbl.layer.cornerRadius = 9
         lbl.clipsToBounds = true
+        lbl.isHidden = true
         lbl.translatesAutoresizingMaskIntoConstraints = false
         return lbl
     }()
 
-    private let taskSubmittedTag: UILabel = {
-        let lbl = UILabel()
-        lbl.text = "Task Submitted"
-        lbl.textColor = UIColor(red: 61/255, green: 160/255, blue: 80/255, alpha: 1)
-        lbl.font = .systemFont(ofSize: 11, weight: .semibold)
-        lbl.textAlignment = .center
-        lbl.backgroundColor = UIColor(red: 225/255, green: 255/255, blue: 230/255, alpha: 1)
-        lbl.layer.cornerRadius = 10
-        lbl.clipsToBounds = true
-        lbl.translatesAutoresizingMaskIntoConstraints = false
-        return lbl
-    }()
-
-    private let selectionCircle: UIView = {
-        let v = UIView()
-        v.layer.cornerRadius = 12
-        v.layer.borderWidth = 2
-        v.layer.borderColor = UIColor.lightGray.cgColor
-        v.translatesAutoresizingMaskIntoConstraints = false
-        return v
-    }()
-    
-    func setSelection(_ isSelected: Bool) {
-        innerCircle.isHidden = !isSelected
-        selectionCircle.layer.borderColor = isSelected ? UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1).cgColor : UIColor.lightGray.cgColor
-    }
-    
-    private let innerCircle: UIView = {
-        let v = UIView()
-        v.layer.cornerRadius = 7
-        v.backgroundColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1)
-        v.isHidden = true
-        v.translatesAutoresizingMaskIntoConstraints = false
-        return v
-    }()
-
-    private let chatButton: UIButton = {
+    private let messageButton: UIButton = {
         let btn = UIButton(type: .system)
-        btn.setImage(UIImage(systemName: "bubble.left.and.bubble.right"), for: .normal)
+        let config = UIImage.SymbolConfiguration(pointSize: 17, weight: .medium)
+        btn.setImage(UIImage(systemName: "message", withConfiguration: config), for: .normal)
         btn.tintColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1)
+        btn.backgroundColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.09)
+        btn.layer.cornerRadius = 20
         btn.translatesAutoresizingMaskIntoConstraints = false
         return btn
     }()
@@ -126,99 +104,112 @@ final class ShortlistedCell: UITableViewCell {
     // MARK: Init
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
+        selectionStyle = .none
+        backgroundColor = .clear
         setupUI()
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-
     // MARK: Configure
     func configure(with candidate: ShortlistedCandidate) {
-        profileImageView.image = candidate.profileImage
         nameLabel.text = candidate.name
-        experienceLabel.text = candidate.experience
         locationLabel.attributedText = iconText("mappin.and.ellipse", text: candidate.location)
         clockLabel.attributedText = iconText("clock", text: candidate.daysAgo)
-
         connectedTag.isHidden = !candidate.isConnected
-        taskSubmittedTag.isHidden = !candidate.isTaskSubmitted
-    }
-    
-    @objc private func chatButtonTapped() {
-        onChatTapped?()
+
+        // Reset to placeholder
+        let cfg = UIImage.SymbolConfiguration(pointSize: 20, weight: .light)
+        profileImageView.image = UIImage(systemName: "person.fill", withConfiguration: cfg)
+        profileImageView.tintColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.35)
+
+        if let urlStr = candidate.profileImageURL, !urlStr.isEmpty {
+            Task {
+                let img = await ImageLoader.shared.image(from: urlStr)
+                await MainActor.run {
+                    self.profileImageView.image = img
+                    self.profileImageView.tintColor = nil
+                }
+            }
+        }
     }
 
+    func setSelection(_ selected: Bool) {
+        cardView.layer.borderWidth = selected ? 2 : 0
+        cardView.layer.borderColor = selected
+            ? UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 0.6).cgColor
+            : UIColor.clear.cgColor
+    }
+
+    @objc private func chatTapped() { onChatTapped?() }
 
     // MARK: Tag + Icon builder
     private func iconText(_ icon: String, text: String) -> NSAttributedString {
         let attachment = NSTextAttachment()
-        attachment.image = UIImage(systemName: icon)
+        attachment.image = UIImage(systemName: icon)?
+            .withTintColor(.secondaryLabel, renderingMode: .alwaysOriginal)
         attachment.bounds = CGRect(x: 0, y: -2, width: 12, height: 12)
-
         let attr = NSMutableAttributedString(attachment: attachment)
-        attr.append(NSAttributedString(string: "  \(text)"))
+        attr.append(NSAttributedString(
+            string: "  \(text)",
+            attributes: [.foregroundColor: UIColor.secondaryLabel]
+        ))
         return attr
     }
 
-
     // MARK: Layout
     private func setupUI() {
-        contentView.addSubview(selectionCircle)
-        selectionCircle.addSubview(innerCircle)
-        contentView.addSubview(profileImageView)
-        contentView.addSubview(nameLabel)
-        contentView.addSubview(experienceLabel)
-        contentView.addSubview(locationLabel)
-        contentView.addSubview(clockLabel)
-        contentView.addSubview(connectedTag)
-        contentView.addSubview(taskSubmittedTag)
-        contentView.addSubview(chatButton)
-        
-        chatButton.addTarget(self, action: #selector(chatButtonTapped), for: .touchUpInside)
+        contentView.addSubview(cardView)
+        cardView.addSubview(profileImageView)
+        cardView.addSubview(nameLabel)
+        cardView.addSubview(locationLabel)
+        cardView.addSubview(clockLabel)
+        cardView.addSubview(connectedTag)
+        cardView.addSubview(messageButton)
+
+        messageButton.addTarget(self, action: #selector(chatTapped), for: .touchUpInside)
 
         NSLayoutConstraint.activate([
+            // Card
+            cardView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 6),
+            cardView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            cardView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            cardView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -6),
 
-            selectionCircle.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            selectionCircle.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            selectionCircle.widthAnchor.constraint(equalToConstant: 24),
-            selectionCircle.heightAnchor.constraint(equalToConstant: 24),
+            // Profile image
+            profileImageView.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 16),
+            profileImageView.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
+            profileImageView.widthAnchor.constraint(equalToConstant: 52),
+            profileImageView.heightAnchor.constraint(equalToConstant: 52),
 
-            innerCircle.centerXAnchor.constraint(equalTo: selectionCircle.centerXAnchor),
-            innerCircle.centerYAnchor.constraint(equalTo: selectionCircle.centerYAnchor),
-            innerCircle.widthAnchor.constraint(equalToConstant: 14),
-            innerCircle.heightAnchor.constraint(equalToConstant: 14),
+            // Message button
+            messageButton.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -16),
+            messageButton.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
+            messageButton.widthAnchor.constraint(equalToConstant: 40),
+            messageButton.heightAnchor.constraint(equalToConstant: 40),
 
-            profileImageView.leadingAnchor.constraint(equalTo: selectionCircle.trailingAnchor, constant: 12),
-            profileImageView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 14),
-            profileImageView.widthAnchor.constraint(equalToConstant: 56),
-            profileImageView.heightAnchor.constraint(equalToConstant: 56),
-
+            // Name — anchored to card top
+            nameLabel.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 16),
             nameLabel.leadingAnchor.constraint(equalTo: profileImageView.trailingAnchor, constant: 12),
-            nameLabel.topAnchor.constraint(equalTo: profileImageView.topAnchor),
+            nameLabel.trailingAnchor.constraint(equalTo: messageButton.leadingAnchor, constant: -8),
 
-            experienceLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
-            experienceLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 2),
-
+            // Location row
+            locationLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 5),
             locationLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
-            locationLabel.topAnchor.constraint(equalTo: experienceLabel.bottomAnchor, constant: 6),
 
-            clockLabel.leadingAnchor.constraint(equalTo: locationLabel.trailingAnchor, constant: 14),
+            // Clock — same row as location
             clockLabel.centerYAnchor.constraint(equalTo: locationLabel.centerYAnchor),
+            clockLabel.leadingAnchor.constraint(equalTo: locationLabel.trailingAnchor, constant: 12),
 
+            // Connected badge
+            connectedTag.topAnchor.constraint(equalTo: locationLabel.bottomAnchor, constant: 6),
             connectedTag.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
-            connectedTag.topAnchor.constraint(equalTo: locationLabel.bottomAnchor, constant: 10),
             connectedTag.heightAnchor.constraint(equalToConstant: 20),
-            connectedTag.widthAnchor.constraint(equalToConstant: 85),
-
-            taskSubmittedTag.leadingAnchor.constraint(equalTo: connectedTag.trailingAnchor, constant: 10),
-            taskSubmittedTag.centerYAnchor.constraint(equalTo: connectedTag.centerYAnchor),
-            taskSubmittedTag.heightAnchor.constraint(equalToConstant: 20),
-            taskSubmittedTag.widthAnchor.constraint(equalToConstant: 110),
-
-            chatButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            chatButton.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            contentView.bottomAnchor.constraint(equalTo: connectedTag.bottomAnchor, constant: 16)
+            connectedTag.bottomAnchor.constraint(lessThanOrEqualTo: cardView.bottomAnchor, constant: -14),
         ])
+
+        // Ensure card height is driven by content when connectedTag is hidden
+        locationLabel.bottomAnchor.constraint(lessThanOrEqualTo: cardView.bottomAnchor, constant: -16).isActive = true
     }
 }
 
@@ -358,7 +349,7 @@ final class ShortlistedViewController: UIViewController {
                 }
                 
                 // Fetch user profiles for all actors
-                var userProfiles: [UUID: (name: String, avatar: UIImage?)] = [:]
+                var userProfiles: [UUID: (name: String, avatarURL: String?)] = [:]
                 for app in shortlistedApps {
                     if let profile = try? await self.fetchUserProfile(userId: app.actorId) {
                         userProfiles[app.actorId] = profile
@@ -371,12 +362,10 @@ final class ShortlistedViewController: UIViewController {
                     return ShortlistedCandidate(
                         actorId: app.actorId,
                         name: userData?.name ?? "Applicant \(app.id.uuidString.prefix(8))",
-                        experience: "Task Submitted",
                         location: "India",
                         daysAgo: self.timeAgoString(from: app.appliedAt),
                         isConnected: false,
-                        isTaskSubmitted: app.status == .taskSubmitted || app.status == .shortlisted || app.status == .selected,
-                        profileImage: userData?.avatar ?? UIImage(named: "avatar_placeholder")
+                        profileImageURL: userData?.avatarURL
                     )
                 }
                 
@@ -394,38 +383,29 @@ final class ShortlistedViewController: UIViewController {
         }
     }
     
-    private func fetchUserProfile(userId: UUID) async throws -> (name: String, avatar: UIImage?) {
+    private func fetchUserProfile(userId: UUID) async throws -> (name: String, avatarURL: String?) {
         struct UserProfile: Codable {
             let fullName: String?
             let username: String?
             let avatarUrl: String?
-            
+            let profilePictureUrl: String?
             enum CodingKeys: String, CodingKey {
                 case fullName = "full_name"
                 case username
                 case avatarUrl = "avatar_url"
+                case profilePictureUrl = "profile_picture_url"
             }
         }
-        
         let profile: UserProfile = try await supabase
             .from("profiles")
-            .select()
+            .select("full_name, username, avatar_url, profile_picture_url")
             .eq("id", value: userId.uuidString)
             .single()
             .execute()
             .value
-        
         let name = profile.fullName ?? profile.username ?? "User \(userId.uuidString.prefix(8))"
-        
-        // Load avatar if URL exists
-        var avatar: UIImage?
-        if let avatarUrl = profile.avatarUrl, let url = URL(string: avatarUrl) {
-            if let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
-                avatar = image
-            }
-        }
-        
-        return (name, avatar)
+        let avatarURL = profile.avatarUrl ?? profile.profilePictureUrl
+        return (name, avatarURL)
     }
     
     private func timeAgoString(from date: Date) -> String {
@@ -527,19 +507,10 @@ final class ShortlistedViewController: UIViewController {
                     .eq("id", value: job.id.uuidString)
                     .execute()
                 
-                print("🏆 Hiring finalized for \(candidate.name)! Job \(job.id.uuidString.prefix(8)) is now COMPLETED.")
+                print("🏆 Hiring finalized for \(candidate.name)!")
                 
                 await MainActor.run {
-                    let success = UIAlertController(title: "Success", message: "\(candidate.name) has been hired! The job is now moved to Completed.", preferredStyle: .alert)
-                    success.addAction(UIAlertAction(title: "Awesome", style: .default) { [weak self] _ in
-                        guard let self = self, let nav = self.navigationController else { return }
-                        if let dashboard = nav.viewControllers.first(where: { $0 is PostedJobsDashboardViewController }) {
-                            nav.popToViewController(dashboard, animated: true)
-                        } else {
-                            nav.popViewController(animated: true)
-                        }
-                    })
-                    self.present(success, animated: true)
+                    self.showHiringCelebration(for: candidate)
                 }
             } catch {
                 print("❌ Hiring failed: \(error)")
@@ -549,6 +520,255 @@ final class ShortlistedViewController: UIViewController {
             }
         }
     }
+
+    // MARK: - Hiring Celebration
+
+    private func showHiringCelebration(for candidate: ShortlistedCandidate) {
+        let plum = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1)
+        let gold = UIColor(red: 255/255, green: 196/255, blue: 100/255, alpha: 1)
+
+        // Full-screen overlay
+        let overlay = UIView(frame: view.bounds)
+        overlay.backgroundColor = UIColor.black.withAlphaComponent(0)
+        overlay.alpha = 0
+        view.addSubview(overlay)
+
+        // Card
+        let card = UIView()
+        card.backgroundColor = .white
+        card.layer.cornerRadius = 28
+        card.layer.shadowColor = UIColor.black.cgColor
+        card.layer.shadowOpacity = 0.25
+        card.layer.shadowRadius = 30
+        card.layer.shadowOffset = CGSize(width: 0, height: 10)
+        card.translatesAutoresizingMaskIntoConstraints = false
+        card.transform = CGAffineTransform(scaleX: 0.6, y: 0.6)
+        card.alpha = 0
+        overlay.addSubview(card)
+
+        NSLayoutConstraint.activate([
+            card.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+            card.centerYAnchor.constraint(equalTo: overlay.centerYAnchor, constant: -20),
+            card.widthAnchor.constraint(equalTo: overlay.widthAnchor, multiplier: 0.82),
+        ])
+
+        // Gradient bar at top of card
+        let gradientBar = CAGradientLayer()
+        gradientBar.colors = [plum.cgColor, UIColor(red: 120/255, green: 40/255, blue: 90/255, alpha: 1).cgColor]
+        gradientBar.startPoint = CGPoint(x: 0, y: 0)
+        gradientBar.endPoint = CGPoint(x: 1, y: 1)
+        gradientBar.cornerRadius = 28
+        gradientBar.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+
+        let gradientBarView = UIView()
+        gradientBarView.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(gradientBarView)
+        NSLayoutConstraint.activate([
+            gradientBarView.topAnchor.constraint(equalTo: card.topAnchor),
+            gradientBarView.leadingAnchor.constraint(equalTo: card.leadingAnchor),
+            gradientBarView.trailingAnchor.constraint(equalTo: card.trailingAnchor),
+            gradientBarView.heightAnchor.constraint(equalToConstant: 110),
+        ])
+
+        // Animated checkmark circle
+        let checkCircle = UIView()
+        checkCircle.backgroundColor = .white
+        checkCircle.layer.cornerRadius = 36
+        checkCircle.layer.shadowColor = plum.cgColor
+        checkCircle.layer.shadowOpacity = 0.3
+        checkCircle.layer.shadowRadius = 10
+        checkCircle.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(checkCircle)
+        NSLayoutConstraint.activate([
+            checkCircle.centerXAnchor.constraint(equalTo: card.centerXAnchor),
+            checkCircle.topAnchor.constraint(equalTo: gradientBarView.bottomAnchor, constant: -36),
+            checkCircle.widthAnchor.constraint(equalToConstant: 72),
+            checkCircle.heightAnchor.constraint(equalToConstant: 72),
+        ])
+
+        // Checkmark shape
+        let checkLayer = CAShapeLayer()
+        checkLayer.strokeColor = plum.cgColor
+        checkLayer.fillColor = UIColor.clear.cgColor
+        checkLayer.lineWidth = 4
+        checkLayer.lineCap = .round
+        checkLayer.lineJoin = .round
+        checkLayer.strokeEnd = 0
+        let checkPath = UIBezierPath()
+        checkPath.move(to: CGPoint(x: 20, y: 36))
+        checkPath.addLine(to: CGPoint(x: 30, y: 48))
+        checkPath.addLine(to: CGPoint(x: 52, y: 24))
+        checkLayer.path = checkPath.cgPath
+        checkCircle.layer.addSublayer(checkLayer)
+
+        // "Congratulations!" label
+        let congLabel = UILabel()
+        congLabel.text = "It's a wrap! 🎬"
+        congLabel.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        congLabel.textColor = gold
+        congLabel.textAlignment = .center
+        congLabel.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(congLabel)
+
+        // Actor name label
+        let nameLabel = UILabel()
+        nameLabel.text = candidate.name
+        nameLabel.font = UIFont.systemFont(ofSize: 22, weight: .bold)
+        nameLabel.textColor = plum
+        nameLabel.textAlignment = .center
+        nameLabel.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(nameLabel)
+
+        // Sub label
+        let subLabel = UILabel()
+        subLabel.text = "has been officially hired\nfor this role."
+        subLabel.font = UIFont.systemFont(ofSize: 15)
+        subLabel.textColor = UIColor.secondaryLabel
+        subLabel.textAlignment = .center
+        subLabel.numberOfLines = 2
+        subLabel.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(subLabel)
+
+        // Divider
+        let divider = UIView()
+        divider.backgroundColor = UIColor(white: 0.92, alpha: 1)
+        divider.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(divider)
+
+        // Done button
+        let doneBtn = UIButton(type: .system)
+        doneBtn.setTitle("Done", for: .normal)
+        doneBtn.setTitleColor(.white, for: .normal)
+        doneBtn.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .bold)
+        doneBtn.backgroundColor = plum
+        doneBtn.layer.cornerRadius = 20
+        doneBtn.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(doneBtn)
+
+        NSLayoutConstraint.activate([
+            congLabel.centerXAnchor.constraint(equalTo: card.centerXAnchor),
+            congLabel.topAnchor.constraint(equalTo: checkCircle.bottomAnchor, constant: 14),
+
+            nameLabel.centerXAnchor.constraint(equalTo: card.centerXAnchor),
+            nameLabel.topAnchor.constraint(equalTo: congLabel.bottomAnchor, constant: 4),
+            nameLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
+            nameLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
+
+            subLabel.centerXAnchor.constraint(equalTo: card.centerXAnchor),
+            subLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 8),
+            subLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
+            subLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
+
+            divider.topAnchor.constraint(equalTo: subLabel.bottomAnchor, constant: 24),
+            divider.leadingAnchor.constraint(equalTo: card.leadingAnchor),
+            divider.trailingAnchor.constraint(equalTo: card.trailingAnchor),
+            divider.heightAnchor.constraint(equalToConstant: 1),
+
+            doneBtn.topAnchor.constraint(equalTo: divider.bottomAnchor, constant: 16),
+            doneBtn.centerXAnchor.constraint(equalTo: card.centerXAnchor),
+            doneBtn.widthAnchor.constraint(equalTo: card.widthAnchor, multiplier: 0.75),
+            doneBtn.heightAnchor.constraint(equalToConstant: 44),
+            doneBtn.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -20),
+        ])
+
+        // Apply gradient after layout
+        DispatchQueue.main.async {
+            gradientBar.frame = gradientBarView.bounds
+            gradientBarView.layer.insertSublayer(gradientBar, at: 0)
+        }
+
+        // Confetti emitter
+        let emitter = makeConfetti(in: overlay.bounds, plum: plum, gold: gold)
+        overlay.layer.addSublayer(emitter)
+
+        // Done action
+        let tapHandler = UIAction { [weak self, weak overlay] _ in
+            UIView.animate(withDuration: 0.3, animations: {
+                overlay?.alpha = 0
+            }, completion: { _ in
+                overlay?.removeFromSuperview()
+                emitter.removeFromSuperlayer()
+                guard let self = self, let nav = self.navigationController else { return }
+                if let dashboard = nav.viewControllers.first(where: { $0 is PostedJobsDashboardViewController }) {
+                    nav.popToViewController(dashboard, animated: true)
+                } else {
+                    nav.popViewController(animated: true)
+                }
+            })
+        }
+        doneBtn.addAction(tapHandler, for: .touchUpInside)
+
+        // Animate in: overlay fade + card spring
+        UIView.animate(withDuration: 0.25) {
+            overlay.backgroundColor = UIColor.black.withAlphaComponent(0.55)
+            overlay.alpha = 1
+        }
+        UIView.animate(
+            withDuration: 0.55,
+            delay: 0.1,
+            usingSpringWithDamping: 0.72,
+            initialSpringVelocity: 0.5
+        ) {
+            card.alpha = 1
+            card.transform = .identity
+        }
+
+        // Animate checkmark stroke after card appears
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            let strokeAnim = CABasicAnimation(keyPath: "strokeEnd")
+            strokeAnim.fromValue = 0
+            strokeAnim.toValue = 1
+            strokeAnim.duration = 0.4
+            strokeAnim.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            strokeAnim.fillMode = .forwards
+            strokeAnim.isRemovedOnCompletion = false
+            checkLayer.add(strokeAnim, forKey: "checkStroke")
+            checkLayer.strokeEnd = 1
+
+            // Pulse the circle
+            let pulse = CAKeyframeAnimation(keyPath: "transform.scale")
+            pulse.values = [1.0, 1.15, 0.95, 1.05, 1.0]
+            pulse.keyTimes = [0, 0.3, 0.6, 0.8, 1.0]
+            pulse.duration = 0.5
+            checkCircle.layer.add(pulse, forKey: "pulse")
+        }
+    }
+
+    private func makeConfetti(in rect: CGRect, plum: UIColor, gold: UIColor) -> CAEmitterLayer {
+        let emitter = CAEmitterLayer()
+        emitter.emitterPosition = CGPoint(x: rect.width / 2, y: -10)
+        emitter.emitterShape = .line
+        emitter.emitterSize = CGSize(width: rect.width, height: 1)
+
+        let colors: [UIColor] = [
+            plum, gold,
+            UIColor(red: 220/255, green: 120/255, blue: 180/255, alpha: 1),
+            UIColor(red: 255/255, green: 220/255, blue: 150/255, alpha: 1),
+            UIColor.white
+        ]
+
+        emitter.emitterCells = colors.map { color in
+            let cell = CAEmitterCell()
+            cell.birthRate = 7
+            cell.lifetime = 5.5
+            cell.lifetimeRange = 1.5
+            cell.velocity = 180
+            cell.velocityRange = 60
+            cell.emissionRange = .pi / 4
+            cell.emissionLongitude = .pi
+            cell.spin = 3.5
+            cell.spinRange = 2
+            cell.scale = 0.6
+            cell.scaleRange = 0.3
+            cell.yAcceleration = 120
+            cell.color = color.cgColor
+            cell.contents = UIImage.confettiRect(size: CGSize(width: 8, height: 5))?.cgImage
+            return cell
+        }
+
+        return emitter
+    }
+
 
     // MARK: - Messaging
     
@@ -609,5 +829,17 @@ extension ShortlistedViewController: UITableViewDataSource {
         }
         
         return cell
+    }
+}
+
+// MARK: - Confetti Image Helper
+private extension UIImage {
+    static func confettiRect(size: CGSize) -> UIImage? {
+        UIGraphicsBeginImageContextWithOptions(size, false, 0)
+        UIColor.white.setFill()
+        UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 1.5).fill()
+        let img = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        return img
     }
 }
