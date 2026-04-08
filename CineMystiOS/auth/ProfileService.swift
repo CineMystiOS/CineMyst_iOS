@@ -252,15 +252,22 @@ class ProfileService {
     func connectionState(requesterId: UUID, receiverId: UUID) async -> String {
         do {
             struct ConnRow: Codable { let status: String }
+            let mId = requesterId.uuidString
+            let oId = receiverId.uuidString
+            
+            // Fetch all possible rows between these two users
             let rows: [ConnRow] = try await supabase
                 .from("connections")
                 .select("status")
-                .or("and(requester_id.eq.\(requesterId.uuidString),receiver_id.eq.\(receiverId.uuidString)),and(requester_id.eq.\(receiverId.uuidString),receiver_id.eq.\(requesterId.uuidString))")
-                .limit(1)
+                .or("and(requester_id.eq.\(mId),receiver_id.eq.\(oId)),and(requester_id.eq.\(oId),receiver_id.eq.\(mId))")
                 .execute()
                 .value
-            if let row = rows.first {
-                return row.status == "accepted" ? "connected" : "pending"
+            
+            if rows.contains(where: { $0.status == "accepted" }) {
+                return "connected"
+            }
+            if !rows.isEmpty {
+                return "pending"
             }
             return "none"
         } catch {
@@ -378,7 +385,13 @@ struct PortfolioResponse: Codable {
     let body_type: String?
     let shoe_size: String?
     let languages: String?
+    let contact_no: String?
+    let education: String?
+    let marital_status: String?
+    let current_profession: String?
+    let hobbies: String?
     let previous_experience: String?
+    let work_interests: [String]?
     let movies: AnyCodable?
     let tvc: AnyCodable?
     let tv_serials: AnyCodable?

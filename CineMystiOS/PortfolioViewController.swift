@@ -71,6 +71,14 @@ class PortfolioViewController: UIViewController {
         setupSections()
         setupLoadingIndicator()
         fetchPortfolioData()
+        
+        NotificationCenter.default.addObserver(self, selector: #selector(portfolioUpdated), 
+                                               name: NSNotification.Name("portfolioCreated"), object: nil)
+    }
+    
+    @objc private func portfolioUpdated() {
+        print("🔄 Portfolio updated notification received, refreshing...")
+        fetchPortfolioData()
     }
 
     override func viewDidLayoutSubviews() {
@@ -526,6 +534,19 @@ class PortfolioViewController: UIViewController {
             contentStack.addArrangedSubview(makeSectionSpacer())
         }
 
+        // --- 2.1 PROFESSIONAL DETAILS (Education, Languages, etc.) ---
+        let hasProfInfo = p.education != nil || p.current_profession != nil || p.languages != nil || p.hobbies != nil
+        if hasProfInfo {
+            contentStack.addArrangedSubview(makeProfessionalInfoSection(p))
+            contentStack.addArrangedSubview(makeSectionSpacer())
+        }
+
+        // --- 2.2 WORK INTERESTS ---
+        if let interests = p.work_interests, !interests.isEmpty {
+            contentStack.addArrangedSubview(makeWorkInterestsSection(interests))
+            contentStack.addArrangedSubview(makeSectionSpacer())
+        }
+
         // --- 3. PROJECT HISTORY SECTIONS ---
         for i in 0..<sections.count {
             sections[i].items = items.filter { sections[i].types.contains($0.type) }
@@ -574,10 +595,28 @@ class PortfolioViewController: UIViewController {
 
     private func rebuildStatBar(items: [PortfolioItem]) {
         statStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        let filmCount  = items.filter { $0.type == .film || $0.type == .tvShow || $0.type == .webseries }.count
-        let stageCount = items.filter { $0.type == .theatre }.count
-        let trainCount = items.filter { $0.type == .workshop || $0.type == .training }.count
-        let adCount    = items.filter { $0.type == .commercial }.count
+        
+        let p = portfolio
+        
+        // Count from structured items (portfolio_items table)
+        var filmCount  = items.filter { $0.type == .film || $0.type == .tvShow || $0.type == .webseries }.count
+        var stageCount = items.filter { $0.type == .theatre }.count
+        var trainCount = items.filter { $0.type == .workshop || $0.type == .training }.count
+        var adCount    = items.filter { $0.type == .commercial }.count
+        
+        // Count from actor_portfolios JSON columns
+        if let actorP = p {
+            filmCount += normalizedProjects(from: actorP.movies).count
+            filmCount += normalizedProjects(from: actorP.web_series).count
+            filmCount += normalizedProjects(from: actorP.tv_serials).count
+            
+            stageCount += normalizedProjects(from: actorP.theatre).count
+            
+            adCount += normalizedProjects(from: actorP.advertisement).count
+            adCount += normalizedProjects(from: actorP.tvc).count
+            
+            // Note: Training/Workshops are usually in portfolio_items or experience text
+        }
 
         let stats: [(String, String)] = [
             ("\(filmCount)", "Films"),
@@ -804,7 +843,10 @@ class PortfolioViewController: UIViewController {
 
     @objc private func editBasicInfoTapped() {
         guard let p = portfolio else { return }
-        openBasicInfoEditor(portfolio: p)
+        let creationVC = PortfolioCreationViewController(existingPortfolio: p)
+        let nav = UINavigationController(rootViewController: creationVC)
+        nav.modalPresentationStyle = .fullScreen
+        present(nav, animated: true)
     }
 
     @objc private func shareTapped() {
@@ -1553,6 +1595,93 @@ class PortfolioViewController: UIViewController {
             grid.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 16),
             grid.trailingAnchor.constraint(equalTo: v.trailingAnchor, constant: -16),
             grid.bottomAnchor.constraint(equalTo: v.bottomAnchor, constant: -14)
+        ])
+        return v
+    }
+
+    private func makeProfessionalInfoSection(_ p: PortfolioResponse) -> UIView {
+        let v = UIView(); v.backgroundColor = .white.withAlphaComponent(0.05); v.layer.cornerRadius = 20
+        v.layer.borderWidth = 1; v.layer.borderColor = UIColor.white.withAlphaComponent(0.12).cgColor
+        v.translatesAutoresizingMaskIntoConstraints = false
+        
+        let title = UILabel(); title.text = "PROFESSIONAL DETAILS"; title.font = .systemFont(ofSize: 11, weight: .bold)
+        title.textColor = .white.withAlphaComponent(0.5); title.translatesAutoresizingMaskIntoConstraints = false
+        v.addSubview(title)
+        
+        let grid = UIStackView(); grid.axis = .vertical; grid.spacing = 14; grid.translatesAutoresizingMaskIntoConstraints = false
+        v.addSubview(grid)
+        
+        func item(_ l: String, _ val: String?) -> UIView {
+            let cnt = UIView(); let ll = UILabel(); let vv = UILabel()
+            ll.text = l.uppercased(); ll.font = .systemFont(ofSize: 9, weight: .bold); ll.textColor = .white.withAlphaComponent(0.4)
+            vv.text = val ?? "—"; vv.font = .systemFont(ofSize: 13, weight: .medium); vv.textColor = .white; vv.numberOfLines = 0
+            ll.translatesAutoresizingMaskIntoConstraints = false; vv.translatesAutoresizingMaskIntoConstraints = false
+            cnt.addSubview(ll); cnt.addSubview(vv)
+            NSLayoutConstraint.activate([
+                ll.topAnchor.constraint(equalTo: cnt.topAnchor), ll.leadingAnchor.constraint(equalTo: cnt.leadingAnchor),
+                vv.topAnchor.constraint(equalTo: ll.bottomAnchor, constant: 4),
+                vv.leadingAnchor.constraint(equalTo: cnt.leadingAnchor), vv.trailingAnchor.constraint(equalTo: cnt.trailingAnchor),
+                vv.bottomAnchor.constraint(equalTo: cnt.bottomAnchor)
+            ])
+            return cnt
+        }
+        
+        if let edu = p.education { grid.addArrangedSubview(item("Education", edu)) }
+        if let prof = p.current_profession { grid.addArrangedSubview(item("Current Profession", prof)) }
+        if let lang = p.languages { grid.addArrangedSubview(item("Languages", lang)) }
+        if let hobbies = p.hobbies { grid.addArrangedSubview(item("Hobbies", hobbies)) }
+        
+        NSLayoutConstraint.activate([
+            title.topAnchor.constraint(equalTo: v.topAnchor, constant: 14),
+            title.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 16),
+            grid.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 12),
+            grid.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 16),
+            grid.trailingAnchor.constraint(equalTo: v.trailingAnchor, constant: -16),
+            grid.bottomAnchor.constraint(equalTo: v.bottomAnchor, constant: -14)
+        ])
+        return v
+    }
+
+    private func makeWorkInterestsSection(_ interests: [String]) -> UIView {
+        let v = UIView(); v.backgroundColor = .white.withAlphaComponent(0.05); v.layer.cornerRadius = 20
+        v.layer.borderWidth = 1; v.layer.borderColor = UIColor.white.withAlphaComponent(0.12).cgColor
+        v.translatesAutoresizingMaskIntoConstraints = false
+        
+        let title = UILabel(); title.text = "WORK INTERESTS"; title.font = .systemFont(ofSize: 11, weight: .bold)
+        title.textColor = .white.withAlphaComponent(0.5); title.translatesAutoresizingMaskIntoConstraints = false
+        v.addSubview(title)
+        
+        let chips = UIStackView(); chips.axis = .horizontal; chips.spacing = 8; chips.translatesAutoresizingMaskIntoConstraints = false
+        let scroll = UIScrollView(); scroll.showsHorizontalScrollIndicator = false; scroll.translatesAutoresizingMaskIntoConstraints = false
+        v.addSubview(title); v.addSubview(scroll); scroll.addSubview(chips)
+        
+        for interest in interests {
+            let l = UILabel(); l.text = interest; l.font = .systemFont(ofSize: 12, weight: .medium); l.textColor = .white
+            l.backgroundColor = PDS.accent.withAlphaComponent(0.2); l.layer.cornerRadius = 8; l.clipsToBounds = true
+            l.textAlignment = .center; l.translatesAutoresizingMaskIntoConstraints = false
+            let container = UIView(); container.addSubview(l); container.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                l.topAnchor.constraint(equalTo: container.topAnchor, constant: 6),
+                l.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -6),
+                l.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 12),
+                l.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -12),
+            ])
+            container.layer.cornerRadius = 10; container.backgroundColor = .white.withAlphaComponent(0.1)
+            chips.addArrangedSubview(container)
+        }
+        
+        NSLayoutConstraint.activate([
+            title.topAnchor.constraint(equalTo: v.topAnchor, constant: 14),
+            title.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 16),
+            scroll.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 10),
+            scroll.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 16),
+            scroll.trailingAnchor.constraint(equalTo: v.trailingAnchor, constant: -16),
+            scroll.bottomAnchor.constraint(equalTo: v.bottomAnchor, constant: -14),
+            scroll.heightAnchor.constraint(equalToConstant: 36),
+            chips.topAnchor.constraint(equalTo: scroll.topAnchor),
+            chips.leadingAnchor.constraint(equalTo: scroll.leadingAnchor),
+            chips.trailingAnchor.constraint(equalTo: scroll.trailingAnchor),
+            chips.bottomAnchor.constraint(equalTo: scroll.bottomAnchor),
         ])
         return v
     }

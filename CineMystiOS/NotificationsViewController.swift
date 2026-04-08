@@ -189,30 +189,36 @@ final class NotificationsViewController: UIViewController {
                 guard let session = try await AuthManager.shared.currentSession() else { return }
                 let meId = session.user.id.uuidString
 
-                // Update connection status → accepted
+                print("🔄 Accepting connection from sender=\(senderId) me=\(meId)")
+
                 struct StatusUpdate: Encodable { let status: String }
-                try await supabase
+                let result = try await supabase
                     .from("connections")
                     .update(StatusUpdate(status: "accepted"))
-                    .eq("requester_id", value: senderId)
-                    .eq("receiver_id", value: meId)
+                    .or("and(requester_id.eq.\(senderId),receiver_id.eq.\(meId)),and(requester_id.eq.\(meId),receiver_id.eq.\(senderId))")
                     .execute()
 
-                // Increment connection_count for both users via RPC (no-op if function missing)
-                let _ = try? await supabase
-                    .rpc("increment_connections", params: ["uid": senderId]).execute()
-                let _ = try? await supabase
-                    .rpc("increment_connections", params: ["uid": meId]).execute()
+                let responseStr = String(data: result.data, encoding: .utf8) ?? "nil"
+                print("✅ Accept response: \(responseStr)")
+
+                // Supabase returns "[]" when RLS blocks the update silently
+                let trimmed = responseStr.trimmingCharacters(in: .whitespaces)
+                if trimmed == "[]" || trimmed == "null" || trimmed.isEmpty {
+                    await MainActor.run {
+                        self.showError("⚠️ Connection update blocked.\n\nPlease add Row Level Security policy in Supabase:\nEnable UPDATE for authenticated users where receiver_id = auth.uid()")
+                    }
+                    return
+                }
 
                 await MainActor.run {
                     self.filtered[indexPath.row].actionState = "accepted"
-                    // Mirror back to master list
                     if let i = self.notifications.firstIndex(where: { $0.id == self.filtered[indexPath.row].id }) {
                         self.notifications[i].actionState = "accepted"
                     }
                     self.tableView.reloadRows(at: [indexPath], with: .automatic)
                 }
             } catch {
+                print("❌ Accept error: \(error)")
                 await MainActor.run { self.showError(error.localizedDescription) }
             }
         }

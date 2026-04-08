@@ -77,6 +77,20 @@ class PortfolioCreationViewController: UIViewController {
     private let totalSteps  = 7     // 0-6
     private var formData    = ActorPortfolioFormData()
     private var pickedMedia: [PickedMediaItem] = []
+    private var existingPortfolio: PortfolioResponse?
+
+    init(existingPortfolio: PortfolioResponse? = nil) {
+        self.existingPortfolio = existingPortfolio
+        super.init(nibName: nil, bundle: nil)
+        if let p = existingPortfolio {
+            self.isEditingEnabled = true
+            fillFormData(from: p)
+        }
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
 
     // MARK: UI
     private let progressView    = UIProgressView(progressViewStyle: .bar)
@@ -100,8 +114,41 @@ class PortfolioCreationViewController: UIViewController {
         setupScrollView()
         setupButtons()
         setupLoader()
-        prefillUserProfile()
+        // Only prefill if we don't already have an existing portfolio (which was filled in init)
+        if existingPortfolio == nil {
+            prefillUserProfile()
+        }
         showStep(0)
+    }
+    
+    private func fillFormData(from p: PortfolioResponse) {
+        formData.fullName = p.full_name ?? p.stage_name
+        formData.age = p.age
+        formData.height = p.height_cm
+        formData.weight = p.weight_kg
+        formData.sex = p.sex
+        formData.education = p.education
+        formData.maritalStatus = p.marital_status
+        formData.currentProfession = p.current_profession
+        formData.contactNo = p.contact_no
+        formData.email = p.website_url ?? "" // Or however email is stored
+        formData.languages = p.languages
+        formData.hobbies = p.hobbies
+        
+        formData.bust = p.bust
+        formData.waist = p.waist
+        formData.hips = p.hips
+        formData.skinTone = p.skin_tone
+        formData.eyeColor = p.eye_color
+        formData.hairColor = p.hair_color
+        formData.bodyType = p.body_type
+        formData.shoeSize = p.shoe_size
+        
+        formData.workInterests = p.work_interests ?? []
+        formData.previousExperience = p.previous_experience
+        formData.instagramUrl = p.instagram_url
+        formData.youtubeUrl = p.youtube_url
+        formData.imdbUrl = p.imdb_url
     }
 
     // MARK: Setup

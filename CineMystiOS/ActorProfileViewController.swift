@@ -1234,14 +1234,27 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
             do {
                 guard let session = try await AuthManager.shared.currentSession() else { return }
                 let me = session.user
+                let meId = me.id.uuidString
+                let otherId = targetId.uuidString
+
+                // Check if a connection already exists in any direction
+                let state = await ProfileService.shared.connectionState(requesterId: me.id, receiverId: targetId)
+                if state != "none" {
+                    await MainActor.run {
+                        let a = UIAlertController(title: "Request Existing", message: "A connection or request already exists between you.", preferredStyle: .alert)
+                        a.addAction(UIAlertAction(title: "OK", style: .default))
+                        self.present(a, animated: true)
+                    }
+                    return
+                }
 
                 struct ConnectionInsert: Encodable {
                     let requester_id, receiver_id, status: String
                 }
                 try await supabase
                     .from("connections")
-                    .insert(ConnectionInsert(requester_id: me.id.uuidString,
-                                             receiver_id: targetId.uuidString,
+                    .insert(ConnectionInsert(requester_id: meId,
+                                             receiver_id: otherId,
                                              status: "pending"))
                     .execute()
 
