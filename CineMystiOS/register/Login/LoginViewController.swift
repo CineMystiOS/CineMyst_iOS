@@ -95,11 +95,11 @@ class LoginViewController: UIViewController {
         
         // 3. Setup Elements
         let emailLabel = UILabel(); applyLabelStyle(emailLabel, text: "Username or Email")
-        applyFieldStyle(emailTextField, placeholder: "sam67@gmail.com")
+        applyFieldStyle(emailTextField, placeholder: " ")
         emailTextField.autocapitalizationType = .none
         
         let passLabel = UILabel(); applyLabelStyle(passLabel, text: "Password")
-        applyFieldStyle(passwordTextField, placeholder: "********")
+        applyFieldStyle(passwordTextField, placeholder: " ")
         passwordTextField.isSecureTextEntry = true
         
         forgotPasswordButton.setTitle("Forgot Password ?", for: .normal)
