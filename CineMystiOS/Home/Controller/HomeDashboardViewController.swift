@@ -599,9 +599,10 @@ final class HomeDashboardViewController: UIViewController {
         presentedViewController?.dismiss(animated: true)
     }
     func openShareSheet(for post: Post) {
-        let vc = ShareBottomSheetController(post: post); vc.modalPresentationStyle = .pageSheet
-        if let s = vc.sheetPresentationController { s.detents = [.medium(), .large()]; s.prefersGrabberVisible = true }
-        present(vc, animated: true)
+        let caption = post.caption?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let shareText = caption.isEmpty ? "Check out this post on CineMyst." : "Check out this post on CineMyst:\n\n\(caption)"
+        let activity = UIActivityViewController(activityItems: [shareText], applicationActivities: nil)
+        present(activity, animated: true)
     }
     private func openCameraForPost() { let vc = CameraViewController(); vc.modalPresentationStyle = .fullScreen; present(vc, animated: true) }
     private func openAIAssistant() {
@@ -1666,7 +1667,8 @@ final class PostFeedCell: UITableViewCell {
         commentRow.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(commentTapped(_:))))
         
         shareButton.setImage(UIImage(systemName: "paperplane"), for: .normal); shareButton.tintColor = .secondaryLabel
-        shareButton.isUserInteractionEnabled = false
+        shareButton.isUserInteractionEnabled = true
+        shareButton.addTarget(self, action: #selector(shareTapped(_:)), for: .touchUpInside)
         let shareRow = UIStackView(arrangedSubviews: [shareButton])
         shareRow.axis = .horizontal; shareRow.spacing = 4; shareRow.alignment = .center
         shareRow.isUserInteractionEnabled = true

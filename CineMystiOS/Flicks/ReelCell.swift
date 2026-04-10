@@ -235,7 +235,7 @@ final class ReelCell: UICollectionViewCell {
 
             // Share stack pinned to top right
             shareStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            shareStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 100),
+            shareStack.topAnchor.constraint(equalTo: contentView.safeAreaLayoutGuide.topAnchor, constant: 16),
 
             // Audio row — bottom left, above tab bar
             audioRow.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
