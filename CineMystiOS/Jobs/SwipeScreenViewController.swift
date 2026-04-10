@@ -316,21 +316,34 @@ class SwipeScreenViewController: UIViewController {
                 
                 print("📥 Loading submissions for job: \(job.id.uuidString)")
                 
-                // Fetch applications for this job that are NOT yet processed (portfolio_submitted or task_submitted)
-                let applications: [Application] = try await supabase
+                // Fetch ALL applications for this job — no status filter so nothing is silently excluded
+                let allApplications: [Application] = try await supabase
                     .from("applications")
                     .select()
                     .eq("job_id", value: job.id.uuidString)
-                    .in("status", value: ["portfolio_submitted", "task_submitted"]) // Only show these
                     .execute()
                     .value
+
+                // Exclude only terminal statuses (already decided). Show everything else.
+                let applications: [Application] = allApplications.filter {
+                    $0.status != .selected && $0.status != .rejected
+                }
+
+                print("📥 Total applications: \(allApplications.count), reviewable: \(applications.count)")
+                for app in allApplications {
+                    print("   status='\(app.status.rawValue)' actor=\(app.actorId.uuidString.prefix(8))")
+                }
 
                 // Deduping by actorId to ensure one card per candidate
                 let dedupedApplications = Dictionary(grouping: applications, by: \.actorId)
                     .compactMap { _, actorApplications in
-                        actorApplications.max(by: { $0.updatedAt < $1.updatedAt })
+                        actorApplications.max(by: {
+                            ($0.updatedAt ?? $0.appliedAt) < ($1.updatedAt ?? $1.appliedAt)
+                        })
                     }
-                    .sorted(by: { $0.updatedAt > $1.updatedAt })
+                    .sorted(by: {
+                        ($0.updatedAt ?? $0.appliedAt) > ($1.updatedAt ?? $1.appliedAt)
+                    })
 
                 self.applications = dedupedApplications
                 print("✅ Fetched \(applications.count) applications for job, using \(dedupedApplications.count) unique applicants")
@@ -515,9 +528,15 @@ class SwipeScreenViewController: UIViewController {
 
     private func applyStackLayout(to card: UIView, position: Int) {
         let baseFrame = baseCardFrame()
-        let verticalOffset = CGFloat(position) * 10
-        let scale = position == 0 ? 1 : 0.98
-        let alpha: CGFloat = position == 0 ? 1 : 0
+
+        // Progressive vertical offset — each card peeks further down
+        let verticalOffset = CGFloat(position) * 12
+        // Progressive scale — background cards are slightly smaller
+        let scaleValues: [CGFloat] = [1.0, 0.94, 0.88]
+        let scale = position < scaleValues.count ? scaleValues[position] : 0.88
+        // Progressive alpha — background cards are slightly dimmed but VISIBLE
+        let alphaValues: [CGFloat] = [1.0, 0.88, 0.72]
+        let alpha = position < alphaValues.count ? alphaValues[position] : 0.0
 
         card.frame = baseFrame.offsetBy(dx: 0, dy: verticalOffset)
         card.transform = CGAffineTransform(scaleX: scale, y: scale)

@@ -458,19 +458,25 @@ final class PostComposerViewController: UIViewController {
                     .single()
                     .execute()
                 let profile = try JSONDecoder().decode(ProfileRecord.self, from: response.data)
-                await MainActor.run {
-                    usernameLabel.text      = profile.username ?? "User"
-                    profileAvatarLabel.text = String((profile.username ?? "U").prefix(1)).uppercased()
+                
+                await MainActor.run { [weak self] in
+                    guard let self = self else { return }
+                    self.usernameLabel.text      = profile.username ?? "User"
+                    self.profileAvatarLabel.text = String((profile.username ?? "U").prefix(1)).uppercased()
+                    
                     if let url = URL(string: profile.profilePictureUrl ?? "") {
-                        URLSession.shared.dataTask(with: url) { data, _, _ in
-                            guard let d = data, let img = UIImage(data: d) else { return }
+                        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+                            guard let self = self, let d = data, let img = UIImage(data: d) else { return }
                             DispatchQueue.main.async {
-                                self.profileAvatarView.layer.sublayers?.forEach { $0.removeFromSuperlayer() }
+                                self.profileAvatarLabel.removeFromSuperview()
+                                self.profileAvatarView.layer.sublayers?.removeAll(where: { $0 is CAGradientLayer })
+                                
                                 let iv = UIImageView(image: img)
                                 iv.frame = self.profileAvatarView.bounds
                                 iv.contentMode = .scaleAspectFill
+                                iv.layer.cornerRadius = 22 // match avatar view radius
+                                iv.clipsToBounds = true
                                 self.profileAvatarView.addSubview(iv)
-                                self.profileAvatarLabel.removeFromSuperview()
                             }
                         }.resume()
                     }

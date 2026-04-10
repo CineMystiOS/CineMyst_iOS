@@ -186,7 +186,7 @@ class CameraViewController: UIViewController {
         captureButton.translatesAutoresizingMaskIntoConstraints = false
         captureButton.backgroundColor = .white
         captureButton.layer.cornerRadius = 35
-        captureButton.addTarget(self, action: #selector(capturePhoto), for: .touchUpInside)
+        captureButton.addTarget(self, action: #selector(captureButtonTapped), for: .touchUpInside)
         view.addSubview(captureButton)
 
         NSLayoutConstraint.activate([
@@ -264,9 +264,18 @@ class CameraViewController: UIViewController {
         }
     }
 
-    @objc private func capturePhoto() {
-        guard currentMode == .photo, let photoOutput else { return }
-        photoOutput.capturePhoto(with: AVCapturePhotoSettings(), delegate: self)
+    @objc private func captureButtonTapped() {
+        if currentMode == .photo {
+            guard let photoOutput else { return }
+            photoOutput.capturePhoto(with: AVCapturePhotoSettings(), delegate: self)
+        } else {
+            // In video mode, tap to start/stop
+            if let videoOutput = videoOutput, videoOutput.isRecording {
+                stopVideoRecording()
+            } else {
+                startVideoRecording()
+            }
+        }
     }
 
     @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
@@ -372,13 +381,37 @@ extension CameraViewController: AVCaptureFileOutputRecordingDelegate {
     }
     
     private func postToFlicks(videoURL: URL) {
-        dismiss(animated: true) { [weak self] in
+        // Capture presentingViewController before dismissing
+        let presenter = self.presentingViewController
+        
+        dismiss(animated: true) {
+            // Walk up hierarchy to find actual top VC
+            var topVC: UIViewController?
+            
+            if let tabBar = presenter as? UITabBarController {
+                topVC = tabBar.selectedViewController
+                if let nav = topVC as? UINavigationController {
+                    topVC = nav.visibleViewController
+                }
+            } else if let nav = presenter as? UINavigationController {
+                topVC = nav.visibleViewController
+            } else {
+                topVC = presenter
+            }
+            
+            // Fall back to key window root VC
+            if topVC == nil {
+                topVC = UIApplication.shared.connectedScenes
+                    .compactMap { $0 as? UIWindowScene }
+                    .flatMap { $0.windows }
+                    .first(where: { $0.isKeyWindow })?
+                    .rootViewController
+            }
+            
             let flickComposer = FlickComposerViewController(videoURL: videoURL)
             flickComposer.modalPresentationStyle = .fullScreen
             
-            if let parent = self?.presentingViewController {
-                parent.present(flickComposer, animated: true)
-            }
+            topVC?.present(flickComposer, animated: true)
         }
     }
 }
@@ -386,13 +419,45 @@ extension CameraViewController: AVCaptureFileOutputRecordingDelegate {
 // MARK: - Helper
 extension CameraViewController {
     private func passMediaToComposer(_ media: [DraftMedia]) {
-        dismiss(animated: true) { [weak self] in
-            if let parent = self?.presentingViewController as? HomeDashboardViewController {
-                let composer = PostComposerViewController(initialMedia: media)
-                composer.delegate = parent
-                composer.modalPresentationStyle = .fullScreen
-                parent.present(composer, animated: true)
+        // Capture presentingViewController before dismissing (it becomes nil after dismiss)
+        let presenter = self.presentingViewController
+
+        dismiss(animated: true) {
+            // Walk up to find the actual presenting view controller
+            var topVC: UIViewController?
+
+            if let tabBar = presenter as? UITabBarController {
+                topVC = tabBar.selectedViewController
+                if let nav = topVC as? UINavigationController {
+                    topVC = nav.visibleViewController
+                }
+            } else if let nav = presenter as? UINavigationController {
+                topVC = nav.visibleViewController
+            } else {
+                topVC = presenter
             }
+
+            // If still nil, fall back to the key window's rootVC
+            if topVC == nil {
+                topVC = UIApplication.shared.connectedScenes
+                    .compactMap { $0 as? UIWindowScene }
+                    .flatMap { $0.windows }
+                    .first(where: { $0.isKeyWindow })?
+                    .rootViewController
+            }
+
+            let composer = PostComposerViewController(initialMedia: media)
+            composer.modalPresentationStyle = .fullScreen
+
+            // Wire delegate if the visible VC is HomeDashboardViewController
+            if let dash = topVC as? HomeDashboardViewController {
+                composer.delegate = dash
+            } else if let nav = topVC as? UINavigationController,
+                      let dash = nav.visibleViewController as? HomeDashboardViewController {
+                composer.delegate = dash
+            }
+
+            topVC?.present(composer, animated: true)
         }
     }
 }
