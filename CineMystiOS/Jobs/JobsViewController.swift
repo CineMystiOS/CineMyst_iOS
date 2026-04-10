@@ -153,6 +153,14 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
         
         filterButton.addTarget(self, action: #selector(openFilter), for: .touchUpInside)
         bookmarkButton.addTarget(self, action: #selector(openSavedPosts), for: .touchUpInside)
+        
+        let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        tap.cancelsTouchesInView = false
+        view.addGestureRecognizer(tap)
+    }
+
+    @objc private func dismissKeyboard() {
+        view.endEditing(true)
     }
 
     override func viewDidLayoutSubviews() {

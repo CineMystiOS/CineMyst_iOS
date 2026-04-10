@@ -243,7 +243,7 @@ final class AIAssistantViewController: UIViewController, UITableViewDataSource, 
 
             composerContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             composerContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            composerContainer.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -12),
+            composerContainer.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -12),
             composerContainer.heightAnchor.constraint(equalToConstant: 62),
 
             textField.leadingAnchor.constraint(equalTo: composerContainer.contentView.leadingAnchor, constant: 18),
