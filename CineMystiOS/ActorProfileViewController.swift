@@ -1207,6 +1207,9 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
         }
 
         updateMediaContent()
+        
+        // Update navigation bar items based on ownership
+        navigationItem.rightBarButtonItem = isOwnProfile ? UIBarButtonItem(customView: makeNavButton(systemName: "gearshape.fill", action: #selector(settingsTapped))) : nil
     }
 
     // MARK: - Connect (other users)
@@ -1624,8 +1627,12 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
         titleLabel.sizeToFit()
         navigationItem.titleView = titleLabel
 
-        let settingsBtn = makeNavButton(systemName: "gearshape.fill", action: #selector(settingsTapped))
-        navigationItem.rightBarButtonItem = UIBarButtonItem(customView: settingsBtn)
+        if isOwnProfile {
+            let settingsBtn = makeNavButton(systemName: "gearshape.fill", action: #selector(settingsTapped))
+            navigationItem.rightBarButtonItem = UIBarButtonItem(customView: settingsBtn)
+        } else {
+            navigationItem.rightBarButtonItem = nil
+        }
 
         let isRoot = navigationController?.viewControllers.first === self
         if !isRoot {
@@ -1663,9 +1670,17 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
             do {
                 try await AuthManager.shared.signOut()
                 await MainActor.run {
-                    let nav = UINavigationController(rootViewController: LoginViewController())
-                    nav.modalPresentationStyle = .fullScreen
-                    self.present(nav, animated: true)
+                    let welcomeVC = LaunchWelcomeViewController()
+                    let nav = UINavigationController(rootViewController: welcomeVC)
+                    nav.setNavigationBarHidden(true, animated: false)
+                    
+                    if let window = UIApplication.shared.windows.first {
+                        window.rootViewController = nav
+                        UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil)
+                    } else {
+                        nav.modalPresentationStyle = .fullScreen
+                        self.present(nav, animated: true)
+                    }
                 }
             } catch {
                 await MainActor.run { self.showErrorMessage("Failed to logout: \(error.localizedDescription)") }
@@ -1695,10 +1710,17 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
                 try await AuthManager.shared.deleteAccount()
                 await MainActor.run {
                     self.loadingView.stopAnimating()
-                    let loginVC = LoginViewController()
-                    let nav = UINavigationController(rootViewController: loginVC)
-                    nav.modalPresentationStyle = .fullScreen
-                    self.present(nav, animated: true)
+                    let welcomeVC = LaunchWelcomeViewController()
+                    let nav = UINavigationController(rootViewController: welcomeVC)
+                    nav.setNavigationBarHidden(true, animated: false)
+                    
+                    if let window = UIApplication.shared.windows.first {
+                        window.rootViewController = nav
+                        UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil)
+                    } else {
+                        nav.modalPresentationStyle = .fullScreen
+                        self.present(nav, animated: true)
+                    }
                 }
             } catch {
                 await MainActor.run {

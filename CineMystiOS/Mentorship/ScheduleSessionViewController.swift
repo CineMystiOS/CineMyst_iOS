@@ -249,8 +249,12 @@ final class ScheduleSessionViewController: UIViewController {
     let selectedOrdered = Array(selectedAreas).sorted()
     let areaString = selectedOrdered.joined(separator: ", ")
 
-    let vc = PaymentViewController(area: areaString, date: chosenDate, time: selectedTimeButton.currentTitle ?? "")
+    let vc = BookingConfirmationViewController()
     vc.mentor = self.mentor
+    vc.scheduledDate = chosenDate
+    vc.selectedArea = areaString
+    vc.selectedTime = selectedTimeButton.currentTitle ?? ""
+    vc.bookingAmountCents = 0 // Payment removed
         navigationController?.pushViewController(vc, animated: true)
     }
 

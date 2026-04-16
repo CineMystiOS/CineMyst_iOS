@@ -387,7 +387,6 @@ final class BecomeMentorViewController: UITableViewController {
 
             let areaIndex = indexPath.row - 1
             let area = Array(form.mentorshipAreas.keys.sorted())[areaIndex]
-            let price = form.mentorshipAreas[area] ?? "Set price"
 
             let cell = tableView.dequeueReusableCell(
                 withIdentifier: ID.button,
@@ -395,10 +394,10 @@ final class BecomeMentorViewController: UITableViewController {
             ) as! ActionRowCell
             cell.configure(
                 title: area,
-                subtitle: price,
+                subtitle: nil,
                 titleColor: CineMystTheme.ink,
                 subtitleColor: CineMystTheme.brandPlum,
-                showChevron: true
+                showChevron: false
             )
             return cell
 
@@ -470,9 +469,7 @@ final class BecomeMentorViewController: UITableViewController {
             if indexPath.row == 0 {
                 presentAreaSelector()
             } else {
-                let areaIndex = indexPath.row - 1
-                let area = Array(form.mentorshipAreas.keys.sorted())[areaIndex]
-                presentPriceSelector(for: area)
+                // price selector removed
             }
 
         case .availability:
@@ -673,10 +670,11 @@ final class BecomeMentorViewController: UITableViewController {
             showAlert(title: "No mentorship area", message: "Select at least one area.")
             return
         }
-        guard form.mentorshipAreas.values.allSatisfy({ !$0.isEmpty }) else {
+        // price check removed
+        /* guard form.mentorshipAreas.values.allSatisfy({ !$0.isEmpty }) else {
             showAlert(title: "Price missing", message: "Set a price for each area.")
             return
-        }
+        } */
 
         // save to backend then navigate
         Task { await submitToBackendAndNavigate() }

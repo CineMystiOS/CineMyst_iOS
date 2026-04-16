@@ -14,8 +14,6 @@ struct MentorFilters {
     var skills: Set<String> = []
     var mentorRole: String? = nil
     var experience: String? = nil
-    var priceMin: Int? = nil
-    var priceMax: Int? = nil
 }
 
 final class FilterViewController: UIViewController {
@@ -50,36 +48,18 @@ final class FilterViewController: UIViewController {
     private let skillsStack = UIStackView()
     private let mentorRoleStack = UIStackView()
     private let experienceStack = UIStackView()
-    private let priceStack = UIStackView()
 
-    // price inputs
-    private let priceMinField: UITextField = {
-        let t = UITextField()
-        t.placeholder = "Min"
-        t.keyboardType = .numberPad
-        t.borderStyle = .roundedRect
-        t.translatesAutoresizingMaskIntoConstraints = false
-        return t
-    }()
-    private let priceMaxField: UITextField = {
-        let t = UITextField()
-        t.placeholder = "Max"
-        t.keyboardType = .numberPad
-        t.borderStyle = .roundedRect
-        t.translatesAutoresizingMaskIntoConstraints = false
-        return t
-    }()
+
 
     // MARK: Tabs
     private enum Tab: Int {
-        case skills = 0, mentorRole, experience, price
+        case skills = 0, mentorRole, experience
 
         var title: String {
             switch self {
             case .skills: return "Skills"
             case .mentorRole: return "Mentor Role"
             case .experience: return "Experience"
-            case .price: return "Price"
             }
         }
     }
@@ -232,7 +212,7 @@ final class FilterViewController: UIViewController {
 
     // Build left menu buttons
     private func buildLeftMenu() {
-        for i in 0...3 {
+        for i in 0...2 {
             guard let t = Tab(rawValue: i) else { continue }
             let b = UIButton(type: .system)
             b.setTitle(t.title, for: .normal)
@@ -288,16 +268,6 @@ final class FilterViewController: UIViewController {
             let row = makeRadioRow(title: e, group: .experience)
             experienceStack.addArrangedSubview(row)
         }
-
-        // Price: two text fields horizontally
-        priceStack.axis = .horizontal
-        priceStack.spacing = 12
-        priceStack.alignment = .center
-        priceStack.translatesAutoresizingMaskIntoConstraints = false
-        priceStack.addArrangedSubview(priceMinField)
-        priceStack.addArrangedSubview(priceMaxField)
-        priceMinField.widthAnchor.constraint(equalToConstant: 110).isActive = true
-        priceMaxField.widthAnchor.constraint(equalToConstant: 110).isActive = true
     }
 
     // MARK: - Content swapping
@@ -328,12 +298,6 @@ final class FilterViewController: UIViewController {
                 experienceStack.topAnchor.constraint(equalTo: contentContainer.topAnchor, constant: 20),
                 experienceStack.leadingAnchor.constraint(equalTo: contentContainer.leadingAnchor, constant: 20),
                 experienceStack.trailingAnchor.constraint(equalTo: contentContainer.trailingAnchor, constant: -20)
-            ])
-        case .price:
-            contentContainer.addSubview(priceStack)
-            NSLayoutConstraint.activate([
-                priceStack.topAnchor.constraint(equalTo: contentContainer.topAnchor, constant: 28),
-                priceStack.leadingAnchor.constraint(equalTo: contentContainer.leadingAnchor, constant: 20)
             ])
         }
     }
@@ -480,22 +444,11 @@ final class FilterViewController: UIViewController {
             }
         }
 
-        priceMinField.text = ""
-        priceMaxField.text = ""
+
     }
 
     @objc private func showResultsTapped() {
-        // read price fields
-        if let minText = priceMinField.text, let min = Int(minText) {
-            filters.priceMin = min
-        } else {
-            filters.priceMin = nil
-        }
-        if let maxText = priceMaxField.text, let max = Int(maxText) {
-            filters.priceMax = max
-        } else {
-            filters.priceMax = nil
-        }
+
 
         dismissAnimated {
             self.onApplyFilters?(self.filters)

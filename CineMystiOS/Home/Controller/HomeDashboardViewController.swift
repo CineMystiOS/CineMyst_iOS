@@ -74,7 +74,6 @@ struct PromoCard {
             gradientEnd:   UIColor(red: 0.804, green: 0.447, blue: 0.659, alpha: 1),
             ctaText: "Upload Reel"
         ),
-        /*
         PromoCard(
             title: "1:1 Mentor Session",
             subtitle: "Refine your pitch with tailored feedback from mentors.",
@@ -82,7 +81,6 @@ struct PromoCard {
             gradientEnd:   UIColor(red: 0.48, green: 0.23, blue: 0.93, alpha: 1),
             ctaText: "Book Session"
         ),
-        */
     ]
 }
 
@@ -117,7 +115,7 @@ struct HomeQuickLink {
 
     static let all: [HomeQuickLink] = [
         .init(value: "15+", title: "Jobs", tint: UIColor(red: 0.918, green: 0.878, blue: 0.911, alpha: 1), accent: UIColor(red: 0.852, green: 0.780, blue: 0.872, alpha: 1), icon: "briefcase.fill"),
-        // .init(value: "10+", title: "Mentors", tint: UIColor(red: 0.928, green: 0.868, blue: 0.902, alpha: 1), accent: UIColor(red: 0.858, green: 0.768, blue: 0.828, alpha: 1), icon: "person.crop.circle.badge.checkmark"),
+        .init(value: "10+", title: "Mentors", tint: UIColor(red: 0.928, green: 0.868, blue: 0.902, alpha: 1), accent: UIColor(red: 0.858, green: 0.768, blue: 0.828, alpha: 1), icon: "person.crop.circle.badge.checkmark"),
         .init(value: "5+", title: "Directors", tint: UIColor(red: 0.894, green: 0.836, blue: 0.914, alpha: 1), accent: UIColor(red: 0.812, green: 0.735, blue: 0.845, alpha: 1), icon: "person.2.fill"),
         .init(value: "2+", title: "Casting Houses", tint: UIColor(red: 0.886, green: 0.902, blue: 0.948, alpha: 1), accent: UIColor(red: 0.792, green: 0.816, blue: 0.902, alpha: 1), icon: "building.2.fill")
     ]
@@ -125,7 +123,6 @@ struct HomeQuickLink {
 
 // MARK: - HomeDashboardViewController
 final class HomeDashboardViewController: UIViewController {
-
     private let tableView      = UITableView(frame: .zero, style: .plain)
     private let refreshControl = UIRefreshControl()
     private let backgroundGradient = CAGradientLayer()
@@ -500,7 +497,7 @@ final class HomeDashboardViewController: UIViewController {
             onExpansionChanged: { [weak self] isExpanded in
                 self?.setFloatingMenuDimmed(isExpanded)
             })
-        let host = UIHostingController(rootView: sv)
+        let host = PassthroughHostingController(rootView: sv)
         host.view.backgroundColor = .clear; host.view.isOpaque = false
         addChild(host); view.addSubview(host.view)
         host.view.translatesAutoresizingMaskIntoConstraints = false
@@ -995,6 +992,9 @@ extension HomeDashboardViewController: UITableViewDataSource, UITableViewDelegat
                 profileVC.hidesBottomBarWhenPushed = true
                 self.navigationController?.pushViewController(profileVC, animated: true)
             }
+            cell.onImageTap = { [weak self] urls, index in
+                self?.openFullScreenImages(urls: urls, selectedIndex: index)
+            }
             return cell
         case .job(let job):
             let cell = tableView.dequeueReusableCell(withIdentifier: CastingFeedCell.reuseId, for: indexPath) as! CastingFeedCell
@@ -1013,15 +1013,18 @@ extension HomeDashboardViewController: UITableViewDataSource, UITableViewDelegat
             let vc = FlickUploadViewController()
             vc.hidesBottomBarWhenPushed = true
             navigationController?.pushViewController(vc, animated: true)
-            /*
         case "Book Session":
             let vc = AllMentorsViewController()
             vc.hidesBottomBarWhenPushed = true
             navigationController?.pushViewController(vc, animated: true)
-            */
         default:
             break
         }
+    }
+    
+    private func openFullScreenImages(urls: [String], selectedIndex: Int) {
+        let vc = MediaFullScreenViewController(urls: urls, selectedIndex: selectedIndex)
+        present(vc, animated: true)
     }
 
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
@@ -1543,6 +1546,7 @@ final class PostFeedCell: UITableViewCell {
     var onComment: (() -> Void)?
     var onShare:   (() -> Void)?
     var onProfile: (() -> Void)?
+    var onImageTap: (([String], Int) -> Void)?
     
     private var postId: String = ""
     private var userId: String = ""
@@ -1566,6 +1570,7 @@ final class PostFeedCell: UITableViewCell {
     private var isLiked        = false
     private var currentLikeCount = 0
     private var currentCommentCount = 0
+    private var currentMediaUrls: [String] = []
 
     // Dynamic height for media — set to 0 when no images
     private var mediaHeightConstraint: NSLayoutConstraint!
@@ -1786,6 +1791,7 @@ final class PostFeedCell: UITableViewCell {
         mediaContainer.subviews.forEach { $0.removeFromSuperview() }
 
         guard !urls.isEmpty else {
+            currentMediaUrls = []
             // No images → collapse the media area to zero height
             mediaHeightConstraint.constant = 0
             mediaContainer.isHidden = true
@@ -1793,6 +1799,7 @@ final class PostFeedCell: UITableViewCell {
         }
 
         mediaContainer.isHidden = false
+        currentMediaUrls = urls
 
         switch urls.count {
 
@@ -1809,6 +1816,9 @@ final class PostFeedCell: UITableViewCell {
                 iv.bottomAnchor.constraint(equalTo: mediaContainer.bottomAnchor)
             ])
             loadImage(url: urls[0], into: iv)
+            iv.tag = 0
+            iv.isUserInteractionEnabled = true
+            iv.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(imageTapped(_:))))
 
         case 2:
             // Two images — side by side
@@ -1827,6 +1837,11 @@ final class PostFeedCell: UITableViewCell {
                 iv2.bottomAnchor.constraint(equalTo: mediaContainer.bottomAnchor)
             ])
             loadImage(url: urls[0], into: iv1); loadImage(url: urls[1], into: iv2)
+            [iv1, iv2].enumerated().forEach { index, iv in
+                iv.tag = index
+                iv.isUserInteractionEnabled = true
+                iv.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(imageTapped(_:))))
+            }
 
         default:
             // 3+ — big left, two stacked right
@@ -1855,6 +1870,11 @@ final class PostFeedCell: UITableViewCell {
             loadImage(url: urls[0], into: iv1)
             loadImage(url: urls[1], into: iv2)
             loadImage(url: urls[2], into: iv3)
+            [iv1, iv2, iv3].enumerated().forEach { index, iv in
+                iv.tag = index
+                iv.isUserInteractionEnabled = true
+                iv.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(imageTapped(_:))))
+            }
 
             // "+N more" overlay on the third tile
             if urls.count > 3 {
@@ -1952,6 +1972,11 @@ final class PostFeedCell: UITableViewCell {
     @objc private func commentTapped(_ sender: Any?) { onComment?() }
     @objc private func shareTapped(_ sender: Any?)   { onShare?()   }
     @objc private func profileTapped(_ sender: Any?) { onProfile?() }
+    
+    @objc private func imageTapped(_ sender: UITapGestureRecognizer) {
+        guard let iv = sender.view as? UIImageView else { return }
+        onImageTap?(currentMediaUrls, iv.tag)
+    }
 }
 
 
@@ -2237,5 +2262,31 @@ final class AdBannerCell: UITableViewCell {
         UIView.animate(withDuration: 0.1, animations: { self.ctaButton.transform = CGAffineTransform(scaleX: 0.94, y: 0.94) }) { _ in
             UIView.animate(withDuration: 0.15) { self.ctaButton.transform = .identity }
         }
+    }
+}
+
+// MARK: - Passthrough Support for SwiftUI
+// This allows the large SwiftUI container to pass touches through its transparent areas
+// to the table view below, fixing the "scrolling blocked" issue.
+
+private final class PassthroughHostingController<Content: View>: UIHostingController<Content> {
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .clear
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        view.backgroundColor = .clear
+    }
+}
+
+private final class PassthroughView: UIView {
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let hitView = super.hitTest(point, with: event)
+        // If the hit view is the passthrough view itself (the background), or its subviews
+        // that are also transparent/empty containers, we return nil to let the touch
+        // pass through to the views behind it (like the feed table view).
+        return (hitView == self) ? nil : hitView
     }
 }

@@ -136,6 +136,7 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
     private var activePositionFilter: String?
     private var activeProjectFilter: String?
     private var activeEarningFilter: Float?
+    private var activeLocationFilter: String?
     
     // MARK: - Lifecycle
     override func viewDidLoad() {
@@ -674,47 +675,36 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
     @objc private func openFilter() {
         let vc = FilterScrollViewController()
         filterVC = vc
-        vc.onFiltersApplied = { [weak self] role, position, project, earning in
+        
+        // Pass current filter values if any
+        vc.selectedRolePreference = activeRoleFilter
+        vc.selectedPosition = activePositionFilter
+        vc.selectedProjectType = activeProjectFilter
+        vc.selectedEarning = activeEarningFilter
+        vc.selectedLocation = activeLocationFilter
+        
+        vc.onFiltersApplied = { [weak self] role, position, project, earning, location in
             self?.activeRoleFilter = role
             self?.activePositionFilter = position
             self?.activeProjectFilter = project
             self?.activeEarningFilter = earning
+            self?.activeLocationFilter = location
             self?.applyFilters()
-            self?.closeFilter()
         }
-        dimView = UIView(frame: view.bounds)
-        dimView.backgroundColor = UIColor.black.withAlphaComponent(0.32)
-        dimView.alpha = 0
-        view.addSubview(dimView)
         
-        let tap = UITapGestureRecognizer(target: self, action: #selector(closeFilter))
-        dimView.addGestureRecognizer(tap)
-        
-        addChild(vc)
-        view.addSubview(vc.view)
-        vc.didMove(toParent: self)
-        
-        let height = view.frame.height * 0.72
-        vc.view.frame = CGRect(x: 0, y: view.frame.height, width: view.frame.width, height: height)
-        vc.view.layer.cornerRadius = 20
-        vc.view.clipsToBounds = true
-        
-        UIView.animate(withDuration: 0.28) {
-            self.dimView.alpha = 1
-            vc.view.frame.origin.y = self.view.frame.height - height
+        let nav = UINavigationController(rootViewController: vc)
+        nav.modalPresentationStyle = .pageSheet
+        if let sheet = nav.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 24
         }
+        
+        present(nav, animated: true)
     }
     
     @objc private func closeFilter() {
-        guard let vc = filterVC else { return }
-        UIView.animate(withDuration: 0.25, animations: {
-            self.dimView.alpha = 0
-            vc.view.frame.origin.y = self.view.frame.height
-        }) { _ in
-            self.dimView.removeFromSuperview()
-            vc.view.removeFromSuperview()
-            vc.removeFromParent()
-        }
+        dismiss(animated: true)
     }
     
     private func applyFilters() {
@@ -723,6 +713,7 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
         if let position = activePositionFilter { filtered = filtered.filter { ($0.title ?? "").lowercased().contains(position.lowercased()) } }
         if let project = activeProjectFilter { filtered = filtered.filter { ($0.title ?? "").lowercased().contains(project.lowercased()) || ($0.jobType ?? "").lowercased().contains(project.lowercased()) } }
         if let earning = activeEarningFilter, earning > 0 { filtered = filtered.filter { ($0.ratePerDay ?? 0) >= Int(earning) } }
+        if let location = activeLocationFilter { filtered = filtered.filter { ($0.location ?? "").lowercased().contains(location.lowercased()) } }
         filteredJobs = filtered
         Task { await displayFilteredJobs() }
     }

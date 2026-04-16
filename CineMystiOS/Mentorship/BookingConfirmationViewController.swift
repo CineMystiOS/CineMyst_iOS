@@ -1,13 +1,12 @@
-//
-// PaymentConfirmationViewController.swift
+// BookingConfirmationViewController.swift
 // Creates a Session on Done. Uses mentor.imageName when available (falls back to demo "Image").
 // Updated: dismisses before replacing Mentorship tab and uses robust tab-finding logic.
-//
+// Payment flow removed.
 
 import UIKit
 import Supabase
 
-final class PaymentConfirmationViewController: UIViewController {
+final class BookingConfirmationViewController: UIViewController {
 
     // optional callback
     var onDone: (() -> Void)?
@@ -103,7 +102,7 @@ final class PaymentConfirmationViewController: UIViewController {
     private let statusLabel: UILabel = {
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.text = "Payment Successful"
+        label.text = "Booking Successful"
         label.font = .systemFont(ofSize: 12, weight: .semibold)
         label.textColor = UIColor(red: 0.16, green: 0.52, blue: 0.31, alpha: 1)
         return label
@@ -138,22 +137,7 @@ final class PaymentConfirmationViewController: UIViewController {
         return view
     }()
 
-    private let amountTitleLabel: UILabel = {
-        let label = UILabel()
-        label.translatesAutoresizingMaskIntoConstraints = false
-        label.text = "Amount paid"
-        label.font = .systemFont(ofSize: 12, weight: .semibold)
-        label.textColor = .secondaryLabel
-        return label
-    }()
 
-    private let amountValueLabel: UILabel = {
-        let label = UILabel()
-        label.translatesAutoresizingMaskIntoConstraints = false
-        label.font = .systemFont(ofSize: 17, weight: .bold)
-        label.textColor = .label
-        return label
-    }()
 
     private let sessionTitleLabel: UILabel = {
         let label = UILabel()
@@ -261,20 +245,11 @@ final class PaymentConfirmationViewController: UIViewController {
         cardView.contentView.addSubview(titleLabel)
         cardView.contentView.addSubview(subtitleLabel)
         cardView.contentView.addSubview(infoRowView)
-        infoRowView.addSubview(amountTitleLabel)
-        infoRowView.addSubview(amountValueLabel)
         infoRowView.addSubview(sessionTitleLabel)
         infoRowView.addSubview(sessionValueLabel)
         cardView.contentView.addSubview(doneButton)
         cardView.contentView.addSubview(cardStrokeView)
 
-        let amountText: String
-        if let bookingAmountCents {
-            amountText = Self.formatPrice(cents: bookingAmountCents)
-        } else {
-            amountText = "Paid"
-        }
-        amountValueLabel.text = amountText
         sessionValueLabel.text = selectedArea?.isEmpty == false ? selectedArea : (mentor?.name ?? "Mentorship session")
 
         NSLayoutConstraint.activate([
@@ -323,19 +298,12 @@ final class PaymentConfirmationViewController: UIViewController {
             infoRowView.leadingAnchor.constraint(equalTo: cardView.contentView.leadingAnchor, constant: 18),
             infoRowView.trailingAnchor.constraint(equalTo: cardView.contentView.trailingAnchor, constant: -18),
 
-            amountTitleLabel.topAnchor.constraint(equalTo: infoRowView.topAnchor, constant: 14),
-            amountTitleLabel.leadingAnchor.constraint(equalTo: infoRowView.leadingAnchor, constant: 14),
-
-            amountValueLabel.topAnchor.constraint(equalTo: amountTitleLabel.bottomAnchor, constant: 4),
-            amountValueLabel.leadingAnchor.constraint(equalTo: amountTitleLabel.leadingAnchor),
-            amountValueLabel.bottomAnchor.constraint(equalTo: infoRowView.bottomAnchor, constant: -14),
-
             sessionTitleLabel.topAnchor.constraint(equalTo: infoRowView.topAnchor, constant: 14),
-            sessionTitleLabel.trailingAnchor.constraint(equalTo: infoRowView.trailingAnchor, constant: -14),
+            sessionTitleLabel.leadingAnchor.constraint(equalTo: infoRowView.leadingAnchor, constant: 14),
 
             sessionValueLabel.topAnchor.constraint(equalTo: sessionTitleLabel.bottomAnchor, constant: 4),
-            sessionValueLabel.trailingAnchor.constraint(equalTo: sessionTitleLabel.trailingAnchor),
-            sessionValueLabel.leadingAnchor.constraint(greaterThanOrEqualTo: amountValueLabel.trailingAnchor, constant: 16),
+            sessionValueLabel.leadingAnchor.constraint(equalTo: sessionTitleLabel.leadingAnchor),
+            sessionValueLabel.trailingAnchor.constraint(equalTo: infoRowView.trailingAnchor, constant: -14),
             sessionValueLabel.bottomAnchor.constraint(equalTo: infoRowView.bottomAnchor, constant: -14),
 
             doneButton.topAnchor.constraint(equalTo: infoRowView.bottomAnchor, constant: 18),

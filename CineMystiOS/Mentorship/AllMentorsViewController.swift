@@ -327,8 +327,8 @@ final class MentorCardCell: UITableViewCell {
             orgLabel.text = ""
         }
 
-        // price from `money` column if present
-        priceLabel.text = mentor.moneyString ?? ""
+        // price hidden
+        pricePillView.isHidden = true
 
         // local fallback
         photoView.image = UIImage(named: mentor.imageName ?? "Image")

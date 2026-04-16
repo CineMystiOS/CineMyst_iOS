@@ -314,6 +314,15 @@ class PortfolioViewController: UIViewController {
                 let userId = try await resolveUserId()
                 let targetId = userId.lowercased()
                 
+                let baseProfileData = try? await ProfileService.shared.fetchUserProfile(userId: UUID(uuidString: userId) ?? UUID())
+                let bProfile = baseProfileData?.profile
+                
+                if bProfile == nil {
+                    print("⚠️ Failed to fetch profile via ProfileService for userId: \(userId)")
+                } else {
+                    print("✅ Fetched profile via ProfileService: \(bProfile?.fullName ?? "no name"), avatar: \(bProfile?.profilePictureUrl ?? "no avatar")")
+                }
+
                 // Determine if this is the user's own profile
                 await MainActor.run { self.isOwnProfile = (targetId == currentUid) }
 
@@ -376,7 +385,7 @@ class PortfolioViewController: UIViewController {
                 await MainActor.run {
                     self.portfolio = p
                     self.loadingIndicator.stopAnimating()
-                    self.updateHero(with: p)
+                    self.updateHero(with: p, profile: bProfile)
                     self.buildSections(items: allItems)
                     self.animateIn()
                 }
@@ -490,13 +499,18 @@ class PortfolioViewController: UIViewController {
     }
 
     // MARK: - Update Hero
-    private func updateHero(with p: PortfolioResponse) {
-        nameLabel.text = p.full_name ?? p.stage_name ?? "Portfolio"
+    private func updateHero(with p: PortfolioResponse, profile: SupabaseProfileData? = nil) {
+        nameLabel.text = p.full_name ?? p.stage_name ?? profile?.fullName ?? "Portfolio"
         bioLabel.text  = p.bio
         emailLabel.isHidden = true
 
-        // Avatar resolution: 1. p.profile_picture_url -> 2. first image from mediaItems
-        var avatarUrl = p.profile_picture_url
+        // Avatar resolution priority:
+        // 1. profile.profilePictureUrl (from profiles table via ProfileService)
+        // 2. p.profile_picture_url (from portfolios table)
+        // 3. first image from mediaItems
+        
+        var avatarUrl = profile?.profilePictureUrl ?? p.profile_picture_url
+        
         if (avatarUrl == nil || avatarUrl?.isEmpty == true) {
             avatarUrl = p.mediaItems.first(where: { $0["type"] == "image" })?["url"]
         }

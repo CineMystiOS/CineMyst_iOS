@@ -171,8 +171,7 @@ final class MentorCell: UICollectionViewCell {
     func configure(with mentor: Mentor) {
         nameLabel.text = mentor.name
         roleLabel.text = mentor.role
-        priceLabel.text = Self.priceHint(for: mentor)
-        priceChipView.isHidden = priceLabel.text == nil
+        priceChipView.isHidden = true // Always hide price chip
         // Prefer remote profilePictureUrl if provided, with cache; otherwise use local asset or symbol
         photoView.image = nil
         if let urlStrRaw = mentor.profilePictureUrl, !urlStrRaw.isEmpty {

@@ -104,7 +104,7 @@ final class ReelsViewController: UIViewController {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         navigationController?.setNavigationBarHidden(false, animated: false)
-        pauseCurrentVideo()
+        pauseAllVideos()
     }
     
     // MARK: - Audio Session
@@ -319,10 +319,9 @@ final class ReelsViewController: UIViewController {
         }
     }
     
-    private func pauseCurrentVideo() {
-        let indexPath = IndexPath(item: currentIndex, section: 0)
-        if let cell = collectionView.cellForItem(at: indexPath) as? ReelCell {
-            cell.pause()
+    private func pauseAllVideos() {
+        collectionView.visibleCells.forEach { cell in
+            (cell as? ReelCell)?.pause()
         }
     }
     
@@ -406,6 +405,10 @@ extension ReelsViewController: UICollectionViewDelegate, UICollectionViewDelegat
         if currentIndex >= reels.count - 2 {
             loadMoreReels()
         }
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
+        (cell as? ReelCell)?.pause()
     }
 }
 
