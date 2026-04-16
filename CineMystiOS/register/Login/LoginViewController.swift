@@ -116,36 +116,7 @@ class LoginViewController: UIViewController {
         signInButton.addTarget(self, action: #selector(signInTapped), for: .touchUpInside)
         signInButton.translatesAutoresizingMaskIntoConstraints = false
         
-        let divider = UIView()
-        divider.backgroundColor = UIColor.systemGray5
-        divider.translatesAutoresizingMaskIntoConstraints = false
-        
-        let orLabel = UILabel()
-        orLabel.text = "Or"
-        orLabel.textColor = .systemGray3
-        orLabel.font = UIFont.systemFont(ofSize: 14)
-        orLabel.backgroundColor = .white
-        orLabel.textAlignment = .center
-        orLabel.translatesAutoresizingMaskIntoConstraints = false
-        
-        googleSignInButton.setTitle("Continue with Google", for: .normal)
-        googleSignInButton.setTitleColor(.black, for: .normal)
-        googleSignInButton.layer.borderWidth = 1
-        googleSignInButton.layer.borderColor = UIColor.systemGray5.cgColor
-        googleSignInButton.layer.cornerRadius = 14
-        googleSignInButton.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
-        googleSignInButton.addTarget(self, action: #selector(googleTapped), for: .touchUpInside)
-        googleSignInButton.translatesAutoresizingMaskIntoConstraints = false
-        
-        // Google Icon from assets (preserving original color)
-        if let googleImg = UIImage(named: "google")?.withRenderingMode(.alwaysOriginal) {
-            googleSignInButton.setImage(googleImg, for: .normal)
-            googleSignInButton.imageEdgeInsets = UIEdgeInsets(top: 0, left: -10, bottom: 0, right: 0)
-            googleSignInButton.imageView?.contentMode = .scaleAspectFit
-        } else if let googleSF = UIImage(systemName: "g.circle.fill") {
-            googleSignInButton.setImage(googleSF, for: .normal)
-            googleSignInButton.imageEdgeInsets = UIEdgeInsets(top: 0, left: -10, bottom: 0, right: 0)
-        }
+
         
         let bottomStack = UIStackView()
         bottomStack.axis = .horizontal
@@ -182,9 +153,7 @@ class LoginViewController: UIViewController {
         contentView.addSubview(passwordTextField)
         contentView.addSubview(forgotPasswordButton)
         contentView.addSubview(signInButton)
-        contentView.addSubview(divider)
-        contentView.addSubview(orLabel)
-        contentView.addSubview(googleSignInButton)
+
         contentView.addSubview(bottomStack)
         
         NSLayoutConstraint.activate([
@@ -226,21 +195,7 @@ class LoginViewController: UIViewController {
             signInButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
             signInButton.heightAnchor.constraint(equalToConstant: 58),
             
-            divider.centerYAnchor.constraint(equalTo: orLabel.centerYAnchor),
-            divider.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
-            divider.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
-            divider.heightAnchor.constraint(equalToConstant: 1),
-            
-            orLabel.topAnchor.constraint(equalTo: signInButton.bottomAnchor, constant: 18),
-            orLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            orLabel.widthAnchor.constraint(equalToConstant: 40),
-            
-            googleSignInButton.topAnchor.constraint(equalTo: orLabel.bottomAnchor, constant: 18),
-            googleSignInButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
-            googleSignInButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
-            googleSignInButton.heightAnchor.constraint(equalToConstant: 58),
-            
-            bottomStack.topAnchor.constraint(equalTo: googleSignInButton.bottomAnchor, constant: 20),
+            bottomStack.topAnchor.constraint(equalTo: signInButton.bottomAnchor, constant: 30),
             bottomStack.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             bottomStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -30)
         ])
@@ -252,7 +207,7 @@ class LoginViewController: UIViewController {
     @objc private func signInTapped() { signInButtonTapped(signInButton) }
     @objc private func forgotPasswordTapped() { forgetPasswordButtonTapped(forgotPasswordButton) }
     @objc private func signUpTapped() { signUpButtonTapped(signUpButton) }
-    @objc private func googleTapped() { googleLoginTapped(googleSignInButton) }
+
 
     private func setupActivityIndicator() {
         activityIndicator = UIActivityIndicatorView(style: .large)

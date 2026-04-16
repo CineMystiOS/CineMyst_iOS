@@ -39,7 +39,7 @@ class CineMystTabBarController: UITabBarController, UITabBarControllerDelegate {
         )
         tabBar.itemPositioning = .centered
         tabBar.itemSpacing = 0
-        tabBar.itemWidth = floor(tabBar.bounds.width / 5.0)
+        tabBar.itemWidth = floor(tabBar.bounds.width / 4.0)
     }
 
     // MARK: - Tab Bar Setup
@@ -95,12 +95,14 @@ class CineMystTabBarController: UITabBarController, UITabBarControllerDelegate {
                                             image: UIImage(systemName: "popcorn.fill"),
                                             tag: 2)
 
+        /*
         // Mentorship
         let mentorHome = MentorshipHomeViewController()
         let mentorVC = UINavigationController(rootViewController: mentorHome)
         mentorVC.tabBarItem = UITabBarItem(title: "1:1",
                                            image: UIImage(systemName: "person.2.fill"),
                                            tag: 3)
+        */
 
         // Profile
         let profileVC = UINavigationController(rootViewController: ActorProfileViewController())
@@ -112,7 +114,7 @@ class CineMystTabBarController: UITabBarController, UITabBarControllerDelegate {
         profileTabNavigationController = profileVC
 
         // Final Tab Order
-        viewControllers = [homeVC, jobsVC, flicksNav, mentorVC, profileVC]
+        viewControllers = [homeVC, jobsVC, flicksNav, profileVC]
     }
 
     private func refreshProfileTabAvatar() {

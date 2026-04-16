@@ -74,6 +74,7 @@ struct PromoCard {
             gradientEnd:   UIColor(red: 0.804, green: 0.447, blue: 0.659, alpha: 1),
             ctaText: "Upload Reel"
         ),
+        /*
         PromoCard(
             title: "1:1 Mentor Session",
             subtitle: "Refine your pitch with tailored feedback from mentors.",
@@ -81,6 +82,7 @@ struct PromoCard {
             gradientEnd:   UIColor(red: 0.48, green: 0.23, blue: 0.93, alpha: 1),
             ctaText: "Book Session"
         ),
+        */
     ]
 }
 
@@ -115,7 +117,7 @@ struct HomeQuickLink {
 
     static let all: [HomeQuickLink] = [
         .init(value: "15+", title: "Jobs", tint: UIColor(red: 0.918, green: 0.878, blue: 0.911, alpha: 1), accent: UIColor(red: 0.852, green: 0.780, blue: 0.872, alpha: 1), icon: "briefcase.fill"),
-        .init(value: "10+", title: "Mentors", tint: UIColor(red: 0.928, green: 0.868, blue: 0.902, alpha: 1), accent: UIColor(red: 0.858, green: 0.768, blue: 0.828, alpha: 1), icon: "person.crop.circle.badge.checkmark"),
+        // .init(value: "10+", title: "Mentors", tint: UIColor(red: 0.928, green: 0.868, blue: 0.902, alpha: 1), accent: UIColor(red: 0.858, green: 0.768, blue: 0.828, alpha: 1), icon: "person.crop.circle.badge.checkmark"),
         .init(value: "5+", title: "Directors", tint: UIColor(red: 0.894, green: 0.836, blue: 0.914, alpha: 1), accent: UIColor(red: 0.812, green: 0.735, blue: 0.845, alpha: 1), icon: "person.2.fill"),
         .init(value: "2+", title: "Casting Houses", tint: UIColor(red: 0.886, green: 0.902, blue: 0.948, alpha: 1), accent: UIColor(red: 0.792, green: 0.816, blue: 0.902, alpha: 1), icon: "building.2.fill")
     ]
@@ -1011,10 +1013,12 @@ extension HomeDashboardViewController: UITableViewDataSource, UITableViewDelegat
             let vc = FlickUploadViewController()
             vc.hidesBottomBarWhenPushed = true
             navigationController?.pushViewController(vc, animated: true)
+            /*
         case "Book Session":
             let vc = AllMentorsViewController()
             vc.hidesBottomBarWhenPushed = true
             navigationController?.pushViewController(vc, animated: true)
+            */
         default:
             break
         }

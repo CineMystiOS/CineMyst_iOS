@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "Apple.png",
+      "filename" : "CineMyst copy 2.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -13,6 +13,7 @@
           "value" : "dark"
         }
       ],
+      "filename" : "CineMyst copy.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -24,6 +25,7 @@
           "value" : "tinted"
         }
       ],
+      "filename" : "CineMyst.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
