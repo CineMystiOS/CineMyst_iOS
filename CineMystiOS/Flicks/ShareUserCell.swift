@@ -8,6 +8,7 @@
 import UIKit
 
 class ShareUserCell: UITableViewCell {
+    var onSendTapped: (() -> Void)?
     
     private let avatarImageView: UIImageView = {
         let iv = UIImageView()
@@ -58,6 +59,8 @@ class ShareUserCell: UITableViewCell {
         contentView.addSubview(nameLabel)
         contentView.addSubview(usernameLabel)
         contentView.addSubview(sendButton)
+
+        sendButton.addTarget(self, action: #selector(sendTapped), for: .touchUpInside)
         
         NSLayoutConstraint.activate([
             avatarImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
@@ -81,5 +84,28 @@ class ShareUserCell: UITableViewCell {
     func configure(with user: ShareUser) {
         nameLabel.text = user.name
         usernameLabel.text = user.username
+        avatarImageView.image = UIImage(systemName: "person.crop.circle.fill")
+        avatarImageView.tintColor = .systemGray3
+
+        if let avatarUrl = user.avatarUrl, let url = URL(string: avatarUrl) {
+            URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+                guard let data, let image = UIImage(data: data) else { return }
+                DispatchQueue.main.async {
+                    self?.avatarImageView.image = image
+                    self?.avatarImageView.tintColor = nil
+                }
+            }.resume()
+        }
+    }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        avatarImageView.image = UIImage(systemName: "person.crop.circle.fill")
+        avatarImageView.tintColor = .systemGray3
+        onSendTapped = nil
+    }
+
+    @objc private func sendTapped() {
+        onSendTapped?()
     }
 }

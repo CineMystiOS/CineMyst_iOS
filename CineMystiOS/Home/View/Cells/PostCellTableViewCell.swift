@@ -58,7 +58,7 @@ final class PostCellTableViewCell: UITableViewCell {
         avatar.isUserInteractionEnabled = true
         avatar.backgroundColor = .systemGray5
         
-        let tap = UITapGestureRecognizer(target: self, action: #selector(didTapAvatar))
+        let tap = makeTapRecognizer(action: #selector(didTapAvatar))
         avatar.addGestureRecognizer(tap)
         
         // Labels
@@ -99,17 +99,17 @@ final class PostCellTableViewCell: UITableViewCell {
         let likeRow = UIStackView(arrangedSubviews: [likeButton, likeCountLabel])
         likeRow.axis = .horizontal; likeRow.spacing = 4; likeRow.alignment = .center
         likeRow.isUserInteractionEnabled = true
-        likeRow.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(didTapLike)))
+        likeRow.addGestureRecognizer(makeTapRecognizer(action: #selector(didTapLike)))
         
         let commentRow = UIStackView(arrangedSubviews: [commentButton, commentCountLabel])
         commentRow.axis = .horizontal; commentRow.spacing = 4; commentRow.alignment = .center
         commentRow.isUserInteractionEnabled = true
-        commentRow.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(didTapComment)))
+        commentRow.addGestureRecognizer(makeTapRecognizer(action: #selector(didTapComment)))
         
         let shareRow = UIStackView(arrangedSubviews: [shareButton, shareCountLabel])
         shareRow.axis = .horizontal; shareRow.spacing = 4; shareRow.alignment = .center
         shareRow.isUserInteractionEnabled = true
-        shareRow.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(didTapShare)))
+        shareRow.addGestureRecognizer(makeTapRecognizer(action: #selector(didTapShare)))
         
         let stack = UIStackView(arrangedSubviews: [likeRow, commentRow, shareRow])
         stack.axis = .horizontal
@@ -193,10 +193,9 @@ final class PostCellTableViewCell: UITableViewCell {
         commentCountLabel.text = "\(post.commentsCount)"
         shareCountLabel.text = "\(post.sharesCount)"
         
-        // Reset like state
-        isLiked = false
-        likeButton.setImage(UIImage(systemName: "heart"), for: .normal)
-        likeButton.tintColor = .label
+        isLiked = post.isLiked
+        likeButton.setImage(UIImage(systemName: isLiked ? "heart.fill" : "heart"), for: .normal)
+        likeButton.tintColor = isLiked ? .systemRed : .label
     }
     
     // MARK: - Image Loading
@@ -215,6 +214,14 @@ final class PostCellTableViewCell: UITableViewCell {
                 imageView.image = image
             }
         }.resume()
+    }
+
+    private func makeTapRecognizer(action: Selector) -> UITapGestureRecognizer {
+        let tap = UITapGestureRecognizer(target: self, action: action)
+        tap.cancelsTouchesInView = false
+        tap.delaysTouchesBegan = false
+        tap.delaysTouchesEnded = false
+        return tap
     }
     
     // MARK: - Button Actions

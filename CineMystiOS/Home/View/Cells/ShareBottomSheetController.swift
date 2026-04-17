@@ -2,110 +2,246 @@
 //  ShareBottomSheetController.swift
 //  CineMystApp
 //
-//  Created by user@50 on 11/11/25.
-//
 
 import UIKit
 
 final class ShareBottomSheetController: UIViewController {
-    private enum ShareAction: Int {
-        case system
-        case message
-        case whatsapp
-        case instagram
-    }
-
     private let post: Post
+
+    private var allUsers: [ShareUser] = []
+    private var filteredUsers: [ShareUser] = []
+    private var isLoading = false
+
+    private let titleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "Share To Connections"
+        label.font = .systemFont(ofSize: 18, weight: .semibold)
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
+    private let searchBar: UISearchBar = {
+        let sb = UISearchBar()
+        sb.placeholder = "Search connections"
+        sb.searchBarStyle = .minimal
+        sb.translatesAutoresizingMaskIntoConstraints = false
+        return sb
+    }()
+
+    private lazy var tableView: UITableView = {
+        let tv = UITableView(frame: .zero, style: .plain)
+        tv.delegate = self
+        tv.dataSource = self
+        tv.rowHeight = 72
+        tv.register(ShareUserCell.self, forCellReuseIdentifier: "ShareUserCell")
+        tv.translatesAutoresizingMaskIntoConstraints = false
+        return tv
+    }()
+
+    private let loadingIndicator: UIActivityIndicatorView = {
+        let indicator = UIActivityIndicatorView(style: .medium)
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        indicator.hidesWhenStopped = true
+        return indicator
+    }()
+
+    private let emptyLabel: UILabel = {
+        let label = UILabel()
+        label.text = "No connections found"
+        label.textColor = .secondaryLabel
+        label.font = .systemFont(ofSize: 15)
+        label.textAlignment = .center
+        label.isHidden = true
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
 
     init(post: Post) {
         self.post = post
         super.init(nibName: nil, bundle: nil)
     }
 
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
+        searchBar.delegate = self
         setupUI()
+        loadConnections()
     }
 
     private func setupUI() {
-        let titleLabel = UILabel()
-        titleLabel.text = "Send as Message"
-        titleLabel.font = .systemFont(ofSize: 18, weight: .semibold)
-
-        let search = UISearchBar()
-        search.placeholder = "Search"
-        search.searchBarStyle = .minimal
-
-        let shareStack = UIStackView()
-        shareStack.axis = .horizontal
-        shareStack.alignment = .center
-        shareStack.spacing = 20
-        shareStack.distribution = .equalSpacing
-
-        let icons = ["square.and.arrow.up", "message", "whatsapp", "paperplane"]
-        let names = ["Share", "iMessage", "WhatsApp", "Instagram"]
-
-        for (i, icon) in icons.enumerated() {
-            let button = UIButton(type: .system)
-            button.setImage(UIImage(systemName: icon), for: .normal)
-            button.tintColor = .label
-            button.setTitle("\n\(names[i])", for: .normal)
-            button.titleLabel?.font = .systemFont(ofSize: 12)
-            button.titleLabel?.textAlignment = .center
-            button.contentHorizontalAlignment = .center
-            button.titleEdgeInsets.top = 8
-            button.tag = i
-            button.addTarget(self, action: #selector(handleShareOption(_:)), for: .touchUpInside)
-            button.translatesAutoresizingMaskIntoConstraints = false
-            button.heightAnchor.constraint(equalToConstant: 60).isActive = true
-            shareStack.addArrangedSubview(button)
-        }
-
-        let stack = UIStackView(arrangedSubviews: [titleLabel, search, shareStack])
-        stack.axis = .vertical
-        stack.spacing = 16
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(stack)
+        view.addSubview(titleLabel)
+        view.addSubview(searchBar)
+        view.addSubview(tableView)
+        view.addSubview(loadingIndicator)
+        view.addSubview(emptyLabel)
 
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
-            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16)
+            titleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
+            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+
+            searchBar.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            searchBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            searchBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+
+            tableView.topAnchor.constraint(equalTo: searchBar.bottomAnchor, constant: 4),
+            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            tableView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+
+            loadingIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+
+            emptyLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            emptyLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
     }
 
-    @objc private func handleShareOption(_ sender: UIButton) {
-        guard let action = ShareAction(rawValue: sender.tag) else { return }
+    private func loadConnections() {
+        isLoading = true
+        loadingIndicator.startAnimating()
+        emptyLabel.isHidden = true
 
-        let shareText = buildShareText()
+        Task {
+            do {
+                guard let currentUserId = try await AuthManager.shared.currentSession()?.user.id.uuidString else {
+                    throw NSError(domain: "ShareBottomSheetController", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+                }
 
-        switch action {
-        case .system:
-            let activity = UIActivityViewController(activityItems: [shareText], applicationActivities: nil)
-            if let popover = activity.popoverPresentationController {
-                popover.sourceView = sender
-                popover.sourceRect = sender.bounds
+                let connections = try await ConnectionManager.shared.fetchUserConnections(userId: currentUserId)
+                let users = connections.map {
+                    ShareUser(
+                        id: $0.id,
+                        name: $0.fullName ?? $0.username,
+                        username: "@\($0.username)",
+                        avatarUrl: $0.profilePictureUrl
+                    )
+                }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+
+                await MainActor.run {
+                    self.isLoading = false
+                    self.loadingIndicator.stopAnimating()
+                    self.allUsers = users
+                    self.filteredUsers = users
+                    self.emptyLabel.isHidden = !users.isEmpty
+                    self.tableView.reloadData()
+                }
+            } catch {
+                await MainActor.run {
+                    self.isLoading = false
+                    self.loadingIndicator.stopAnimating()
+                    self.allUsers = []
+                    self.filteredUsers = []
+                    self.emptyLabel.text = "Failed to load connections"
+                    self.emptyLabel.isHidden = false
+                    self.tableView.reloadData()
+                }
             }
-            present(activity, animated: true)
+        }
+    }
 
-        case .message, .whatsapp, .instagram:
-            let activity = UIActivityViewController(activityItems: [shareText], applicationActivities: nil)
-            if let popover = activity.popoverPresentationController {
-                popover.sourceView = sender
-                popover.sourceRect = sender.bounds
+    private func applySearch(query: String) {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            filteredUsers = allUsers
+        } else {
+            filteredUsers = allUsers.filter {
+                $0.name.localizedCaseInsensitiveContains(trimmed) ||
+                $0.username.localizedCaseInsensitiveContains(trimmed)
             }
-            present(activity, animated: true)
+        }
+        emptyLabel.text = filteredUsers.isEmpty ? "No matching connections" : "No connections found"
+        emptyLabel.isHidden = !filteredUsers.isEmpty || isLoading
+        tableView.reloadData()
+    }
+
+    private func sendPost(to user: ShareUser) {
+        guard let recipientId = UUID(uuidString: user.id) else { return }
+
+        let sendingAlert = UIAlertController(title: nil, message: "Sending...", preferredStyle: .alert)
+        present(sendingAlert, animated: true)
+
+        Task {
+            do {
+                let conversation = try await MessagesService.shared.getOrCreateConversation(withUserId: recipientId)
+                let shareText = buildShareText()
+                _ = try await MessagesService.shared.sendMessage(conversationId: conversation.id, content: shareText)
+
+                await MainActor.run {
+                    sendingAlert.dismiss(animated: true) {
+                        let successAlert = UIAlertController(
+                            title: "Sent",
+                            message: "Post shared with \(user.name)",
+                            preferredStyle: .alert
+                        )
+                        successAlert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+                            self.dismiss(animated: true)
+                        })
+                        self.present(successAlert, animated: true)
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    sendingAlert.dismiss(animated: true) {
+                        let errorAlert = UIAlertController(
+                            title: "Share Failed",
+                            message: error.localizedDescription,
+                            preferredStyle: .alert
+                        )
+                        errorAlert.addAction(UIAlertAction(title: "OK", style: .default))
+                        self.present(errorAlert, animated: true)
+                    }
+                }
+            }
         }
     }
 
     private func buildShareText() -> String {
-        let caption = post.caption?.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let caption, !caption.isEmpty {
-            return "Check out this post on CineMyst:\n\n\(caption)"
+        let caption = post.caption?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let firstMediaURL = post.mediaUrls.first?.url ?? ""
+
+        if !caption.isEmpty, !firstMediaURL.isEmpty {
+            return "Shared a post with you on CineMyst:\n\n\(caption)\n\n\(firstMediaURL)"
         }
-        return "Check out this post on CineMyst."
+        if !caption.isEmpty {
+            return "Shared a post with you on CineMyst:\n\n\(caption)"
+        }
+        if !firstMediaURL.isEmpty {
+            return "Shared a post with you on CineMyst:\n\n\(firstMediaURL)"
+        }
+        return "Shared a post with you on CineMyst."
+    }
+}
+
+extension ShareBottomSheetController: UITableViewDelegate, UITableViewDataSource {
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        filteredUsers.count
+    }
+
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "ShareUserCell", for: indexPath) as! ShareUserCell
+        let user = filteredUsers[indexPath.row]
+        cell.configure(with: user)
+        cell.onSendTapped = { [weak self] in
+            self?.sendPost(to: user)
+        }
+        return cell
+    }
+
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        sendPost(to: filteredUsers[indexPath.row])
+    }
+}
+
+extension ShareBottomSheetController: UISearchBarDelegate {
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        applySearch(query: searchText)
     }
 }

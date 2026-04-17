@@ -28,6 +28,7 @@ struct Post: Identifiable {
     let commentsCount: Int
     let sharesCount: Int
     let createdAt: Date
+    var isLiked: Bool
     
     // Computed properties for display
     var displayName: String { 
@@ -171,5 +172,4 @@ struct CommentUserProfile: Codable, Identifiable {
         case profilePictureUrl = "profile_picture_url"
     }
 }
-
 

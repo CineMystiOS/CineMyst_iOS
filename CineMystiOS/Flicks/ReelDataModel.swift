@@ -58,6 +58,8 @@ struct ReelComment {
 }
 
 struct ShareUser {
+    let id: String
     let name: String
     let username: String
+    let avatarUrl: String?
 }

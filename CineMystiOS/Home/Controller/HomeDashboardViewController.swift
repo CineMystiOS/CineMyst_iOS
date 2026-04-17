@@ -121,9 +121,18 @@ struct HomeQuickLink {
     ]
 }
 
+final class HomeFeedTableView: UITableView {
+    override func touchesShouldCancel(in view: UIView) -> Bool {
+        if view is UIControl {
+            return true
+        }
+        return super.touchesShouldCancel(in: view)
+    }
+}
+
 // MARK: - HomeDashboardViewController
 final class HomeDashboardViewController: UIViewController {
-    private let tableView      = UITableView(frame: .zero, style: .plain)
+    private let tableView      = HomeFeedTableView(frame: .zero, style: .plain)
     private let refreshControl = UIRefreshControl()
     private let backgroundGradient = CAGradientLayer()
     private let ambientGlowTop = UIView()
@@ -450,6 +459,8 @@ final class HomeDashboardViewController: UIViewController {
         tableView.dataSource  = self; tableView.delegate = self
         tableView.separatorStyle = .none; tableView.showsVerticalScrollIndicator = false
         tableView.backgroundColor = .clear
+        tableView.canCancelContentTouches = true
+        tableView.delaysContentTouches = false
         tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 100, right: 0)
         tableView.tableHeaderView = makeTableHeader()
         refreshControl.tintColor = CineMystTheme.pink
@@ -544,6 +555,28 @@ final class HomeDashboardViewController: UIViewController {
         for job in jobs { feedItems.append(.job(job)) }
     }
 
+    private func updatePostLikeState(postId: String, isLiked: Bool, likeCount: Int) {
+        guard let index = posts.firstIndex(where: { $0.id == postId }) else { return }
+        var updatedPost = posts[index]
+        updatedPost.isLiked = isLiked
+        updatedPost = Post(
+            id: updatedPost.id,
+            userId: updatedPost.userId,
+            username: updatedPost.username,
+            fullName: updatedPost.fullName,
+            userProfilePictureUrl: updatedPost.userProfilePictureUrl,
+            caption: updatedPost.caption,
+            mediaUrls: updatedPost.mediaUrls,
+            likesCount: likeCount,
+            commentsCount: updatedPost.commentsCount,
+            sharesCount: updatedPost.sharesCount,
+            createdAt: updatedPost.createdAt,
+            isLiked: isLiked
+        )
+        posts[index] = updatedPost
+        rebuildFeed()
+    }
+
     private func loadDummyData() {
         posts = []
         jobs = [
@@ -598,10 +631,14 @@ final class HomeDashboardViewController: UIViewController {
         presentedViewController?.dismiss(animated: true)
     }
     func openShareSheet(for post: Post) {
-        let caption = post.caption?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let shareText = caption.isEmpty ? "Check out this post on CineMyst." : "Check out this post on CineMyst:\n\n\(caption)"
-        let activity = UIActivityViewController(activityItems: [shareText], applicationActivities: nil)
-        present(activity, animated: true)
+        let shareVC = ShareBottomSheetController(post: post)
+        shareVC.modalPresentationStyle = .pageSheet
+        if let sheet = shareVC.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 24
+        }
+        present(shareVC, animated: true)
     }
     private func openCameraForPost() { let vc = CameraViewController(); vc.modalPresentationStyle = .fullScreen; present(vc, animated: true) }
     private func openAIAssistant() {
@@ -981,6 +1018,9 @@ extension HomeDashboardViewController: UITableViewDataSource, UITableViewDelegat
             cell.configure(with: post)
             cell.onComment = { [weak self] in self?.openComments(for: post) }
             cell.onShare   = { [weak self] in self?.openShareSheet(for: post) }
+            cell.onLikeStateChanged = { [weak self] postId, isLiked, likeCount in
+                self?.updatePostLikeState(postId: postId, isLiked: isLiked, likeCount: likeCount)
+            }
             cell.onProfile = { [weak self] in
                 guard let self else { return }
                 let profileVC: ActorProfileViewController
@@ -1200,6 +1240,7 @@ final class PromoBannerCell: UITableViewCell, UIScrollViewDelegate {
         scrollView.decelerationRate = .fast
         scrollView.delaysContentTouches = false
         scrollView.canCancelContentTouches = true
+        scrollView.isScrollEnabled = false // Prevent manual dragging to fix vertical scroll interference
 
         // ✅ KEEP PEEK VISUAL ONLY
         scrollView.contentInset = UIEdgeInsets(top: 0, left: cardPeek, bottom: 0, right: cardPeek)
@@ -1547,6 +1588,7 @@ final class PostFeedCell: UITableViewCell {
     var onShare:   (() -> Void)?
     var onProfile: (() -> Void)?
     var onImageTap: (([String], Int) -> Void)?
+    var onLikeStateChanged: ((String, Bool, Int) -> Void)?
     
     private var postId: String = ""
     private var userId: String = ""
@@ -1665,7 +1707,7 @@ final class PostFeedCell: UITableViewCell {
         let likeRow = UIStackView(arrangedSubviews: [likeButton, likeCount])
         likeRow.axis = .horizontal; likeRow.spacing = 4; likeRow.alignment = .center
         likeRow.isUserInteractionEnabled = true
-        likeRow.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(likeTapped(_:))))
+        likeRow.addGestureRecognizer(makeTapRecognizer(action: #selector(likeTapped(_:))))
         
         commentButton.setImage(UIImage(systemName: "bubble.left"), for: .normal); commentButton.tintColor = .secondaryLabel
         commentButton.isUserInteractionEnabled = false
@@ -1673,7 +1715,7 @@ final class PostFeedCell: UITableViewCell {
         let commentRow = UIStackView(arrangedSubviews: [commentButton, commentCountLabel])
         commentRow.axis = .horizontal; commentRow.spacing = 4; commentRow.alignment = .center
         commentRow.isUserInteractionEnabled = true
-        commentRow.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(commentTapped(_:))))
+        commentRow.addGestureRecognizer(makeTapRecognizer(action: #selector(commentTapped(_:))))
         
         shareButton.setImage(UIImage(systemName: "paperplane"), for: .normal); shareButton.tintColor = .secondaryLabel
         shareButton.isUserInteractionEnabled = true
@@ -1681,7 +1723,7 @@ final class PostFeedCell: UITableViewCell {
         let shareRow = UIStackView(arrangedSubviews: [shareButton])
         shareRow.axis = .horizontal; shareRow.spacing = 4; shareRow.alignment = .center
         shareRow.isUserInteractionEnabled = true
-        shareRow.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(shareTapped(_:))))
+        shareRow.addGestureRecognizer(makeTapRecognizer(action: #selector(shareTapped(_:))))
         
         let spacer = UIView(); spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         let reactionStack = UIStackView(arrangedSubviews: [likeRow, commentRow, spacer, shareRow])
@@ -1735,9 +1777,9 @@ final class PostFeedCell: UITableViewCell {
         currentCommentCount = post.commentsCount
         likeCount.text    = "\(post.likesCount)"
         commentCountLabel.text = "\(post.commentsCount)"
-        isLiked = false
-        likeButton.setImage(UIImage(systemName: "heart"), for: .normal)
-        likeButton.tintColor = .secondaryLabel
+        isLiked = post.isLiked
+        likeButton.setImage(UIImage(systemName: isLiked ? "heart.fill" : "heart"), for: .normal)
+        likeButton.tintColor = isLiked ? .systemRed : .secondaryLabel
 
         // Load profile picture or show initials as fallback
         avatarLabel.text = String(name.prefix(1)).uppercased()
@@ -1818,7 +1860,7 @@ final class PostFeedCell: UITableViewCell {
             loadImage(url: urls[0], into: iv)
             iv.tag = 0
             iv.isUserInteractionEnabled = true
-            iv.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(imageTapped(_:))))
+            iv.addGestureRecognizer(makeTapRecognizer(action: #selector(imageTapped(_:))))
 
         case 2:
             // Two images — side by side
@@ -1840,7 +1882,7 @@ final class PostFeedCell: UITableViewCell {
             [iv1, iv2].enumerated().forEach { index, iv in
                 iv.tag = index
                 iv.isUserInteractionEnabled = true
-                iv.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(imageTapped(_:))))
+                iv.addGestureRecognizer(makeTapRecognizer(action: #selector(imageTapped(_:))))
             }
 
         default:
@@ -1873,7 +1915,7 @@ final class PostFeedCell: UITableViewCell {
             [iv1, iv2, iv3].enumerated().forEach { index, iv in
                 iv.tag = index
                 iv.isUserInteractionEnabled = true
-                iv.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(imageTapped(_:))))
+                iv.addGestureRecognizer(makeTapRecognizer(action: #selector(imageTapped(_:))))
             }
 
             // "+N more" overlay on the third tile
@@ -1899,6 +1941,14 @@ final class PostFeedCell: UITableViewCell {
         iv.contentMode = .scaleAspectFill; iv.clipsToBounds = true
         iv.backgroundColor = CineMystTheme.plumMist.withAlphaComponent(0.5)
         return iv
+    }
+
+    private func makeTapRecognizer(action: Selector) -> UITapGestureRecognizer {
+        let tap = UITapGestureRecognizer(target: self, action: action)
+        tap.cancelsTouchesInView = false
+        tap.delaysTouchesBegan = false
+        tap.delaysTouchesEnded = false
+        return tap
     }
 
     private func loadImage(url: String, into iv: UIImageView) {
@@ -1965,6 +2015,11 @@ final class PostFeedCell: UITableViewCell {
                     }
                     self.likeCount.text = "\(self.currentLikeCount)"
                 }
+                return
+            }
+
+            DispatchQueue.main.async {
+                self.onLikeStateChanged?(self.postId, self.isLiked, self.currentLikeCount)
             }
         }
     }

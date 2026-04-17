@@ -37,11 +37,11 @@ class ShareBottomSheetViewController: UIViewController {
     }()
     
     private var users: [ShareUser] = [
-        ShareUser(name: "John Doe", username: "@johndoe"),
-        ShareUser(name: "Jane Smith", username: "@janesmith"),
-        ShareUser(name: "Mike Johnson", username: "@mikej"),
-        ShareUser(name: "Sarah Williams", username: "@sarahw"),
-        ShareUser(name: "Alex Brown", username: "@alexb")
+        ShareUser(id: UUID().uuidString, name: "John Doe", username: "@johndoe", avatarUrl: nil),
+        ShareUser(id: UUID().uuidString, name: "Jane Smith", username: "@janesmith", avatarUrl: nil),
+        ShareUser(id: UUID().uuidString, name: "Mike Johnson", username: "@mikej", avatarUrl: nil),
+        ShareUser(id: UUID().uuidString, name: "Sarah Williams", username: "@sarahw", avatarUrl: nil),
+        ShareUser(id: UUID().uuidString, name: "Alex Brown", username: "@alexb", avatarUrl: nil)
     ]
     
     override func viewDidLoad() {

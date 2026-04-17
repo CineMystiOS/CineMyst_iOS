@@ -17,6 +17,7 @@ final class PostManager {
     
     // MARK: - Fetch Posts
     func fetchPosts(limit: Int = 50, offset: Int = 0) async throws -> [Post] {
+        let currentUserId = try? await AuthManager.shared.currentSession()?.user.id.uuidString
         let response = try await client
             .from("posts")
             .select("""
@@ -73,25 +74,12 @@ final class PostManager {
         
         let posts = try decoder.decode([PostResponse].self, from: response.data)
         
-        return posts.map { postResponse in
-            Post(
-                id: postResponse.id,
-                userId: postResponse.userId,
-                username: postResponse.profiles?.username ?? "Unknown",
-                fullName: postResponse.profiles?.fullName,
-                userProfilePictureUrl: postResponse.profiles?.profilePictureUrl,
-                caption: postResponse.caption,
-                mediaUrls: postResponse.postMedia ?? [],
-                likesCount: postResponse.likesCount,
-                commentsCount: postResponse.commentsCount,
-                sharesCount: postResponse.sharesCount,
-                createdAt: postResponse.createdAt
-            )
-        }
+        return try await mapPostResponses(posts, currentUserId: currentUserId ?? nil)
     }
     
     // MARK: - Fetch User Posts (for Profile)
     func fetchUserPosts(userId: String, limit: Int = 50) async throws -> [Post] {
+        let currentUserId = try? await AuthManager.shared.currentSession()?.user.id.uuidString
         let response = try await client
             .from("posts")
             .select("""
@@ -149,7 +137,17 @@ final class PostManager {
         
         let posts = try decoder.decode([PostResponse].self, from: response.data)
         
-        return posts.map { postResponse in
+        return try await mapPostResponses(posts, currentUserId: currentUserId ?? nil)
+    }
+
+    private func mapPostResponses(_ postResponses: [PostResponse], currentUserId: String?) async throws -> [Post] {
+        var likedPostIds = Set<String>()
+        if let currentUserId, !postResponses.isEmpty {
+            let postIds = postResponses.map(\.id)
+            likedPostIds = try await fetchLikedPostIds(postIds: postIds, userId: currentUserId)
+        }
+
+        return postResponses.map { postResponse in
             Post(
                 id: postResponse.id,
                 userId: postResponse.userId,
@@ -161,9 +159,32 @@ final class PostManager {
                 likesCount: postResponse.likesCount,
                 commentsCount: postResponse.commentsCount,
                 sharesCount: postResponse.sharesCount,
-                createdAt: postResponse.createdAt
+                createdAt: postResponse.createdAt,
+                isLiked: likedPostIds.contains(postResponse.id)
             )
         }
+    }
+
+    private func fetchLikedPostIds(postIds: [String], userId: String) async throws -> Set<String> {
+        guard !postIds.isEmpty else { return [] }
+
+        let response = try await client
+            .from("post_likes")
+            .select("post_id")
+            .eq("user_id", value: userId)
+            .execute()
+
+        struct PostLikeRow: Decodable {
+            let postId: String
+
+            enum CodingKeys: String, CodingKey {
+                case postId = "post_id"
+            }
+        }
+
+        let likedRows = try JSONDecoder().decode([PostLikeRow].self, from: response.data)
+        let visiblePostIds = Set(postIds)
+        return Set(likedRows.compactMap { visiblePostIds.contains($0.postId) ? $0.postId : nil })
     }
     
     private func fetchUserProfile(userId: String) async throws -> ProfileRecord? {
@@ -353,7 +374,8 @@ final class PostManager {
             likesCount: postResponse.likesCount,
             commentsCount: postResponse.commentsCount,
             sharesCount: postResponse.sharesCount,
-            createdAt: postResponse.createdAt
+            createdAt: postResponse.createdAt,
+            isLiked: false
         )
     }
     
