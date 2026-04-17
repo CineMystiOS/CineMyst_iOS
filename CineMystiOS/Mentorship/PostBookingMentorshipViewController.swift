@@ -634,7 +634,8 @@ extension PostBookingMentorshipViewController: UICollectionViewDataSource, UICol
         let insets = layout.sectionInset.left + layout.sectionInset.right
         let spacing = layout.minimumInteritemSpacing
         let width = floor((cv.bounds.width - insets - spacing) / 2.0)
-        return CGSize(width: width, height: width * 0.85)
+        let height = ceil(94 + (width - 16) * 0.85)
+        return CGSize(width: width, height: height)
     }
 
     func collectionView(_ cv: UICollectionView, didSelectItemAt indexPath: IndexPath) {

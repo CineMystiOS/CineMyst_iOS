@@ -143,7 +143,7 @@ final class MentorCell: UICollectionViewCell {
             imageContainerView.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 9),
             imageContainerView.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 9),
             imageContainerView.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -9),
-            imageContainerView.heightAnchor.constraint(equalTo: cardView.widthAnchor, multiplier: 0.48),
+            imageContainerView.heightAnchor.constraint(equalTo: cardView.widthAnchor, multiplier: 0.85),
 
             photoView.topAnchor.constraint(equalTo: imageContainerView.topAnchor),
             photoView.leadingAnchor.constraint(equalTo: imageContainerView.leadingAnchor),
@@ -1675,7 +1675,7 @@ extension MentorshipHomeViewController: UICollectionViewDataSource, UICollection
         let insets = layout.sectionInset.left + layout.sectionInset.right
         let spacing = layout.minimumInteritemSpacing
         let width = floor((collectionView.bounds.width - insets - spacing) / 2.0)
-        let height = max(width * 0.98, 192)
+        let height = ceil(94 + (width - 16) * 0.85)
         return CGSize(width: width, height: height)
     }
 

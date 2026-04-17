@@ -409,22 +409,20 @@ final class BookViewController: UIViewController {
 
         // Card container
         let card = UIView()
-        card.backgroundColor = UIColor.white.withAlphaComponent(0.84)
+        card.backgroundColor = MentorshipUI.pageBackground
         card.layer.cornerRadius = 30
         card.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         card.layer.shadowColor = MentorshipUI.shadow.cgColor
         card.layer.shadowOpacity = 1
         card.layer.shadowOffset = CGSize(width: 0, height: -6)
         card.layer.shadowRadius = 24
-        card.layer.borderWidth = 1
-        card.layer.borderColor = MentorshipUI.plumStroke.cgColor
         contentView.addSubview(card)
         card.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            card.topAnchor.constraint(equalTo: headerImageView.bottomAnchor, constant: -24),
-            card.leadingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.leadingAnchor),
-            card.trailingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.trailingAnchor),
-            card.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -24)
+            card.topAnchor.constraint(equalTo: headerImageView.bottomAnchor, constant: -30),
+            card.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            card.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            card.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
         ])
 
         // Stacks

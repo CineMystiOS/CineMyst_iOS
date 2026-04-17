@@ -83,7 +83,7 @@ class ConnectionManager {
         }
         
         // Pending - determine if sent or received
-        if connection.requesterId == currentUserId {
+        if connection.requesterId.lowercased() == currentUserId.lowercased() {
             return .requestSent
         } else {
             return .requestReceived
@@ -180,9 +180,10 @@ class ConnectionManager {
         
         // Get the connected user IDs
         var connectedUserIds: [String] = []
+        let lowerUserId = userId.lowercased()
         for connection in connections {
-            let connectedId = connection.requesterId == userId ? connection.receiverId : connection.requesterId
-            if connectedId != userId {
+            let connectedId = connection.requesterId.lowercased() == lowerUserId ? connection.receiverId : connection.requesterId
+            if connectedId.lowercased() != lowerUserId {
                 connectedUserIds.append(connectedId)
             }
         }

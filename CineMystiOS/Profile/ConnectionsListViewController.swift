@@ -77,7 +77,8 @@ final class ConnectionsListViewController: UIViewController {
         Task {
             do {
                 let connections = try await ConnectionManager.shared.fetchUserConnections(userId: userId)
-                let filteredConnections = connections.filter { $0.id != userId }
+                let lowerUserId = userId.lowercased()
+                let filteredConnections = connections.filter { $0.id.lowercased() != lowerUserId }
                 
                 await MainActor.run {
                     self.connections = filteredConnections
