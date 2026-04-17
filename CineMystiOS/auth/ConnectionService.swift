@@ -15,6 +15,13 @@ final class ConnectionService {
     // MARK: - Send follow request
     func sendRequest(to receiverId: String) async throws {
         let uid = try await currentUserId()
+        guard uid != receiverId else {
+            throw NSError(
+                domain: "ConnectionService",
+                code: 400,
+                userInfo: [NSLocalizedDescriptionKey: "You cannot connect with yourself."]
+            )
+        }
 
         struct NewConn: Encodable {
             let requester_id: String

@@ -5,7 +5,6 @@
 //  Modern actor profile screen - #431631 × #CD72A8
 
 import UIKit
-import PhotosUI
 import Supabase
 import AVKit
 import AVFoundation
@@ -57,6 +56,7 @@ class ActorProfileCardView: UIView {
     let nameLabel          = UILabel()
     let verifiedBadge      = UIImageView()
     let roleLabel          = UILabel()
+    let connectionsButton  = UIButton(type: .system)
     let connectionsLabel   = UILabel()
     let editPortfolioButton = GradientButton(type: .system)
     let editProfileButton   = GradientButton(type: .system)   // own profile — edit details
@@ -144,10 +144,17 @@ class ActorProfileCardView: UIView {
         roleLabel.translatesAutoresizingMaskIntoConstraints = false
         addSubview(roleLabel)
 
+        // Connections CTA
+        connectionsButton.translatesAutoresizingMaskIntoConstraints = false
+        connectionsButton.backgroundColor = .clear
+        connectionsButton.accessibilityTraits = [.button]
+        addSubview(connectionsButton)
+
         // Connections Label
         connectionsLabel.font      = UIFont.systemFont(ofSize: 16, weight: .semibold)
         connectionsLabel.textColor = ActorProfileDS.deepPlum
         connectionsLabel.textAlignment = .center
+        connectionsLabel.isUserInteractionEnabled = false
         connectionsLabel.translatesAutoresizingMaskIntoConstraints = false
         addSubview(connectionsLabel)
 
@@ -156,6 +163,7 @@ class ActorProfileCardView: UIView {
         connLabel.font      = UIFont.systemFont(ofSize: 13, weight: .regular)
         connLabel.textColor = .gray
         connLabel.textAlignment = .center
+        connLabel.isUserInteractionEnabled = false
         connLabel.translatesAutoresizingMaskIntoConstraints = false
         addSubview(connLabel)
 
@@ -235,6 +243,11 @@ class ActorProfileCardView: UIView {
             roleLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 4),
             roleLabel.leftAnchor.constraint(equalTo: leftAnchor, constant: 16),
             roleLabel.rightAnchor.constraint(equalTo: rightAnchor, constant: -16),
+
+            connectionsButton.topAnchor.constraint(equalTo: roleLabel.bottomAnchor, constant: 12),
+            connectionsButton.centerXAnchor.constraint(equalTo: centerXAnchor),
+            connectionsButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 120),
+            connectionsButton.heightAnchor.constraint(equalToConstant: 50),
 
             connectionsLabel.topAnchor.constraint(equalTo: roleLabel.bottomAnchor, constant: 16),
             connectionsLabel.leftAnchor.constraint(equalTo: leftAnchor, constant: 16),
@@ -500,7 +513,7 @@ class AboutSectionView: UIView {
 // MARK: - Gallery Header View
 
 class GalleryHeaderView: UIView {
-    let segmentControl = UISegmentedControl(items: ["Gallery", "Flicks", "Tagged"])
+    let segmentControl = UISegmentedControl(items: ["Posts", "Flicks", "Tagged"])
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -917,9 +930,17 @@ final class PrivacyPolicyViewController: UIViewController {
 // MARK: - Gallery Collection View Data Source
 
 struct ProfileMediaItem {
+    enum Source: Equatable {
+        case post
+        case flick
+        case tagged
+    }
+
+    let id: String
     let previewURL: String
     let contentURL: String
     let type: String
+    let source: Source
 }
 
 class GalleryCollectionViewDataSource: NSObject, UICollectionViewDataSource, UICollectionViewDelegate {
@@ -936,7 +957,10 @@ class GalleryCollectionViewDataSource: NSObject, UICollectionViewDataSource, UIC
         else {
             return collectionView.dequeueReusableCell(withReuseIdentifier: GalleryCell.reuseId, for: indexPath)
         }
-        cell.configureWithURL(imageURL: mediaItems[indexPath.item].previewURL)
+        let item = mediaItems[indexPath.item]
+        cell.configureWithURL(imageURL: item.previewURL)
+        cell.setMenuHidden(true)
+        cell.onMenuTap = nil
         return cell
     }
 
@@ -946,12 +970,21 @@ class GalleryCollectionViewDataSource: NSObject, UICollectionViewDataSource, UIC
     }
 }
 
-final class ProfileImageViewerController: UIViewController {
-    private let imageURL: String
-    private let imageView = UIImageView()
+final class ProfileMediaViewerController: UIViewController {
+    private let item: ProfileMediaItem
+    private let showsDeleteAction: Bool
+    private let onDeleteAction: ((ProfileMediaItem) -> Void)?
 
-    init(imageURL: String) {
-        self.imageURL = imageURL
+    private let imageView = UIImageView()
+    private let videoContainerView = UIView()
+    private let actionButton = UIButton(type: .system)
+    private var player: AVPlayer?
+    private var playerLayer: AVPlayerLayer?
+
+    init(item: ProfileMediaItem, showsDeleteAction: Bool, onDeleteAction: ((ProfileMediaItem) -> Void)? = nil) {
+        self.item = item
+        self.showsDeleteAction = showsDeleteAction
+        self.onDeleteAction = onDeleteAction
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -963,7 +996,12 @@ final class ProfileImageViewerController: UIViewController {
 
         imageView.contentMode = .scaleAspectFit
         imageView.translatesAutoresizingMaskIntoConstraints = false
+        imageView.isHidden = item.type == "video"
         view.addSubview(imageView)
+
+        videoContainerView.translatesAutoresizingMaskIntoConstraints = false
+        videoContainerView.isHidden = item.type != "video"
+        view.addSubview(videoContainerView)
 
         let closeButton = UIButton(type: .system)
         closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
@@ -974,19 +1012,48 @@ final class ProfileImageViewerController: UIViewController {
         closeButton.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(closeButton)
 
+        actionButton.setImage(UIImage(systemName: "ellipsis"), for: .normal)
+        actionButton.tintColor = .white
+        actionButton.backgroundColor = UIColor.white.withAlphaComponent(0.12)
+        actionButton.layer.cornerRadius = 20
+        actionButton.translatesAutoresizingMaskIntoConstraints = false
+        actionButton.isHidden = !showsDeleteAction
+        if showsDeleteAction {
+            configureActionMenu()
+        }
+        view.addSubview(actionButton)
+
         NSLayoutConstraint.activate([
             imageView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             imageView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             imageView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             imageView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
+            videoContainerView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            videoContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            videoContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            videoContainerView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
             closeButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
             closeButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             closeButton.widthAnchor.constraint(equalToConstant: 40),
-            closeButton.heightAnchor.constraint(equalToConstant: 40)
+            closeButton.heightAnchor.constraint(equalToConstant: 40),
+
+            actionButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
+            actionButton.trailingAnchor.constraint(equalTo: closeButton.leadingAnchor, constant: -12),
+            actionButton.widthAnchor.constraint(equalToConstant: 40),
+            actionButton.heightAnchor.constraint(equalToConstant: 40)
         ])
 
-        if let url = URL(string: imageURL) {
+        if item.type == "video", let url = URL(string: item.contentURL) {
+            let player = AVPlayer(url: url)
+            let playerLayer = AVPlayerLayer(player: player)
+            playerLayer.videoGravity = .resizeAspect
+            videoContainerView.layer.addSublayer(playerLayer)
+            self.player = player
+            self.playerLayer = playerLayer
+            player.play()
+        } else if let url = URL(string: item.contentURL) {
             URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
                 guard let data, let image = UIImage(data: data) else { return }
                 DispatchQueue.main.async {
@@ -996,14 +1063,51 @@ final class ProfileImageViewerController: UIViewController {
         }
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        playerLayer?.frame = videoContainerView.bounds
+    }
+
     @objc private func closeTapped() {
+        player?.pause()
         dismiss(animated: true)
+    }
+
+    private func configureActionMenu() {
+        let deleteAction = UIAction(
+            title: "Delete",
+            image: UIImage(systemName: "trash"),
+            attributes: .destructive
+        ) { [weak self] _ in
+            self?.presentDeleteConfirmation()
+        }
+
+        actionButton.menu = UIMenu(title: "", children: [deleteAction])
+        actionButton.showsMenuAsPrimaryAction = true
+    }
+
+    private func presentDeleteConfirmation() {
+        let itemName = item.source == .flick ? "Flick" : "Post"
+        let alert = UIAlertController(
+            title: "Delete \(itemName)?",
+            message: "This action cannot be undone.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { [weak self] _ in
+            guard let self else { return }
+            self.player?.pause()
+            self.dismiss(animated: true) {
+                self.onDeleteAction?(self.item)
+            }
+        })
+        present(alert, animated: true)
     }
 }
 
 // MARK: - Main Actor Profile ViewController
 
-final class ActorProfileViewController: UIViewController, EditProfileDelegate, PHPickerViewControllerDelegate {
+final class ActorProfileViewController: UIViewController, EditProfileDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     private enum MediaTab: Int {
         case gallery = 0
         case flicks = 1
@@ -1139,6 +1243,10 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
             card.verifiedBadge.isHidden = !isVerifiedCasting
             card.roleLabel.text        = formatRoleLabel(data)
             card.connectionsLabel.text = "\(data.profile.connectionCount)"
+            card.connectionsButton.accessibilityLabel = "Connections"
+            card.connectionsButton.accessibilityValue = "\(data.profile.connectionCount)"
+            card.connectionsButton.removeTarget(nil, action: nil, for: .allEvents)
+            card.connectionsButton.addTarget(self, action: #selector(connectionsTapped), for: .touchUpInside)
 
             if let url = data.profile.profilePictureUrl {
                 loadImage(from: url) { card.profileImageView.image = $0 }
@@ -1370,6 +1478,15 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
         }
     }
 
+    @objc private func connectionsTapped() {
+        guard let targetUserId = profileData?.profile.id ?? userId else { return }
+
+        let connectionsVC = ConnectionsListViewController()
+        connectionsVC.userId = targetUserId.uuidString
+        connectionsVC.hidesBottomBarWhenPushed = true
+        navigationController?.pushViewController(connectionsVC, animated: true)
+    }
+
     // MARK: - Image Editing (avatar / banner — own profile only)
 
     @objc private func editProfileImageTapped() {
@@ -1391,31 +1508,44 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
     }
 
     private func presentImagePicker(for target: ImageEditTarget) {
-        var config = PHPickerConfiguration(photoLibrary: .shared())
-        config.filter         = .images
-        config.selectionLimit = 1
-        let picker = PHPickerViewController(configuration: config)
-        picker.delegate        = self
         pendingImageEditTarget = target
+        guard UIImagePickerController.isSourceTypeAvailable(.photoLibrary) else {
+            showErrorMessage("Photo library is not available on this device.")
+            return
+        }
+
+        let picker = UIImagePickerController()
+        picker.sourceType = .photoLibrary
+        picker.mediaTypes = ["public.image"]
+        picker.allowsEditing = true
+        picker.delegate = self
         present(picker, animated: true)
     }
 
-    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
         picker.dismiss(animated: true)
-        guard let result = results.first,
-              result.itemProvider.canLoadObject(ofClass: UIImage.self),
-              let target = pendingImageEditTarget else { return }
+        pendingImageEditTarget = nil
+    }
 
-        result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] object, _ in
-            guard let self, let image = object as? UIImage else { return }
-            DispatchQueue.main.async {
-                guard let card = self.contentStackView.arrangedSubviews.first as? ActorProfileCardView else { return }
-                switch target {
-                case .banner: card.bannerImageView.image  = image
-                case .avatar: card.profileImageView.image = image
-                }
-                self.persistImageChange(image, target: target)
+    func imagePickerController(_ picker: UIImagePickerController,
+                               didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        picker.dismiss(animated: true)
+
+        guard let target = pendingImageEditTarget else { return }
+        pendingImageEditTarget = nil
+
+        let selectedImage = (info[.editedImage] ?? info[.originalImage]) as? UIImage
+        guard let image = selectedImage else { return }
+
+        DispatchQueue.main.async {
+            guard let card = self.contentStackView.arrangedSubviews.first as? ActorProfileCardView else { return }
+            switch target {
+            case .banner:
+                card.bannerImageView.image = image
+            case .avatar:
+                card.profileImageView.image = image
             }
+            self.persistImageChange(image, target: target)
         }
     }
 
@@ -1529,16 +1659,13 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
     }
 
     private func openMediaItem(_ item: ProfileMediaItem) {
-        if item.type == "video", let url = URL(string: item.contentURL) {
-            let playerVC = AVPlayerViewController()
-            playerVC.player = AVPlayer(url: url)
-            present(playerVC, animated: true) {
-                playerVC.player?.play()
+        let viewer = ProfileMediaViewerController(
+            item: item,
+            showsDeleteAction: isOwnProfile && item.source != .tagged,
+            onDeleteAction: { [weak self] selectedItem in
+                self?.deleteMedia(selectedItem)
             }
-            return
-        }
-
-        let viewer = ProfileImageViewerController(imageURL: item.contentURL)
+        )
         viewer.modalPresentationStyle = .fullScreen
         present(viewer, animated: true)
     }
@@ -1581,13 +1708,25 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
             mediaItems = posts.compactMap { post in
                 guard let first = post.media.first else { return nil }
                 let previewURL = (first.mediaType == "video" ? first.thumbnailUrl : nil) ?? first.mediaUrl
-                return ProfileMediaItem(previewURL: previewURL, contentURL: first.mediaUrl, type: first.mediaType)
+                return ProfileMediaItem(
+                    id: post.id,
+                    previewURL: previewURL,
+                    contentURL: first.mediaUrl,
+                    type: first.mediaType,
+                    source: .post
+                )
             }
         case .flicks:
             mediaItems = userFlicks.compactMap { flick in
                 let previewURL = flick.thumbnailUrl ?? flick.videoUrl
                 guard !previewURL.isEmpty else { return nil }
-                return ProfileMediaItem(previewURL: previewURL, contentURL: flick.videoUrl, type: "video")
+                return ProfileMediaItem(
+                    id: flick.id,
+                    previewURL: previewURL,
+                    contentURL: flick.videoUrl,
+                    type: "video",
+                    source: .flick
+                )
             }
         case .tagged:
             mediaItems = []
@@ -1603,6 +1742,41 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, P
         galleryHeightConstraint?.constant = rows == 0 ? 0 : rows * itemWidth + max(0, rows - 1) * spacing
         collectionView?.isHidden = mediaItems.isEmpty
         collectionView?.reloadData()
+    }
+
+    private func deleteMedia(_ item: ProfileMediaItem) {
+        loadingView.startAnimating()
+
+        Task {
+            do {
+                switch item.source {
+                case .post:
+                    try await PostManager.shared.deletePost(postId: item.id)
+                case .flick:
+                    try await FlicksService.shared.deleteFlick(flickId: item.id)
+                case .tagged:
+                    return
+                }
+
+                await MainActor.run {
+                    switch item.source {
+                    case .post:
+                        self.posts.removeAll { $0.id == item.id }
+                    case .flick:
+                        self.userFlicks.removeAll { $0.id == item.id }
+                    case .tagged:
+                        break
+                    }
+                    self.loadingView.stopAnimating()
+                    self.updateMediaContent()
+                }
+            } catch {
+                await MainActor.run {
+                    self.loadingView.stopAnimating()
+                    self.showErrorMessage("Failed to delete item: \(error.localizedDescription)")
+                }
+            }
+        }
     }
 
     private func showErrorMessage(_ message: String) {

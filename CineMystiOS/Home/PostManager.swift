@@ -570,6 +570,24 @@ final class PostManager {
     
     // MARK: - Delete Post
     func deletePost(postId: String) async throws {
+        try? await client
+            .from("post_likes")
+            .delete()
+            .eq("post_id", value: postId)
+            .execute()
+
+        try? await client
+            .from("post_comments")
+            .delete()
+            .eq("post_id", value: postId)
+            .execute()
+
+        try? await client
+            .from("post_media")
+            .delete()
+            .eq("post_id", value: postId)
+            .execute()
+
         try await client
             .from("posts")
             .delete()

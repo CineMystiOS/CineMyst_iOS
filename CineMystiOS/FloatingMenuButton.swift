@@ -24,7 +24,7 @@ struct FloatingMenuButton: View {
     private let cameraOffset = CGSize(width: -56, height: -112)
     private let galleryOffset = CGSize(width: 2, height: -92)
     
-    var body: some View {
+    var menuContent: some View {
         ZStack(alignment: .bottomTrailing) {
             if isExpanded {
                 MenuActionButton(
@@ -111,8 +111,20 @@ struct FloatingMenuButton: View {
             .scaleEffect(buttonScale)
             .padding(20)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        // Apply no expanding frame here. We use Spacer outside to position it bottom-trailing perfectly without eating touches.
     }
+    
+    // Position the entire ZStack at the bottom trailing using Spacers, which are guaranteed not to intercept hit tests.
+    var body: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Spacer()
+                menuContent
+            }
+        }
+    }
+    
     
     private func collapseAndExecute(_ action: (() -> Void)?) {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {

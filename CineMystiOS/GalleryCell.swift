@@ -6,6 +6,8 @@ import UIKit
 
 final class GalleryCell: UICollectionViewCell {
     static let reuseId = "GalleryCell"
+
+    var onMenuTap: (() -> Void)?
     
     private let imageView: UIImageView = {
         let iv = UIImageView()
@@ -15,6 +17,17 @@ final class GalleryCell: UICollectionViewCell {
         iv.backgroundColor = .darkGray
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
+    }()
+
+    private let menuButton: UIButton = {
+        let button = UIButton(type: .system)
+        let config = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
+        button.setImage(UIImage(systemName: "ellipsis", withConfiguration: config), for: .normal)
+        button.tintColor = .white
+        button.backgroundColor = UIColor.black.withAlphaComponent(0.38)
+        button.layer.cornerRadius = 15
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
     }()
     
     override init(frame: CGRect) {
@@ -27,18 +40,37 @@ final class GalleryCell: UICollectionViewCell {
     }
     
     private func setupViews() {
-        addSubview(imageView)
+        contentView.addSubview(imageView)
+        contentView.addSubview(menuButton)
+
+        menuButton.addTarget(self, action: #selector(menuTapped), for: .touchUpInside)
         
         NSLayoutConstraint.activate([
-            imageView.topAnchor.constraint(equalTo: topAnchor),
-            imageView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            imageView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            imageView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            imageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+
+            menuButton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
+            menuButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+            menuButton.widthAnchor.constraint(equalToConstant: 30),
+            menuButton.heightAnchor.constraint(equalToConstant: 30)
         ])
+    }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        imageView.image = nil
+        imageView.tintColor = nil
+        onMenuTap = nil
     }
     
     func configure(imageName: String) {
         imageView.image = UIImage(named: imageName)
+    }
+
+    func setMenuHidden(_ hidden: Bool) {
+        menuButton.isHidden = hidden
     }
     
     func configureWithURL(imageURL: String) {
@@ -62,5 +94,9 @@ final class GalleryCell: UICollectionViewCell {
                 self.imageView.image = image
             }
         }.resume()
+    }
+
+    @objc private func menuTapped() {
+        onMenuTap?()
     }
 }

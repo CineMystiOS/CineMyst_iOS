@@ -378,4 +378,25 @@ class FlicksService {
             .rpc("increment_flick_shares", params: ["flick_id": flickId])
             .execute()
     }
+
+    // MARK: - Delete Flick
+    func deleteFlick(flickId: String) async throws {
+        try? await supabase
+            .from("flick_likes")
+            .delete()
+            .eq("flick_id", value: flickId)
+            .execute()
+
+        try? await supabase
+            .from("flick_comments")
+            .delete()
+            .eq("flick_id", value: flickId)
+            .execute()
+
+        try await supabase
+            .from("flicks")
+            .delete()
+            .eq("id", value: flickId)
+            .execute()
+    }
 }

@@ -7,6 +7,20 @@
 import Foundation
 import Supabase
 
+private struct ConnectionParticipants: Decodable {
+    let requesterId: String
+    let receiverId: String
+
+    enum CodingKeys: String, CodingKey {
+        case requesterId = "requester_id"
+        case receiverId = "receiver_id"
+    }
+}
+
+private struct ConnectionIdentifier: Decodable {
+    let id: String
+}
+
 class ConnectionManager {
     static let shared = ConnectionManager()
     private init() {}
@@ -20,6 +34,13 @@ class ConnectionManager {
         }
         
         let requesterId = currentUser.user.id.uuidString
+        guard requesterId != receiverId else {
+            throw NSError(
+                domain: "ConnectionManager",
+                code: 400,
+                userInfo: [NSLocalizedDescriptionKey: "You cannot connect with yourself."]
+            )
+        }
         
         // Insert new connection with pending status
         let connectionData: [String: String] = [
@@ -155,17 +176,18 @@ class ConnectionManager {
             .execute()
         
         let decoder = JSONDecoder()
-        let connections = try decoder.decode([Connection].self, from: response.data)
+        let connections = try decoder.decode([ConnectionParticipants].self, from: response.data)
         
         // Get the connected user IDs
         var connectedUserIds: [String] = []
         for connection in connections {
-            if connection.requesterId == userId {
-                connectedUserIds.append(connection.receiverId)
-            } else {
-                connectedUserIds.append(connection.requesterId)
+            let connectedId = connection.requesterId == userId ? connection.receiverId : connection.requesterId
+            if connectedId != userId {
+                connectedUserIds.append(connectedId)
             }
         }
+
+        connectedUserIds = Array(Set(connectedUserIds)).sorted()
         
         guard !connectedUserIds.isEmpty else {
             return []
@@ -206,7 +228,7 @@ class ConnectionManager {
             .execute()
         
         let decoder = JSONDecoder()
-        let connections = try decoder.decode([Connection].self, from: response.data)
+        let connections = try decoder.decode([ConnectionIdentifier].self, from: response.data)
         return connections.count
     }
 }

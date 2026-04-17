@@ -77,12 +77,13 @@ final class ConnectionsListViewController: UIViewController {
         Task {
             do {
                 let connections = try await ConnectionManager.shared.fetchUserConnections(userId: userId)
+                let filteredConnections = connections.filter { $0.id != userId }
                 
                 await MainActor.run {
-                    self.connections = connections
+                    self.connections = filteredConnections
                     self.loadingIndicator.stopAnimating()
                     
-                    if connections.isEmpty {
+                    if filteredConnections.isEmpty {
                         self.emptyLabel.isHidden = false
                     } else {
                         self.emptyLabel.isHidden = true
@@ -121,8 +122,10 @@ extension ConnectionsListViewController: UITableViewDelegate, UITableViewDataSou
         tableView.deselectRow(at: indexPath, animated: true)
         
         let user = connections[indexPath.row]
-        
-        let profileVC = ActorProfileViewController()
+
+        guard let connectedUserId = UUID(uuidString: user.id) else { return }
+
+        let profileVC = ActorProfileViewController(userId: connectedUserId)
         navigationController?.pushViewController(profileVC, animated: true)
     }
 }

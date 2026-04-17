@@ -159,15 +159,30 @@ class ProfileService {
     /// Count accepted connections for a user from the connections table
     private func fetchConnectionCount(userId: UUID) async -> Int {
         do {
-            // Count rows where user is requester OR receiver and status is accepted
             let uid = userId.uuidString
             let result = try await supabase
                 .from("connections")
-                .select("id", head: true, count: .exact)
+                .select("requester_id,receiver_id")
                 .eq("status", value: "accepted")
                 .or("requester_id.eq.\(uid),receiver_id.eq.\(uid)")
                 .execute()
-            let count = result.count ?? 0
+
+            struct ConnectionPair: Decodable {
+                let requesterId: String
+                let receiverId: String
+
+                enum CodingKeys: String, CodingKey {
+                    case requesterId = "requester_id"
+                    case receiverId = "receiver_id"
+                }
+            }
+
+            let connections = try JSONDecoder().decode([ConnectionPair].self, from: result.data)
+            let connectedIds = Set(connections.compactMap { connection in
+                let otherId = connection.requesterId == uid ? connection.receiverId : connection.requesterId
+                return otherId == uid ? nil : otherId
+            })
+            let count = connectedIds.count
             print("🔗 Connection count for \(uid.prefix(8)): \(count)")
             return count
         } catch {
