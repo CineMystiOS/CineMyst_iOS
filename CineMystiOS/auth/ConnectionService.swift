@@ -73,6 +73,44 @@ final class ConnectionService {
             .execute()
     }
 
+    // MARK: - Fetch following users
+    func fetchFollowing() async throws -> [ProfileRecord] {
+        let uid = try await currentUserId()
+        let response = try await supabase
+            .from("connections")
+            .select("receiver_id")
+            .eq("requester_id", value: uid)
+            .eq("status", value: "accepted")
+            .execute()
+        
+        // This is a bit inefficient (N+1), but for a small following list it's okay.
+        // Better would be a join if the schema allowed easily.
+        let rows = try JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] ?? []
+        let ids = rows.compactMap { $0["receiver_id"] as? String }
+        
+        guard !ids.isEmpty else { return [] }
+        
+        let profileRes = try await supabase
+            .from("profiles")
+            .select("*")
+            .in("id", value: ids)
+            .execute()
+            
+        return try JSONDecoder().decode([ProfileRecord].self, from: profileRes.data)
+    }
+
+    // MARK: - Search users
+    func searchUsers(query: String) async throws -> [ProfileRecord] {
+        let response = try await supabase
+            .from("profiles")
+            .select("*")
+            .ilike("username", value: "\(query)%")
+            .limit(10)
+            .execute()
+            
+        return try JSONDecoder().decode([ProfileRecord].self, from: response.data)
+    }
+
     // MARK: - Helper
     private func currentUserId() async throws -> String {
         try await supabase.auth.session.user.id.uuidString

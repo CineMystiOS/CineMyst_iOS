@@ -19,7 +19,12 @@ struct Flick: Codable, Identifiable {
     let likesCount: Int
     var commentsCount: Int
     let sharesCount: Int
+    let location: String?
+    let taggedUsers: [String]?
+    let hashtags: [String]?
     let createdAt: String
+    let audience: String?       // "everyone" | "friends"
+    let allowComments: Bool?    // true = comments allowed
     
     // User info (joined from profiles table)
     var username: String?
@@ -36,7 +41,12 @@ struct Flick: Codable, Identifiable {
         case likesCount = "likes_count"
         case commentsCount = "comments_count"
         case sharesCount = "shares_count"
+        case location
+        case taggedUsers = "tagged_users"
+        case hashtags
         case createdAt = "created_at"
+        case audience
+        case allowComments = "allow_comments"
         case username
         case fullName = "full_name"
         case profilePictureUrl = "profile_picture_url"
@@ -85,7 +95,45 @@ class FlicksService {
     
     // MARK: - Fetch Flicks
     func fetchFlicks(limit: Int = 10, offset: Int = 0) async throws -> [Flick] {
-        // Simple select — no FK join needed (flicks.user_id has no declared FK constraint)
+        // Get current user ID to filter friends-only flicks
+        let currentUserId = try? await supabase.auth.session.user.id.uuidString
+
+        // Fetch friends (accepted connections) — check BOTH directions
+        // because a connection can be stored as either requester->receiver or receiver->requester
+        var friendIds: Set<String> = []
+        if let currentUserId {
+            // Direction 1: current user sent the request
+            let sentRes = try? await supabase
+                .from("connections")
+                .select("receiver_id")
+                .eq("requester_id", value: currentUserId)
+                .eq("status", value: "accepted")
+                .execute()
+            if let sentRes,
+               let rows = try? JSONSerialization.jsonObject(with: sentRes.data) as? [[String: Any]] {
+                rows.forEach { row in
+                    if let id = row["receiver_id"] as? String { friendIds.insert(id) }
+                }
+            }
+
+            // Direction 2: current user received the request
+            let receivedRes = try? await supabase
+                .from("connections")
+                .select("requester_id")
+                .eq("receiver_id", value: currentUserId)
+                .eq("status", value: "accepted")
+                .execute()
+            if let receivedRes,
+               let rows = try? JSONSerialization.jsonObject(with: receivedRes.data) as? [[String: Any]] {
+                rows.forEach { row in
+                    if let id = row["requester_id"] as? String { friendIds.insert(id) }
+                }
+            }
+
+            // Always include own flicks
+            friendIds.insert(currentUserId)
+        }
+
         let response = try await supabase
             .from("flicks")
             .select("*")
@@ -94,6 +142,17 @@ class FlicksService {
             .execute()
 
         var flicks = try JSONDecoder().decode([Flick].self, from: response.data)
+
+        // Filter: hide friends-only flicks from non-friends
+        if let currentUserId {
+            flicks = flicks.filter { flick in
+                if flick.audience == "friends" {
+                    // Show if it's your own flick OR the poster is a connected friend
+                    return flick.userId == currentUserId || friendIds.contains(flick.userId)
+                }
+                return true // "everyone" or nil (legacy rows) are always visible
+            }
+        }
 
         // Enrich each flick with profile info via separate lookup
         for i in flicks.indices {
@@ -110,7 +169,7 @@ class FlicksService {
                     flicks[i].profilePictureUrl  = json["profile_picture_url"] as? String
                 }
             }
-            // 2. Fetch accurate comment count
+            // Fetch accurate comment count
             if let commentsData = try? await supabase
                 .from("flick_comments")
                 .select("id")
@@ -160,7 +219,17 @@ class FlicksService {
     }
     
     // MARK: - Create Flick
-    func createFlick(videoUrl: String, thumbnailUrl: String?, caption: String?, audioTitle: String?) async throws -> Flick {
+    func createFlick(
+        videoUrl: String,
+        thumbnailUrl: String?,
+        caption: String?,
+        audioTitle: String?,
+        location: String? = nil,
+        taggedUsers: [String]? = nil,
+        hashtags: [String]? = nil,
+        audience: String = "everyone",
+        allowComments: Bool = true
+    ) async throws -> Flick {
         guard let userId = try? await supabase.auth.session.user.id.uuidString else {
             throw NSError(domain: "FlicksService", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
         }
@@ -174,6 +243,11 @@ class FlicksService {
             let likes_count: Int
             let comments_count: Int
             let shares_count: Int
+            let location: String?
+            let tagged_users: [String]?
+            let hashtags: [String]?
+            let audience: String
+            let allow_comments: Bool
         }
         
         let newFlick = NewFlick(
@@ -184,7 +258,12 @@ class FlicksService {
             audio_title: audioTitle ?? "Original Audio",
             likes_count: 0,
             comments_count: 0,
-            shares_count: 0
+            shares_count: 0,
+            location: location,
+            tagged_users: taggedUsers,
+            hashtags: hashtags,
+            audience: audience,
+            allow_comments: allowComments
         )
         
         let response = try await supabase

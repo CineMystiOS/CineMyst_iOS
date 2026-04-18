@@ -292,8 +292,9 @@ extension FlickUploadViewController: PHPickerViewControllerDelegate {
                 // Present FlickComposerViewController from the presenting view controller
                 self?.dismiss(animated: true) {
                     let composer = FlickComposerViewController(videoURL: url)
-                    composer.modalPresentationStyle = .fullScreen
-                    presentingVC.present(composer, animated: true)
+                    let nav = UINavigationController(rootViewController: composer)
+                    nav.modalPresentationStyle = .fullScreen
+                    presentingVC.present(nav, animated: true)
                 }
             }
         }

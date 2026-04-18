@@ -253,7 +253,8 @@ final class ReelsViewController: UIViewController {
                         shares: reel.shares,
                         audioTitle: reel.audioTitle,
                         caption: reel.caption,
-                        isLiked: isLiked
+                        isLiked: isLiked,
+                        allowComments: reel.allowComments
                     )
                     self.reels[index] = updatedReel
                     
@@ -421,6 +422,7 @@ extension ReelsViewController: ReelCellDelegate {
         
         let commentVC = CommentBottomSheetViewController()
         commentVC.flickId = reel.id
+        commentVC.allowComments = reel.allowComments
         commentVC.modalPresentationStyle = .pageSheet
         
         if let sheet = commentVC.sheetPresentationController {

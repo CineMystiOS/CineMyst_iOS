@@ -409,9 +409,10 @@ extension CameraViewController: AVCaptureFileOutputRecordingDelegate {
             }
             
             let flickComposer = FlickComposerViewController(videoURL: videoURL)
-            flickComposer.modalPresentationStyle = .fullScreen
+            let nav = UINavigationController(rootViewController: flickComposer)
+            nav.modalPresentationStyle = .fullScreen
             
-            topVC?.present(flickComposer, animated: true)
+            topVC?.present(nav, animated: true)
         }
     }
 }

@@ -10,6 +10,7 @@ final class CommentBottomSheetViewController: UIViewController {
 
     // MARK: - Public
     var flickId: String?
+    var allowComments: Bool = true  // Set from the Flick model before presenting
 
     // MARK: - Design
     private enum DS {
@@ -132,6 +133,25 @@ final class CommentBottomSheetViewController: UIViewController {
         inputField.delegate = self
         sendButton.addTarget(self, action: #selector(sendTapped), for: .touchUpInside)
         loadComments()
+
+        // Enforce allow_comments setting
+        if !allowComments {
+            inputBar.isHidden = true
+            // Show a disabled notice
+            let notice = UILabel()
+            notice.text = "🔒 Comments are turned off for this Flick"
+            notice.font = .systemFont(ofSize: 13, weight: .medium)
+            notice.textColor = UIColor(white: 1, alpha: 0.4)
+            notice.textAlignment = .center
+            notice.numberOfLines = 0
+            notice.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(notice)
+            NSLayoutConstraint.activate([
+                notice.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+                notice.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+                notice.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -12)
+            ])
+        }
     }
 
     override func viewWillDisappear(_ animated: Bool) {

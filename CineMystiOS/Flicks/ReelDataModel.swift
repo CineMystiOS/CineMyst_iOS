@@ -22,6 +22,7 @@ struct Reel {
     let audioTitle: String
     let caption: String?
     let isLiked: Bool
+    let allowComments: Bool   // from flick.allow_comments
     
     // Helper to create from Flick model
     static func from(flick: Flick, isLiked: Bool = false) -> Reel {
@@ -38,7 +39,8 @@ struct Reel {
             shares: formatCount(flick.sharesCount),
             audioTitle: flick.audioTitle ?? "Original Audio",
             caption: flick.caption,
-            isLiked: isLiked
+            isLiked: isLiked,
+            allowComments: flick.allowComments ?? true
         )
     }
     
