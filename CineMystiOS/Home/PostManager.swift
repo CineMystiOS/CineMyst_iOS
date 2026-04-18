@@ -17,7 +17,10 @@ final class PostManager {
     
     // MARK: - Fetch Posts
     func fetchPosts(limit: Int = 50, offset: Int = 0) async throws -> [Post] {
-        let currentUserId = try? await AuthManager.shared.currentSession()?.user.id.uuidString
+        var currentUserId = AuthManager.shared.currentUser?.id.uuidString
+        if currentUserId == nil {
+            currentUserId = try? await AuthManager.shared.currentSession()?.user.id.uuidString
+        }
         let response = try await client
             .from("posts")
             .select("""
@@ -79,7 +82,10 @@ final class PostManager {
     
     // MARK: - Fetch User Posts (for Profile)
     func fetchUserPosts(userId: String, limit: Int = 50) async throws -> [Post] {
-        let currentUserId = try? await AuthManager.shared.currentSession()?.user.id.uuidString
+        var currentUserId = AuthManager.shared.currentUser?.id.uuidString
+        if currentUserId == nil {
+            currentUserId = try? await AuthManager.shared.currentSession()?.user.id.uuidString
+        }
         let response = try await client
             .from("posts")
             .select("""
@@ -168,23 +174,30 @@ final class PostManager {
     private func fetchLikedPostIds(postIds: [String], userId: String) async throws -> Set<String> {
         guard !postIds.isEmpty else { return [] }
 
-        let response = try await client
-            .from("post_likes")
-            .select("post_id")
-            .eq("user_id", value: userId)
-            .execute()
+        let lowercasedUserId = userId.lowercased()
+        print("🔍 Checking likes for \(postIds.count) posts, user: \(lowercasedUserId)")
+        
+        do {
+            let response = try await client
+                .from("post_likes")
+                .select("post_id")
+                .eq("user_id", value: lowercasedUserId)
+                .in("post_id", value: postIds)
+                .execute()
 
-        struct PostLikeRow: Decodable {
-            let postId: String
-
-            enum CodingKeys: String, CodingKey {
-                case postId = "post_id"
+            struct PostLikeRow: Decodable {
+                let postId: String
+                enum CodingKeys: String, CodingKey { case postId = "post_id" }
             }
-        }
 
-        let likedRows = try JSONDecoder().decode([PostLikeRow].self, from: response.data)
-        let visiblePostIds = Set(postIds)
-        return Set(likedRows.compactMap { visiblePostIds.contains($0.postId) ? $0.postId : nil })
+            let likedRows = try JSONDecoder().decode([PostLikeRow].self, from: response.data)
+            let result = Set(likedRows.map { $0.postId })
+            print("✅ Found \(result.count) likes for user \(lowercasedUserId) across these posts")
+            return result
+        } catch {
+            print("❌ Error fetching liked post IDs: \(error)")
+            return []
+        }
     }
     
     private func fetchUserProfile(userId: String) async throws -> ProfileRecord? {
@@ -375,7 +388,7 @@ final class PostManager {
             commentsCount: postResponse.commentsCount,
             sharesCount: postResponse.sharesCount,
             createdAt: postResponse.createdAt,
-            isLiked: false
+            isLiked: false // Newly created posts start unliked
         )
     }
     
@@ -433,7 +446,7 @@ final class PostManager {
             throw NSError(domain: "PostManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
         }
         
-        let userId = session.user.id.uuidString
+        let userId = session.user.id.uuidString.lowercased()
         
         // Check if already liked
         let existingLike = try await client
@@ -474,7 +487,7 @@ final class PostManager {
             throw NSError(domain: "PostManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
         }
         
-        let userId = session.user.id.uuidString
+        let userId = session.user.id.uuidString.lowercased()
         
         // Delete the like
         try await client

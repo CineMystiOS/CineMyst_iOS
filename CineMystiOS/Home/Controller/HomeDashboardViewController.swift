@@ -123,10 +123,9 @@ struct HomeQuickLink {
 
 final class HomeFeedTableView: UITableView {
     override func touchesShouldCancel(in view: UIView) -> Bool {
-        if view is UIControl {
-            return true
-        }
-        return super.touchesShouldCancel(in: view)
+        // Return true to allow the table view to cancel touches and take over scrolling
+        // even if the touch started on a subview like a button or a view with a gesture recognizer.
+        return true
     }
 }
 
@@ -460,7 +459,7 @@ final class HomeDashboardViewController: UIViewController {
         tableView.separatorStyle = .none; tableView.showsVerticalScrollIndicator = false
         tableView.backgroundColor = .clear
         tableView.canCancelContentTouches = true
-        tableView.delaysContentTouches = false
+        tableView.delaysContentTouches = true
         tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 100, right: 0)
         tableView.tableHeaderView = makeTableHeader()
         refreshControl.tintColor = CineMystTheme.pink
@@ -2325,13 +2324,19 @@ final class AdBannerCell: UITableViewCell {
 // to the table view below, fixing the "scrolling blocked" issue.
 
 private final class PassthroughHostingController<Content: View>: UIHostingController<Content> {
+    override func loadView() {
+        super.loadView()
+        // We replace the view with a PassthroughView but keep the original view as a subview
+        // However, a cleaner way is to just override hitTest on the view if we can.
+        // Since we can't easily change the class of UIHostingController.view after it's created,
+        // we override loadView to use our custom PassthroughView.
+        let rootView = PassthroughView()
+        rootView.backgroundColor = .clear
+        self.view = rootView
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .clear
-    }
-    
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
         view.backgroundColor = .clear
     }
 }
