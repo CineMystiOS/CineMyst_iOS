@@ -1588,6 +1588,8 @@ final class PostFeedCell: UITableViewCell {
     var onProfile: (() -> Void)?
     var onImageTap: (([String], Int) -> Void)?
     var onLikeStateChanged: ((String, Bool, Int) -> Void)?
+    var onMoreTap: ((UIButton) -> Void)?
+    var isManagementEnabled: Bool = false
     
     private var postId: String = ""
     private var userId: String = ""
@@ -1608,6 +1610,7 @@ final class PostFeedCell: UITableViewCell {
     private let commentButton  = UIButton(type: .system)
     private let commentCountLabel = UILabel()
     private let shareButton    = UIButton(type: .system)
+    private let moreButton     = UIButton(type: .system)
     private var isLiked        = false
     private var currentLikeCount = 0
     private var currentCommentCount = 0
@@ -1677,10 +1680,18 @@ final class PostFeedCell: UITableViewCell {
         let headerRow = UIStackView(arrangedSubviews: [avatarView, infoStack])
         headerRow.axis = .horizontal; headerRow.spacing = 10; headerRow.alignment = .center
         card.addSubview(headerRow); headerRow.translatesAutoresizingMaskIntoConstraints = false
+        
+        // More button (kebab)
+        moreButton.setImage(UIImage(systemName: "ellipsis"), for: .normal)
+        moreButton.tintColor = .secondaryLabel
+        moreButton.addTarget(self, action: #selector(moreTapped), for: .touchUpInside)
+        card.addSubview(moreButton); moreButton.translatesAutoresizingMaskIntoConstraints = false
+        
         profileTapButton.backgroundColor = .clear
         profileTapButton.tintColor = .clear
         profileTapButton.addTarget(self, action: #selector(profileTapped), for: .touchUpInside)
         card.addSubview(profileTapButton); profileTapButton.translatesAutoresizingMaskIntoConstraints = false
+        card.bringSubviewToFront(moreButton)
 
         // Caption
         captionLabel.font = .systemFont(ofSize: 13.5, weight: .regular)
@@ -1759,7 +1770,12 @@ final class PostFeedCell: UITableViewCell {
             reactionStack.topAnchor.constraint(equalTo: sep.bottomAnchor, constant: 10),
             reactionStack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
             reactionStack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -14),
-            reactionStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -12)
+            reactionStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -12),
+            
+            moreButton.centerYAnchor.constraint(equalTo: headerRow.centerYAnchor),
+            moreButton.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -10),
+            moreButton.widthAnchor.constraint(equalToConstant: 32),
+            moreButton.heightAnchor.constraint(equalToConstant: 32)
         ])
     }
 
@@ -1779,6 +1795,14 @@ final class PostFeedCell: UITableViewCell {
         isLiked = post.isLiked
         likeButton.setImage(UIImage(systemName: isLiked ? "heart.fill" : "heart"), for: .normal)
         likeButton.tintColor = isLiked ? .systemRed : .secondaryLabel
+
+        // Only show more button if it's the current user's post
+        // Show more button only if management is enabled AND it belongs to current user
+        if isManagementEnabled, let currentUserId = AuthManager.shared.currentUser?.id.uuidString.lowercased() {
+            moreButton.isHidden = post.userId.lowercased() != currentUserId
+        } else {
+            moreButton.isHidden = true
+        }
 
         // Load profile picture or show initials as fallback
         avatarLabel.text = String(name.prefix(1)).uppercased()
@@ -2026,6 +2050,7 @@ final class PostFeedCell: UITableViewCell {
     @objc private func commentTapped(_ sender: Any?) { onComment?() }
     @objc private func shareTapped(_ sender: Any?)   { onShare?()   }
     @objc private func profileTapped(_ sender: Any?) { onProfile?() }
+    @objc private func moreTapped()                  { onMoreTap?(moreButton) }
     
     @objc private func imageTapped(_ sender: UITapGestureRecognizer) {
         guard let iv = sender.view as? UIImageView else { return }
@@ -2348,5 +2373,140 @@ private final class PassthroughView: UIView {
         // that are also transparent/empty containers, we return nil to let the touch
         // pass through to the views behind it (like the feed table view).
         return (hitView == self) ? nil : hitView
+    }
+}
+
+// MARK: ═══════════════════════════════════════════
+// MARK: CELL: FlickFeedCell (Card style)
+// MARK: ═══════════════════════════════════════════
+
+final class FlickFeedCell: UITableViewCell {
+    static let reuseId = "FlickFeedCell"
+    
+    var onMoreTap: ((UIButton) -> Void)?
+    
+    private let card           = UIView()
+    private let videoPreview   = UIImageView()
+    private let playIcon       = UIImageView()
+    private let captionLabel   = UILabel()
+    private let moreButton     = UIButton(type: .system)
+    private let headerRow      = UIStackView()
+    private let nameLabel      = UILabel()
+    private let timeLabel      = UILabel()
+    
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        selectionStyle = .none
+        backgroundColor = .clear
+        setupUI()
+    }
+    
+    required init?(coder: NSCoder) { fatalError() }
+    
+    private func setupUI() {
+        card.backgroundColor = UIColor(red: 1.0, green: 0.995, blue: 0.985, alpha: 0.96)
+        card.layer.cornerRadius = CineMystTheme.cardRadius
+        card.layer.borderWidth = 0.5
+        card.layer.borderColor = UIColor(red: 0.92, green: 0.87, blue: 0.78, alpha: 1).cgColor
+        card.layer.shadowColor = CineMystTheme.ink.cgColor
+        card.layer.shadowOpacity = 0.06
+        card.layer.shadowRadius = 16
+        card.layer.shadowOffset = CGSize(width: 0, height: 8)
+        contentView.addSubview(card)
+        card.translatesAutoresizingMaskIntoConstraints = false
+        
+        nameLabel.font = .systemFont(ofSize: 14, weight: .semibold)
+        nameLabel.textColor = CineMystTheme.ink
+        timeLabel.font = .systemFont(ofSize: 11)
+        timeLabel.textColor = .secondaryLabel
+        
+        let infoStack = UIStackView(arrangedSubviews: [nameLabel, timeLabel])
+        infoStack.axis = .vertical; infoStack.spacing = 2
+        
+        moreButton.setImage(UIImage(systemName: "ellipsis"), for: .normal)
+        moreButton.tintColor = .secondaryLabel
+        moreButton.addTarget(self, action: #selector(moreTapped), for: .touchUpInside)
+        
+        let header = UIStackView(arrangedSubviews: [infoStack, UIView(), moreButton])
+        header.axis = .horizontal; header.alignment = .center
+        card.addSubview(header)
+        header.translatesAutoresizingMaskIntoConstraints = false
+        
+        videoPreview.contentMode = .scaleAspectFill
+        videoPreview.clipsToBounds = true
+        videoPreview.layer.cornerRadius = CineMystTheme.cardRadiusSm
+        videoPreview.backgroundColor = .systemGray6
+        card.addSubview(videoPreview)
+        videoPreview.translatesAutoresizingMaskIntoConstraints = false
+        
+        playIcon.image = UIImage(systemName: "play.fill")
+        playIcon.tintColor = .white
+        playIcon.contentMode = .scaleAspectFit
+        videoPreview.addSubview(playIcon)
+        playIcon.translatesAutoresizingMaskIntoConstraints = false
+        
+        captionLabel.font = .systemFont(ofSize: 13.5)
+        captionLabel.textColor = CineMystTheme.ink.withAlphaComponent(0.92)
+        captionLabel.numberOfLines = 0
+        card.addSubview(captionLabel)
+        captionLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        NSLayoutConstraint.activate([
+            card.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 7),
+            card.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
+            card.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -14),
+            card.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -7),
+            
+            header.topAnchor.constraint(equalTo: card.topAnchor, constant: 14),
+            header.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
+            header.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -14),
+            
+            videoPreview.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 12),
+            videoPreview.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 10),
+            videoPreview.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -10),
+            videoPreview.heightAnchor.constraint(equalTo: videoPreview.widthAnchor, multiplier: 1.2), // Vertical rectangular
+            
+            playIcon.centerXAnchor.constraint(equalTo: videoPreview.centerXAnchor),
+            playIcon.centerYAnchor.constraint(equalTo: videoPreview.centerYAnchor),
+            playIcon.widthAnchor.constraint(equalToConstant: 40),
+            playIcon.heightAnchor.constraint(equalToConstant: 40),
+            
+            captionLabel.topAnchor.constraint(equalTo: videoPreview.bottomAnchor, constant: 10),
+            captionLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
+            captionLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -14),
+            captionLabel.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -14)
+        ])
+    }
+    
+    func configure(with flick: Flick) {
+        nameLabel.text = flick.fullName ?? flick.username ?? "User"
+        timeLabel.text = "Flick"
+        captionLabel.text = flick.caption
+        
+        if let thumb = flick.thumbnailUrl, let url = URL(string: thumb) {
+            loadImage(from: url)
+        } else if let video = URL(string: flick.videoUrl) {
+            // In a real app we'd generate a thumbnail
+        }
+        
+        // Ownership check for kebab menu
+        if let currentUserId = AuthManager.shared.currentUser?.id.uuidString.lowercased() {
+            moreButton.isHidden = flick.userId.lowercased() != currentUserId
+        } else {
+            moreButton.isHidden = true
+        }
+    }
+    
+    @objc private func moreTapped() {
+        onMoreTap?(moreButton)
+    }
+    
+    private func loadImage(from url: URL) {
+        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+            guard let data = data, let image = UIImage(data: data) else { return }
+            DispatchQueue.main.async {
+                self?.videoPreview.image = image
+            }
+        }.resume()
     }
 }

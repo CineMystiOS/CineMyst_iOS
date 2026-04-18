@@ -630,6 +630,15 @@ final class PostManager {
             .execute()
     }
     
+    // MARK: - Update Post
+    func updatePostCaption(postId: String, newCaption: String) async throws {
+        try await client
+            .from("posts")
+            .update(["caption": newCaption])
+            .eq("id", value: postId)
+            .execute()
+    }
+    
     // MARK: - Fetch Current User Profile
     func fetchCurrentUserProfile() async throws -> CommentUserProfile? {
         guard let session = try await AuthManager.shared.currentSession() else {

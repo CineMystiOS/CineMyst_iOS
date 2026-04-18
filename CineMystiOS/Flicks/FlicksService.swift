@@ -14,7 +14,7 @@ struct Flick: Codable, Identifiable {
     let userId: String
     let videoUrl: String
     let thumbnailUrl: String?
-    let caption: String?
+    var caption: String?
     let audioTitle: String?
     let likesCount: Int
     var commentsCount: Int
@@ -374,7 +374,16 @@ class FlicksService {
             print("RPC decrement failed, but unlike succeeded: \(error)")
         }
     }
-
+    
+    // MARK: - Update Flick
+    func updateFlickCaption(flickId: String, newCaption: String) async throws {
+        try await supabase
+            .from("flicks")
+            .update(["caption": newCaption])
+            .eq("id", value: flickId)
+            .execute()
+    }
+    
     // MARK: - Check if Liked
     func isFlickLiked(flickId: String) async throws -> Bool {
         guard let uid = try? await supabase.auth.session.user.id.uuidString else { return false }

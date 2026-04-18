@@ -1123,7 +1123,7 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
     private var galleryHeightConstraint: NSLayoutConstraint?
 
     private var profileData: UserProfileData?
-    private var posts:        [PostData] = []
+    private var posts:        [Post] = []
     private var userFlicks:   [Flick] = []
     private let userId:       UUID?
     private var hasPortfolio: Bool   = false
@@ -1201,7 +1201,7 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
 
                 let isFirstLoad    = self.profileData == nil
                 self.profileData   = combined
-                self.posts         = try await ProfileService.shared.fetchUserPosts(userId: combined.profile.id)
+                self.posts         = try await PostManager.shared.fetchUserPosts(userId: combined.profile.id.uuidString)
                 self.userFlicks    = try await self.fetchUserFlicks(userId: combined.profile.id)
                 self.hasPortfolio  = await ProfileService.shared.hasPortfolio(userId: combined.profile.id)
                 let castingProfile = await self.fetchCastingProfile(userId: combined.profile.id)
@@ -1659,6 +1659,25 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
     }
 
     private func openMediaItem(_ item: ProfileMediaItem) {
+        if item.source == .post {
+            // Find the index of the post in our local array
+            if let index = posts.firstIndex(where: { $0.id == item.id }) {
+                let feedVC = UserPostsFeedViewController(posts: posts, startIndex: index)
+                feedVC.hidesBottomBarWhenPushed = true
+                navigationController?.pushViewController(feedVC, animated: true)
+                return
+            }
+        } else if item.source == .flick {
+            // Find the index of the flick in our local array
+            if let index = userFlicks.firstIndex(where: { $0.id == item.id }) {
+                let flickFeedVC = UserFlicksFeedViewController(flicks: userFlicks, startIndex: index)
+                flickFeedVC.hidesBottomBarWhenPushed = true
+                navigationController?.pushViewController(flickFeedVC, animated: true)
+                return
+            }
+        }
+        
+        // Fallback for other items to the single viewer
         let viewer = ProfileMediaViewerController(
             item: item,
             showsDeleteAction: isOwnProfile && item.source != .tagged,
@@ -1677,7 +1696,19 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
             .eq("user_id", value: userId.uuidString)
             .order("created_at", ascending: false)
             .execute()
-        return try JSONDecoder().decode([Flick].self, from: response.data)
+        
+        var flicks = try JSONDecoder().decode([Flick].self, from: response.data)
+        
+        // Inject user info from our loaded profileData
+        if let data = profileData {
+            for i in 0..<flicks.count {
+                flicks[i].username = data.profile.username
+                flicks[i].fullName = data.profile.fullName
+                flicks[i].profilePictureUrl = data.profile.profilePictureUrl
+            }
+        }
+        
+        return flicks
     }
 
     private func fetchCastingProfile(userId: UUID) async -> CastingProfileRecord? {
@@ -1706,13 +1737,13 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
         switch selectedMediaTab {
         case .gallery:
             mediaItems = posts.compactMap { post in
-                guard let first = post.media.first else { return nil }
-                let previewURL = (first.mediaType == "video" ? first.thumbnailUrl : nil) ?? first.mediaUrl
+                guard let first = post.mediaUrls.first else { return nil }
+                let previewURL = (first.mediaType == .video ? first.thumbnailUrl : nil) ?? first.url
                 return ProfileMediaItem(
                     id: post.id,
                     previewURL: previewURL,
-                    contentURL: first.mediaUrl,
-                    type: first.mediaType,
+                    contentURL: first.url,
+                    type: first.type,
                     source: .post
                 )
             }

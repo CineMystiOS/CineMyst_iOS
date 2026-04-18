@@ -22,7 +22,7 @@ struct Post: Identifiable {
     let username: String
     let fullName: String?
     let userProfilePictureUrl: String?
-    let caption: String?
+    var caption: String?
     let mediaUrls: [PostMedia]
     let likesCount: Int
     let commentsCount: Int
