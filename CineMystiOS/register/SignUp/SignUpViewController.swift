@@ -403,10 +403,7 @@ class SignUpViewController: UIViewController {
                     showLoading(false)
                     
                     if self.requiresEmailConfirmation() {
-                        self.showAlert(
-                            title: "Account Created",
-                            message: "Please check your email to verify your account, then sign in to continue."
-                        )
+                        self.showVerificationAlert()
                     } else {
                         // ✅ Check if session exists
                         if authResponse.session != nil {
@@ -518,6 +515,21 @@ class SignUpViewController: UIViewController {
     }
 
     
+    // MARK: - Email Verification Alert
+    private func showVerificationAlert() {
+        let alert = UIAlertController(
+            title: "Verify Your Email",
+            message: "A verification link has been sent to your email. Please check your inbox to activate your account before signing in.",
+            preferredStyle: .alert
+        )
+        
+        let okAction = UIAlertAction(title: "OK", style: .default) { [weak self] _ in
+            self?.navigationController?.popViewController(animated: true)
+        }
+        
+        alert.addAction(okAction)
+        present(alert, animated: true)
+    }
 }
 
 // MARK: - UITextFieldDelegate
