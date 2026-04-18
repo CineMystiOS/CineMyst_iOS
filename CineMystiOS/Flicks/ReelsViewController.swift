@@ -97,8 +97,14 @@ final class ReelsViewController: UIViewController {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(true, animated: false)
         reels = []
+        currentIndex = 0
         collectionView.reloadData()
         Task { await fetchReelsFromSupabase() }
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        playCurrentVideo()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -221,6 +227,11 @@ final class ReelsViewController: UIViewController {
                 reels.append(contentsOf: newReels)
             }
             collectionView.reloadData()
+            
+            // Auto-play the first video once data is loaded
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.playCurrentVideo()
+            }
 
         } catch {
             print("❌ Failed to fetch flicks: \(error)")
@@ -437,36 +448,22 @@ extension ReelsViewController: ReelCellDelegate {
     func didTapShare(on cell: ReelCell) {
         guard let indexPath = collectionView.indexPath(for: cell) else { return }
         let reel = reels[indexPath.item]
-        
-        // Create share items
-        let shareText = "Check out this flick by \(reel.authorName)!"
-        let shareURL = URL(string: reel.videoURL)
-        
-        var itemsToShare: [Any] = [shareText]
-        if let url = shareURL {
-            itemsToShare.append(url)
+
+        let shareVC = ShareBottomSheetViewController()
+        shareVC.flickId           = reel.id
+        shareVC.flickVideoURL     = reel.videoURL
+        shareVC.flickCaption      = reel.caption
+        shareVC.flickAuthorName   = reel.authorName
+        shareVC.flickAuthorAvatarURL = reel.authorAvatarURL
+        shareVC.modalPresentationStyle = .pageSheet
+
+        if let sheet = shareVC.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 24
         }
-        
-        let activityVC = UIActivityViewController(activityItems: itemsToShare, applicationActivities: nil)
-        
-        // iPad support
-        if let popover = activityVC.popoverPresentationController {
-            popover.sourceView = cell
-            popover.sourceRect = CGRect(x: cell.bounds.midX, y: cell.bounds.midY, width: 0, height: 0)
-        }
-        
-        present(activityVC, animated: true) {
-            // Increment share count in backend
-            Task {
-                do {
-                    try await FlicksService.shared.incrementShareCount(flickId: reel.id)
-                    // Update local count
-                    await self.updateShareCount(at: indexPath.item)
-                } catch {
-                    print("Failed to increment share count: \(error)")
-                }
-            }
-        }
+
+        present(shareVC, animated: true)
     }
 
     func didTapMore(on cell: ReelCell, sourceView: UIView) {
@@ -536,8 +533,9 @@ extension ReelsViewController: PHPickerViewControllerDelegate {
                 try FileManager.default.copyItem(at: url, to: tempURL)
                 DispatchQueue.main.async {
                     let composer = FlickComposerViewController(videoURL: tempURL)
-                    composer.modalPresentationStyle = .fullScreen
-                    self.present(composer, animated: true)
+                    let nav = UINavigationController(rootViewController: composer)
+                    nav.modalPresentationStyle = .fullScreen
+                    self.present(nav, animated: true)
                 }
             } catch {
                 print("❌ Failed to copy video: \(error)")

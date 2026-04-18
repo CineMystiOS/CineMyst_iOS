@@ -203,19 +203,18 @@ final class ShareBottomSheetController: UIViewController {
     }
 
     private func buildShareText() -> String {
+        let name = post.displayName
+        let avatarURL = post.userProfilePictureUrl ?? ""
         let caption = post.caption?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let firstMediaURL = post.mediaUrls.first?.url ?? ""
 
-        if !caption.isEmpty, !firstMediaURL.isEmpty {
-            return "Shared a post with you on CineMyst:\n\n\(caption)\n\n\(firstMediaURL)"
-        }
-        if !caption.isEmpty {
-            return "Shared a post with you on CineMyst:\n\n\(caption)"
-        }
-        if !firstMediaURL.isEmpty {
-            return "Shared a post with you on CineMyst:\n\n\(firstMediaURL)"
-        }
-        return "Shared a post with you on CineMyst."
+        var parts = ["[POST]"]
+        parts.append("author:\(name)")
+        if !avatarURL.isEmpty { parts.append("avatar:\(avatarURL)") }
+        if !caption.isEmpty   { parts.append("caption:\(caption)") }
+        if !firstMediaURL.isEmpty { parts.append(firstMediaURL) }
+        
+        return parts.joined(separator: "\n")
     }
 }
 

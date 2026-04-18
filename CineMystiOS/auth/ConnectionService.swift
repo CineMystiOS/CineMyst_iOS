@@ -50,16 +50,36 @@ final class ConnectionService {
             .execute()
     }
 
-    // MARK: - Check if following
-    func isFollowing(userId: String) async throws -> Bool {
+    // MARK: - Check connection status (both directions)
+    // Returns: "connected" | "pending" | "none"
+    func connectionStatus(with userId: String) async throws -> String {
         let uid = try await currentUserId()
-        let res = try await supabase
+
+        // Check if I sent a request
+        let sentRes = try await supabase
             .from("connections")
-            .select("id")
+            .select("status")
             .eq("requester_id", value: uid)
             .eq("receiver_id",  value: userId)
             .execute()
-        return !res.data.isEmpty
+        if let rows = try? JSONSerialization.jsonObject(with: sentRes.data) as? [[String: Any]],
+           let row = rows.first, let status = row["status"] as? String {
+            return status == "accepted" ? "connected" : "pending"
+        }
+
+        // Check if they sent a request to me
+        let recvRes = try await supabase
+            .from("connections")
+            .select("status")
+            .eq("requester_id", value: userId)
+            .eq("receiver_id",  value: uid)
+            .execute()
+        if let rows = try? JSONSerialization.jsonObject(with: recvRes.data) as? [[String: Any]],
+           let row = rows.first, let status = row["status"] as? String {
+            return status == "accepted" ? "connected" : "pending"
+        }
+
+        return "none"
     }
 
     // MARK: - Accept a request

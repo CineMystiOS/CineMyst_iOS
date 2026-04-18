@@ -4,6 +4,7 @@
 
 import UIKit
 import Supabase
+import AVFoundation
 
 private extension UITextField {
     func applyCineMystSearchStyle(placeholderText: String) {
@@ -868,7 +869,9 @@ final class ChatViewController: UIViewController {
         tableView.separatorStyle = .none
         tableView.delegate = self
         tableView.dataSource = self
-        tableView.register(ChatMessageCell.self, forCellReuseIdentifier: ChatMessageCell.reuseID)
+        tableView.register(ChatMessageCell.self,      forCellReuseIdentifier: ChatMessageCell.reuseID)
+        tableView.register(ChatFlickPreviewCell.self,  forCellReuseIdentifier: ChatFlickPreviewCell.reuseID)
+        tableView.register(ChatImagePreviewCell.self,  forCellReuseIdentifier: ChatImagePreviewCell.reuseID)
         tableView.backgroundColor = .clear
         tableView.keyboardDismissMode = .interactive
         view.addSubview(tableView)
@@ -1040,20 +1043,455 @@ final class ChatViewController: UIViewController {
     }
 }
 
+// MARK: - Media Message Parser
+
+struct MediaMessageParser {
+    struct FlickInfo {
+        let author: String
+        let avatarURL: String?
+        let caption: String?
+        let videoURL: String
+    }
+    struct ImageInfo {
+        let author: String?
+        let avatarURL: String?
+        let caption: String?
+        let imageURL: String
+    }
+    enum Kind {
+        case flickVideo(FlickInfo)
+        case sharedImage(ImageInfo)
+        case plain
+    }
+
+    static func parse(_ content: String) -> Kind {
+        let lines = content.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        let videoExts = [".mov", ".mp4", ".m4v", ".avi", ".wmv"]
+        let imageExts = [".jpg", ".jpeg", ".png", ".webp", ".heic"]
+
+        var author: String?
+        var avatarURL: String?
+        var caption: String?
+        var mediaURL: String?
+        
+        // Helper to extract by prefix
+        func extract(_ line: String, prefix: String) -> String? {
+            if line.lowercased().hasPrefix(prefix.lowercased()) {
+                return String(line.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces)
+            }
+            return nil
+        }
+
+        // ── Phase 1: Structured Scan ───────────────────────
+        let messageText = content.lowercased()
+        let isFlick = messageText.contains("[flick]")
+        let isPost  = messageText.contains("[post]")
+
+        for line in lines {
+            if let a = extract(line, prefix: "author:") { author = a }
+            else if let a = extract(line, prefix: "by:")     { author = a }
+            else if let v = extract(line, prefix: "avatar:") { avatarURL = v }
+            else if let c = extract(line, prefix: "caption:"){ caption = c }
+            else if line.lowercased().hasPrefix("http") {
+                mediaURL = line
+            }
+        }
+
+        // ── Phase 2: Classification ────────────────────────
+        if isFlick, let url = mediaURL {
+             return .flickVideo(FlickInfo(author: author ?? "CineMyst User", avatarURL: avatarURL, caption: caption, videoURL: url))
+        }
+        if isPost, let url = mediaURL {
+             return .sharedImage(ImageInfo(author: author ?? "CineMyst User", avatarURL: avatarURL, caption: caption, imageURL: url))
+        }
+
+        // ── Phase 3: Legacy Fallback ───────────────────────
+        for line in lines {
+            let lower = line.lowercased()
+            if lower.hasPrefix("http") {
+                if videoExts.contains(where: { lower.contains($0) }) {
+                    let inferredCaption = lines.filter { !$0.lowercased().hasPrefix("http") && !($0.lowercased().contains("author:") || $0.lowercased().contains("by:")) }.joined(separator: " ")
+                    return .flickVideo(FlickInfo(author: author ?? "CineMyst User", avatarURL: avatarURL,
+                                                 caption: inferredCaption.isEmpty ? nil : inferredCaption, videoURL: line))
+                }
+                if imageExts.contains(where: { lower.contains($0) }) {
+                    let inferredCaption = lines.filter { !$0.lowercased().hasPrefix("http") && !($0.lowercased().contains("author:") || $0.lowercased().contains("by:")) }.joined(separator: " ")
+                    return .sharedImage(ImageInfo(author: author ?? "CineMyst User", avatarURL: avatarURL,
+                                                  caption: inferredCaption.isEmpty ? nil : inferredCaption, imageURL: line))
+                }
+            }
+        }
+
+        return .plain
+    }
+}
+
+// MARK: - Shared Media Card Cell Base
+// Provides the common card shell: border, rounded corners, shadow
+
+private final class MediaCardView: UIView {
+    // Header
+    let authorAvatar: UIImageView = {
+        let iv = UIImageView()
+        iv.layer.cornerRadius = 14
+        iv.clipsToBounds = true
+        iv.contentMode = .scaleAspectFill
+        iv.backgroundColor = UIColor(red: 0.85, green: 0.75, blue: 0.85, alpha: 1)
+        iv.image = UIImage(systemName: "person.circle.fill")
+        iv.tintColor = UIColor(red: 0.6, green: 0.3, blue: 0.55, alpha: 1)
+        iv.translatesAutoresizingMaskIntoConstraints = false
+        return iv
+    }()
+    let authorLabel: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 13, weight: .semibold)
+        l.textColor = UIColor(red: 0.15, green: 0.07, blue: 0.12, alpha: 1)
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+    let badgeLabel: UILabel = {
+        let l = UILabel()
+        l.text = "CineMyst"
+        l.font = .systemFont(ofSize: 10, weight: .bold)
+        l.textColor = UIColor(red: 0.55, green: 0.18, blue: 0.40, alpha: 1)
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+    // Media area
+    let mediaContainer: UIView = {
+        let v = UIView()
+        v.clipsToBounds = true
+        v.backgroundColor = UIColor(red: 0.10, green: 0.05, blue: 0.09, alpha: 1)
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+    // Footer
+    let captionLabel: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 13)
+        l.textColor = UIColor(red: 0.25, green: 0.12, blue: 0.22, alpha: 1)
+        l.numberOfLines = 2
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .white
+        layer.cornerRadius = 18
+        layer.borderWidth  = 1
+        layer.borderColor  = UIColor(red: 0.55, green: 0.18, blue: 0.40, alpha: 0.18).cgColor
+        layer.shadowColor  = UIColor(red: 0.26, green: 0.09, blue: 0.19, alpha: 0.18).cgColor
+        layer.shadowOffset = CGSize(width: 0, height: 4)
+        layer.shadowRadius = 12
+        layer.shadowOpacity = 1
+        translatesAutoresizingMaskIntoConstraints = false
+
+        let headerRow = UIView()
+        headerRow.translatesAutoresizingMaskIntoConstraints = false
+
+        let authorStack = UIStackView(arrangedSubviews: [authorLabel, badgeLabel])
+        authorStack.axis = .vertical
+        authorStack.spacing = 0
+        authorStack.translatesAutoresizingMaskIntoConstraints = false
+
+        headerRow.addSubview(authorAvatar)
+        headerRow.addSubview(authorStack)
+
+        addSubview(headerRow)
+        addSubview(mediaContainer)
+        addSubview(captionLabel)
+
+        NSLayoutConstraint.activate([
+            headerRow.topAnchor.constraint(equalTo: topAnchor, constant: 10),
+            headerRow.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            headerRow.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+            headerRow.heightAnchor.constraint(equalToConstant: 34),
+
+            authorAvatar.leadingAnchor.constraint(equalTo: headerRow.leadingAnchor),
+            authorAvatar.centerYAnchor.constraint(equalTo: headerRow.centerYAnchor),
+            authorAvatar.widthAnchor.constraint(equalToConstant: 28),
+            authorAvatar.heightAnchor.constraint(equalToConstant: 28),
+
+            authorStack.leadingAnchor.constraint(equalTo: authorAvatar.trailingAnchor, constant: 8),
+            authorStack.centerYAnchor.constraint(equalTo: headerRow.centerYAnchor),
+            authorStack.trailingAnchor.constraint(lessThanOrEqualTo: headerRow.trailingAnchor),
+
+            mediaContainer.topAnchor.constraint(equalTo: headerRow.bottomAnchor, constant: 8),
+            mediaContainer.leadingAnchor.constraint(equalTo: leadingAnchor),
+            mediaContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
+            mediaContainer.heightAnchor.constraint(equalToConstant: 160),
+
+            captionLabel.topAnchor.constraint(equalTo: mediaContainer.bottomAnchor, constant: 8),
+            captionLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            captionLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+            captionLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10),
+        ])
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    func loadAvatar(from urlString: String?) {
+        guard let urlString, let url = URL(string: urlString) else { return }
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            guard let data, let img = UIImage(data: data) else { return }
+            DispatchQueue.main.async { self.authorAvatar.image = img }
+        }.resume()
+    }
+}
+
+// MARK: - ChatFlickPreviewCell
+
+final class ChatFlickPreviewCell: UITableViewCell {
+    static let reuseID = "ChatFlickPreviewCell"
+
+    private let card = MediaCardView()
+    private let thumbnailView: UIImageView = {
+        let iv = UIImageView()
+        iv.contentMode = .scaleAspectFill
+        iv.clipsToBounds = true
+        iv.translatesAutoresizingMaskIntoConstraints = false
+        return iv
+    }()
+    private let flickBadge: UILabel = {
+        let l = UILabel()
+        l.text = "FLICK"
+        l.font = .systemFont(ofSize: 10, weight: .black)
+        l.textColor = .white
+        l.backgroundColor = UIColor(red: 0.26, green: 0.09, blue: 0.19, alpha: 0.82)
+        l.textAlignment = .center
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+    private let timeLabel: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 10)
+        l.textColor = .tertiaryLabel
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+    private var leadingC: NSLayoutConstraint!
+    private var trailingC: NSLayoutConstraint!
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        backgroundColor = .clear
+        selectionStyle  = .none
+
+        card.mediaContainer.addSubview(thumbnailView)
+        card.mediaContainer.addSubview(flickBadge)
+
+        contentView.addSubview(card)
+        contentView.addSubview(timeLabel)
+
+        leadingC  = card.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12)
+        trailingC = card.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12)
+
+        NSLayoutConstraint.activate([
+            card.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 6),
+            card.widthAnchor.constraint(equalToConstant: 256),
+
+            thumbnailView.topAnchor.constraint(equalTo: card.mediaContainer.topAnchor),
+            thumbnailView.leadingAnchor.constraint(equalTo: card.mediaContainer.leadingAnchor),
+            thumbnailView.trailingAnchor.constraint(equalTo: card.mediaContainer.trailingAnchor),
+            thumbnailView.bottomAnchor.constraint(equalTo: card.mediaContainer.bottomAnchor),
+
+            flickBadge.leadingAnchor.constraint(equalTo: card.mediaContainer.leadingAnchor),
+            flickBadge.trailingAnchor.constraint(equalTo: card.mediaContainer.trailingAnchor),
+            flickBadge.bottomAnchor.constraint(equalTo: card.mediaContainer.bottomAnchor),
+            flickBadge.heightAnchor.constraint(equalToConstant: 28),
+
+            timeLabel.topAnchor.constraint(equalTo: card.bottomAnchor, constant: 3),
+            timeLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -6),
+        ])
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    func configure(info: MediaMessageParser.FlickInfo, isFromCurrentUser: Bool, time: String) {
+        card.authorLabel.text = info.author
+        card.captionLabel.text = info.caption
+        card.captionLabel.isHidden = info.caption == nil
+        card.loadAvatar(from: info.avatarURL)
+        timeLabel.text = time
+        timeLabel.textAlignment = isFromCurrentUser ? .right : .left
+
+        leadingC.isActive  = !isFromCurrentUser
+        trailingC.isActive = isFromCurrentUser
+
+        if isFromCurrentUser {
+            timeLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor).isActive = true
+        } else {
+            timeLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor).isActive = true
+        }
+
+        thumbnailView.image = nil
+        guard let url = URL(string: info.videoURL) else { return }
+        Task {
+            let asset = AVURLAsset(url: url)
+            let gen = AVAssetImageGenerator(asset: asset)
+            gen.appliesPreferredTrackTransform = true
+            gen.maximumSize = CGSize(width: 512, height: 320)
+            if let cgImg = try? gen.copyCGImage(at: CMTime(seconds: 0.5, preferredTimescale: 600), actualTime: nil) {
+                let img = UIImage(cgImage: cgImg)
+                await MainActor.run { self.thumbnailView.image = img }
+            }
+        }
+    }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        thumbnailView.image = nil
+        card.authorAvatar.image = UIImage(systemName: "person.circle.fill")
+        leadingC.isActive = false
+        trailingC.isActive = false
+    }
+}
+
+// MARK: - ChatImagePreviewCell
+
+final class ChatImagePreviewCell: UITableViewCell {
+    static let reuseID = "ChatImagePreviewCell"
+
+    private let card = MediaCardView()
+    private let imagePreview: UIImageView = {
+        let iv = UIImageView()
+        iv.contentMode = .scaleAspectFill
+        iv.clipsToBounds = true
+        iv.translatesAutoresizingMaskIntoConstraints = false
+        return iv
+    }()
+    private let postBadge: UILabel = {
+        let l = UILabel()
+        l.text = "POST"
+        l.font = .systemFont(ofSize: 10, weight: .black)
+        l.textColor = .white
+        l.backgroundColor = UIColor(red: 0.26, green: 0.09, blue: 0.19, alpha: 0.78)
+        l.textAlignment = .center
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+    private let timeLabel: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 10)
+        l.textColor = .tertiaryLabel
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+    private var leadingC: NSLayoutConstraint!
+    private var trailingC: NSLayoutConstraint!
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        backgroundColor = .clear
+        selectionStyle  = .none
+
+        card.mediaContainer.addSubview(imagePreview)
+        card.mediaContainer.addSubview(postBadge)
+        contentView.addSubview(card)
+        contentView.addSubview(timeLabel)
+
+        leadingC  = card.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12)
+        trailingC = card.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12)
+
+        NSLayoutConstraint.activate([
+            card.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 6),
+            card.widthAnchor.constraint(equalToConstant: 256),
+
+            imagePreview.topAnchor.constraint(equalTo: card.mediaContainer.topAnchor),
+            imagePreview.leadingAnchor.constraint(equalTo: card.mediaContainer.leadingAnchor),
+            imagePreview.trailingAnchor.constraint(equalTo: card.mediaContainer.trailingAnchor),
+            imagePreview.bottomAnchor.constraint(equalTo: card.mediaContainer.bottomAnchor),
+
+            postBadge.leadingAnchor.constraint(equalTo: card.mediaContainer.leadingAnchor),
+            postBadge.trailingAnchor.constraint(equalTo: card.mediaContainer.trailingAnchor),
+            postBadge.bottomAnchor.constraint(equalTo: card.mediaContainer.bottomAnchor),
+            postBadge.heightAnchor.constraint(equalToConstant: 28),
+
+            timeLabel.topAnchor.constraint(equalTo: card.bottomAnchor, constant: 3),
+            timeLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -6),
+        ])
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    func configure(info: MediaMessageParser.ImageInfo, isFromCurrentUser: Bool, time: String) {
+        card.authorLabel.text = info.author ?? "CineMyst User"
+        card.captionLabel.text = info.caption
+        card.captionLabel.isHidden = info.caption == nil
+        card.loadAvatar(from: info.avatarURL)
+        timeLabel.text = time
+        timeLabel.textAlignment = isFromCurrentUser ? .right : .left
+
+        leadingC.isActive  = !isFromCurrentUser
+        trailingC.isActive = isFromCurrentUser
+
+        if isFromCurrentUser {
+            timeLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor).isActive = true
+        } else {
+            timeLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor).isActive = true
+        }
+
+        imagePreview.image = nil
+        if let url = URL(string: info.imageURL) {
+            URLSession.shared.dataTask(with: url) { data, _, _ in
+                guard let data, let img = UIImage(data: data) else { return }
+                DispatchQueue.main.async { self.imagePreview.image = img }
+            }.resume()
+        }
+    }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        imagePreview.image = nil
+        card.authorAvatar.image = UIImage(systemName: "person.circle.fill")
+        leadingC.isActive = false
+        trailingC.isActive = false
+    }
+}
+
 // MARK: - ChatViewController Table DataSource
 extension ChatViewController: UITableViewDelegate, UITableViewDataSource {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return messages.count
     }
-    
+
+    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+        switch MediaMessageParser.parse(messages[indexPath.row].content) {
+        case .flickVideo, .sharedImage: return UITableView.automaticDimension
+        case .plain:                    return UITableView.automaticDimension
+        }
+    }
+
+    func tableView(_ tableView: UITableView, estimatedHeightForRowAt indexPath: IndexPath) -> CGFloat {
+        switch MediaMessageParser.parse(messages[indexPath.row].content) {
+        case .flickVideo:  return 290
+        case .sharedImage: return 290
+        case .plain:       return 60
+        }
+    }
+
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: ChatMessageCell.reuseID, for: indexPath) as! ChatMessageCell
         let message = messages[indexPath.row]
         let isFromCurrentUser = message.senderId == currentUserId
-        
-        cell.configure(with: message, isFromCurrentUser: isFromCurrentUser)
-        
-        return cell
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        let time = formatter.string(from: message.createdAt)
+
+        switch MediaMessageParser.parse(message.content) {
+        case .flickVideo(let info):
+            let cell = tableView.dequeueReusableCell(withIdentifier: ChatFlickPreviewCell.reuseID, for: indexPath) as! ChatFlickPreviewCell
+            cell.configure(info: info, isFromCurrentUser: isFromCurrentUser, time: time)
+            return cell
+        case .sharedImage(let info):
+            let cell = tableView.dequeueReusableCell(withIdentifier: ChatImagePreviewCell.reuseID, for: indexPath) as! ChatImagePreviewCell
+            cell.configure(info: info, isFromCurrentUser: isFromCurrentUser, time: time)
+            return cell
+        case .plain:
+            let cell = tableView.dequeueReusableCell(withIdentifier: ChatMessageCell.reuseID, for: indexPath) as! ChatMessageCell
+            cell.configure(with: message, isFromCurrentUser: isFromCurrentUser)
+            return cell
+        }
     }
 }
 

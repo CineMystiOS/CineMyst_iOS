@@ -28,7 +28,7 @@ final class ReelCell: UICollectionViewCell {
     private var currentLikes   = 0
     private var currentFlickId: String?
     private var currentUserId:  String?
-    private var isFollowing     = false
+    private var connectionState: String = "none"  // "none" | "pending" | "connected"
     private var isOwnContent    = false
 
     // MARK: Player
@@ -59,17 +59,6 @@ final class ReelCell: UICollectionViewCell {
         return g
     }()
 
-    // MARK: - Play Icon
-    private let playIconView: UIImageView = {
-        let iv = UIImageView()
-        let cfg = UIImage.SymbolConfiguration(pointSize: 64, weight: .ultraLight)
-        iv.image = UIImage(systemName: "play.fill", withConfiguration: cfg)
-        iv.tintColor = UIColor.white.withAlphaComponent(0.85)
-        iv.contentMode = .center
-        iv.alpha = 0
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        return iv
-    }()
 
     // MARK: - Right Action Stack
     private let actionStack: UIStackView = {
@@ -110,7 +99,7 @@ final class ReelCell: UICollectionViewCell {
 
     private let followButton: UIButton = {
         let b = UIButton(type: .system)
-        b.setTitle("Follow", for: .normal)
+        b.setTitle("Connect", for: .normal)
         b.setTitleColor(.white, for: .normal)
         b.titleLabel?.font = .systemFont(ofSize: 13, weight: .bold)
         b.layer.cornerRadius = 14
@@ -193,7 +182,6 @@ final class ReelCell: UICollectionViewCell {
         contentView.backgroundColor = .black
         contentView.layer.addSublayer(gradientLayer)
 
-        contentView.addSubview(playIconView)
         contentView.addSubview(heartBurst)
         contentView.addSubview(actionStack)
 
@@ -217,12 +205,6 @@ final class ReelCell: UICollectionViewCell {
         let tabOffset: CGFloat = 96
 
         NSLayoutConstraint.activate([
-            // Play icon — centred
-            playIconView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            playIconView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            playIconView.widthAnchor.constraint(equalToConstant: 100),
-            playIconView.heightAnchor.constraint(equalToConstant: 100),
-
             // Heart burst — centred
             heartBurst.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             heartBurst.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
@@ -288,11 +270,6 @@ final class ReelCell: UICollectionViewCell {
         doubleTap.numberOfTapsRequired = 2
         contentView.addGestureRecognizer(doubleTap)
 
-        // Single tap to play/pause
-        let singleTap = UITapGestureRecognizer(target: self, action: #selector(handleSingleTap))
-        singleTap.require(toFail: doubleTap)
-        contentView.addGestureRecognizer(singleTap)
-
         let profileTap = UITapGestureRecognizer(target: self, action: #selector(handleProfileTap))
         avatarView.addGestureRecognizer(profileTap)
         let nameTap = UITapGestureRecognizer(target: self, action: #selector(handleProfileTap))
@@ -315,7 +292,8 @@ final class ReelCell: UICollectionViewCell {
 
     // MARK: - Actions
 
-    @objc private func handleSingleTap() { togglePlayPause() }
+    // MARK: - Actions
+
 
     @objc private func handleDoubleTap() {
         if !isLiked { 
@@ -330,10 +308,26 @@ final class ReelCell: UICollectionViewCell {
     }
 
     @objc private func handleFollow() {
-        guard !isOwnContent else { return }
-        isFollowing.toggle()
-        animateFollowButton()
-        persistFollowState()
+        guard !isOwnContent, connectionState == "none" else { return }
+        guard let uid = currentUserId else { return }
+
+        // Optimistically show Pending right away
+        connectionState = "pending"
+        applyConnectionUI(animated: true)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+
+        Task {
+            do {
+                try await ConnectionService.shared.sendRequest(to: uid)
+            } catch {
+                // Revert on failure
+                await MainActor.run {
+                    self.connectionState = "none"
+                    self.applyConnectionUI(animated: true)
+                }
+                print("❌ Connect request failed: \(error)")
+            }
+        }
     }
 
     @objc private func handleLike() {
@@ -428,45 +422,57 @@ final class ReelCell: UICollectionViewCell {
         }
     }
 
-    // MARK: - Follow Logic
+    // MARK: - Connection Button UI
 
-    private func animateFollowButton() {
-        if isFollowing {
-            followButton.setTitle("Following", for: .normal)
-            followButton.backgroundColor = DS.plum
-            followButton.layer.borderColor = DS.plum.cgColor
+    private func applyConnectionUI(animated: Bool) {
+        let title: String
+        let bgColor: UIColor
+        let borderColor: UIColor
+        let textColor: UIColor
+        let enabled: Bool
+
+        switch connectionState {
+        case "connected":
+            title = "Connected"
+            bgColor = UIColor(red: 0.20, green: 0.78, blue: 0.35, alpha: 0.25)
+            borderColor = UIColor(red: 0.20, green: 0.78, blue: 0.35, alpha: 0.8)
+            textColor = UIColor(red: 0.20, green: 0.78, blue: 0.35, alpha: 1)
+            enabled = false
+        case "pending":
+            title = "Pending"
+            bgColor = UIColor.white.withAlphaComponent(0.12)
+            borderColor = UIColor.white.withAlphaComponent(0.4)
+            textColor = UIColor.white.withAlphaComponent(0.6)
+            enabled = false
+        default: // "none"
+            title = "Connect"
+            bgColor = .clear
+            borderColor = UIColor.white
+            textColor = .white
+            enabled = true
+        }
+
+        let apply = {
+            self.followButton.setTitle(title, for: .normal)
+            self.followButton.backgroundColor = bgColor
+            self.followButton.layer.borderColor = borderColor.cgColor
+            self.followButton.setTitleColor(textColor, for: .normal)
+            self.followButton.isEnabled = enabled
+        }
+
+        if animated {
+            UIView.animate(withDuration: 0.22, delay: 0,
+                           usingSpringWithDamping: 0.7, initialSpringVelocity: 6,
+                           options: []) {
+                self.followButton.transform = CGAffineTransform(scaleX: 0.88, y: 0.88)
+            } completion: { _ in
+                apply()
+                UIView.animate(withDuration: 0.2) {
+                    self.followButton.transform = .identity
+                }
+            }
         } else {
-            followButton.setTitle("Follow", for: .normal)
-            followButton.backgroundColor = .clear
-            followButton.layer.borderColor = UIColor.white.cgColor
-        }
-
-        UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 8) {
-            self.followButton.transform = CGAffineTransform(scaleX: 0.92, y: 0.92)
-        } completion: { _ in
-            UIView.animate(withDuration: 0.2) {
-                self.followButton.transform = .identity
-            }
-        }
-    }
-
-    private func persistFollowState() {
-        guard let receiverId = currentUserId else { return }
-        Task {
-            do {
-                if isFollowing {
-                    try await ConnectionService.shared.sendRequest(to: receiverId)
-                } else {
-                    try await ConnectionService.shared.cancelRequest(to: receiverId)
-                }
-            } catch {
-                // Revert on failure
-                await MainActor.run {
-                    self.isFollowing.toggle()
-                    self.animateFollowButton()
-                }
-                print("❌ Follow action failed: \(error)")
-            }
+            apply()
         }
     }
 
@@ -488,13 +494,20 @@ final class ReelCell: UICollectionViewCell {
         likeCountLabel.text = currentLikes == 0 ? "Be the first to like" : "❤️ \(reel.likes) likes"
         refreshLikeUI(animated: false)
 
-        // Check if own content (hide follow button)
+        // Check if own content and fetch connection status
+        let reelUserId = reel.userId
         Task {
-            if let session = try? await supabase.auth.session {
-                let isMine = session.user.id.uuidString == reel.userId
-                await MainActor.run {
-                    self.isOwnContent = isMine
-                    self.followButton.isHidden = isMine
+            guard let session = try? await supabase.auth.session else { return }
+            let myId = session.user.id.uuidString
+            let isMine = myId == reelUserId
+            let status = isMine ? "own" : ((try? await ConnectionService.shared.connectionStatus(with: reelUserId)) ?? "none")
+
+            await MainActor.run {
+                self.isOwnContent    = isMine
+                self.followButton.isHidden = isMine
+                if !isMine {
+                    self.connectionState = status
+                    self.applyConnectionUI(animated: false)
                 }
             }
         }
@@ -545,17 +558,10 @@ final class ReelCell: UICollectionViewCell {
         queuePlayer?.isMuted = false
         queuePlayer?.volume  = 1
         queuePlayer?.play()
-        UIView.animate(withDuration: 0.2) { self.playIconView.alpha = 0 }
     }
 
     func pause() {
         queuePlayer?.pause()
-        UIView.animate(withDuration: 0.2) { self.playIconView.alpha = 1 }
-    }
-
-    private func togglePlayPause() {
-        guard let p = queuePlayer else { return }
-        if p.rate > 0 { pause() } else { play() }
     }
 
     private func cleanupPlayer() {
@@ -572,10 +578,8 @@ final class ReelCell: UICollectionViewCell {
         avatarView.image   = nil
         nameLabel.text     = nil
         captionLabel.text  = nil
-        isFollowing        = false
-        followButton.setTitle("Follow", for: .normal)
-        followButton.backgroundColor       = .clear
-        followButton.layer.borderColor     = UIColor.white.cgColor
+        connectionState    = "none"
+        applyConnectionUI(animated: false)
         followButton.isHidden = false
     }
 
