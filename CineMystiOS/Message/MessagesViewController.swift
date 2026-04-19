@@ -86,6 +86,20 @@ final class ConversationCell: UITableViewCell {
         return iv
     }()
 
+    private let unreadBadgeLabel: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 11, weight: .bold)
+        l.textColor = .white
+        l.backgroundColor = .systemRed
+        l.textAlignment = .center
+        l.layer.cornerRadius = 10
+        l.layer.masksToBounds = true
+        l.translatesAutoresizingMaskIntoConstraints = false
+        l.isHidden = true
+        return l
+    }()
+
+
     private let separator: UIView = {
         let v = UIView()
         v.backgroundColor = UIColor(white: 0.9, alpha: 1)
@@ -103,6 +117,7 @@ final class ConversationCell: UITableViewCell {
         contentView.addSubview(previewLabel)
         contentView.addSubview(timeLabel)
         contentView.addSubview(chevron)
+        contentView.addSubview(unreadBadgeLabel)
         contentView.addSubview(separator)
         setupConstraints()
     }
@@ -133,9 +148,14 @@ final class ConversationCell: UITableViewCell {
             nameLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
 
             previewLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
-            previewLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -40),
+            previewLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -46),
             previewLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 4),
             previewLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
+
+            unreadBadgeLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            unreadBadgeLabel.centerYAnchor.constraint(equalTo: previewLabel.centerYAnchor),
+            unreadBadgeLabel.heightAnchor.constraint(equalToConstant: 20),
+            unreadBadgeLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 20),
 
             separator.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
             separator.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
@@ -167,6 +187,15 @@ final class ConversationCell: UITableViewCell {
         timeLabel.font = .systemFont(ofSize: 13, weight: isUnread ? .semibold : .regular)
         chevron.tintColor = CineMystTheme.brandPlum.withAlphaComponent(0.55)
         separator.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.08)
+
+        if isUnread {
+            unreadBadgeLabel.isHidden = false
+            unreadBadgeLabel.text = " \(model.unreadCount) "
+            chevron.isHidden = true
+        } else {
+            unreadBadgeLabel.isHidden = true
+            chevron.isHidden = false
+        }
         
         // Load avatar from URL or use placeholder
         if let urlString = model.avatarUrl, let url = URL(string: urlString) {

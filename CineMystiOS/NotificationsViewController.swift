@@ -49,6 +49,11 @@ final class NotificationsViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         fetchNotifications()
+        
+        Task {
+            try? await NotificationService.shared.markAllAsRead()
+        }
+
         // Remove CineMyst logo
         if let navBar = navigationController?.navigationBar {
             if let contentView = navBar.subviews.first(where: {

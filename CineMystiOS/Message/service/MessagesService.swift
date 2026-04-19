@@ -96,6 +96,26 @@ class MessagesService {
             .value
         
         print("✅ Found \(conversations.count) conversations")
+
+        // Fetch real unread counts grouping by conversation_id
+        struct UnreadMessageRow: Decodable {
+            let conversation_id: UUID
+        }
+
+        let unreadRows: [UnreadMessageRow]? = try? await client
+            .from("messages")
+            .select("conversation_id")
+            .eq("is_read", value: false)
+            .neq("sender_id", value: currentUserId.uuidString)
+            .execute()
+            .value
+
+        var actualUnreadCounts: [UUID: Int] = [:]
+        if let rows = unreadRows {
+            for row in rows {
+                actualUnreadCounts[row.conversation_id, default: 0] += 1
+            }
+        }
         
         // Fetch user profiles for all participants
         var result: [(conversation: ConversationModel, otherUser: UserProfile)] = []
@@ -106,9 +126,12 @@ class MessagesService {
                 ? conversation.participant2Id 
                 : conversation.participant1Id
             
+            var updatedConversation = conversation
+            updatedConversation.unreadCount = actualUnreadCounts[conversation.id] ?? 0
+
             // Fetch the other user's profile
             if let userProfile = try? await fetchUserProfile(userId: otherUserId) {
-                result.append((conversation: conversation, otherUser: userProfile))
+                result.append((conversation: updatedConversation, otherUser: userProfile))
             } else {
                 // If we can't fetch the profile, create a placeholder
                 let placeholder = UserProfile(
@@ -118,7 +141,7 @@ class MessagesService {
                     avatarUrl: nil,
                     bio: nil
                 )
-                result.append((conversation: conversation, otherUser: placeholder))
+                result.append((conversation: updatedConversation, otherUser: placeholder))
             }
         }
         
@@ -386,14 +409,32 @@ class MessagesService {
     func fetchUnreadMessageCount() async throws -> Int {
         guard let currentUserId = client.auth.currentUser?.id else { return 0 }
 
-        let conversationRows: [ConversationIdRow] = try await client
-            .from("conversations")
-            .select("id,unread_count")
-            .or("participant1_id.eq.\(currentUserId.uuidString),participant2_id.eq.\(currentUserId.uuidString)")
-            .execute()
-            .value
+        do {
+            // First, fetch the IDs of conversations this user is a part of
+            let conversations: [ConversationIdRow] = try await client
+                .from("conversations")
+                .select("id")
+                .or("participant1_id.eq.\(currentUserId.uuidString),participant2_id.eq.\(currentUserId.uuidString)")
+                .execute()
+                .value
+            
+            let conversationIds = conversations.map { $0.id.uuidString }
+            guard !conversationIds.isEmpty else { return 0 }
 
-        return conversationRows.reduce(0) { $0 + max(0, $1.unread_count ?? 0) }
+            // Then, count exact unread messages belonging ONLY to those conversations
+            let response = try await client
+                .from("messages")
+                .select("id", head: true, count: .exact)
+                .eq("is_read", value: false)
+                .neq("sender_id", value: currentUserId.uuidString)
+                .in("conversation_id", values: Array(conversationIds))
+                .execute()
+                
+            return response.count ?? 0
+        } catch {
+            print("❌ Cannot fetch unread messages count directly: \(error)")
+            return 0
+        }
     }
     
     // MARK: - Private Helpers

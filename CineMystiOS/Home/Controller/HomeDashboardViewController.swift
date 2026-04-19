@@ -137,8 +137,12 @@ final class HomeDashboardViewController: UIViewController {
     private let ambientGlowTop = UIView()
     private let ambientGlowBottom = UIView()
     private let floatingMenuDimView = UIView()
-    private weak var chatBadgeLabel: UILabel?
+    private var floatMenuWidthConst: NSLayoutConstraint?
+    private var floatMenuHeightConst: NSLayoutConstraint?
+    private var chatBadgeView: UIView?
+    private var notificationBadgeView: UIView?
     private var unreadMessagesSubscription: MessagesRealtimeSubscription?
+    private var notificationSubscription: MessagesRealtimeSubscription?
     private var unreadMessagesCount = 0
     private var feedItems: [FeedItem] = []
     private var posts: [Post] = []
@@ -153,7 +157,7 @@ final class HomeDashboardViewController: UIViewController {
         setupTable()
         setupFloatingMenu()
         loadPosts()
-        startUnreadMessageUpdates()
+        startUnreadUpdates()
         navigationItem.backButtonTitle = ""
     }
 
@@ -389,25 +393,42 @@ final class HomeDashboardViewController: UIViewController {
             separator.centerYAnchor.constraint(equalTo: blur.contentView.centerYAnchor)
         ])
 
-        let badge = UILabel(frame: CGRect(x: 64, y: -2, width: 22, height: 22))
-        badge.backgroundColor = CineMystTheme.brandPlum
-        badge.textColor = .white
-        badge.font = .systemFont(ofSize: 11, weight: .bold)
-        badge.textAlignment = .center
-        badge.layer.cornerRadius = 11
-        badge.layer.masksToBounds = true
-        badge.layer.borderWidth = 2
-        badge.layer.borderColor = UIColor.white.withAlphaComponent(0.96).cgColor
-        badge.layer.shadowColor = CineMystTheme.deepPlumDark.cgColor
-        badge.layer.shadowOpacity = 0.16
-        badge.layer.shadowRadius = 6
-        badge.layer.shadowOffset = CGSize(width: 0, height: 2)
-        badge.isHidden = true
-        container.addSubview(badge)
-        chatBadgeLabel = badge
-        applyUnreadMessageBadge()
+        // Chat Badge (Right side)
+        let chatBadge = createBadgeView(x: 68, color: CineMystTheme.accent)
+        container.addSubview(chatBadge)
+        container.bringSubviewToFront(chatBadge)
+        chatBadgeView = chatBadge
+
+        // Notification Badge (Left side)
+        let notifBadge = createBadgeView(x: 24, color: .systemRed)
+        container.addSubview(notifBadge)
+        container.bringSubviewToFront(notifBadge)
+        notificationBadgeView = notifBadge
+
+        refreshUnreadUpdates()
 
         return UIBarButtonItem(customView: container)
+    }
+
+    private func createBadgeView(x: CGFloat, color: UIColor) -> UIView {
+        let badgeView = UIView(frame: CGRect(x: x, y: -2, width: 18, height: 18))
+        badgeView.backgroundColor = color 
+        badgeView.layer.cornerRadius = 9
+        badgeView.layer.masksToBounds = true
+        badgeView.layer.borderWidth = 1.5
+        badgeView.layer.borderColor = UIColor.white.cgColor
+        badgeView.isHidden = true
+        badgeView.isUserInteractionEnabled = false
+
+        let label = UILabel(frame: badgeView.bounds)
+        label.textColor = .white
+        label.font = .systemFont(ofSize: 10, weight: .bold)
+        label.textAlignment = .center
+        label.backgroundColor = .clear
+        label.tag = 100
+        badgeView.addSubview(label)
+
+        return badgeView
     }
 
     private func makeNavActionBubble(frame: CGRect) -> UIVisualEffectView {
@@ -420,39 +441,60 @@ final class HomeDashboardViewController: UIViewController {
         return blur
     }
 
-    private func startUnreadMessageUpdates() {
+    private func startUnreadUpdates() {
         unreadMessagesSubscription?.cancel()
         unreadMessagesSubscription = MessagesService.shared.subscribeToConversationChanges { [weak self] in
             self?.refreshUnreadMessageBadge()
         }
-        refreshUnreadMessageBadge()
+        
+        notificationSubscription?.cancel()
+        notificationSubscription = NotificationService.shared.subscribeToNotificationChanges { [weak self] in
+            self?.refreshNotificationBadge()
+        }
+        
+        refreshUnreadUpdates()
     }
 
-    private func refreshUnreadMessageBadge() {
+    private func refreshUnreadUpdates() {
+        refreshUnreadMessageBadge()
+        refreshNotificationBadge()
+    }
+
+    private func refreshNotificationBadge() {
         Task {
-            let unreadCount = (try? await MessagesService.shared.fetchUnreadMessageCount()) ?? 0
-            await MainActor.run {
-                self.unreadMessagesCount = unreadCount
-                self.applyUnreadMessageBadge()
+            do {
+                let count = try await NotificationService.shared.fetchUnreadCount()
+                print("📝 Unread Notifications Count: \(count)")
+                await MainActor.run {
+                    if let badge = self.notificationBadgeView, let label = badge.viewWithTag(100) as? UILabel {
+                        label.text = "\(count)"
+                        badge.isHidden = (count == 0 || count < 0)
+                        badge.backgroundColor = .systemRed
+                    }
+                }
+            } catch {
+                print("❌ Notification badge fetch failed: \(error)")
             }
         }
     }
 
-    private func applyUnreadMessageBadge() {
-        guard let chatBadgeLabel else { return }
-        if unreadMessagesCount > 0 {
-            chatBadgeLabel.isHidden = false
-            chatBadgeLabel.text = unreadMessagesCount > 99 ? "99+" : "\(unreadMessagesCount)"
-            let text = chatBadgeLabel.text ?? ""
-            let width = max(22, text.size(withAttributes: [.font: chatBadgeLabel.font as Any]).width + 10)
-            chatBadgeLabel.frame = CGRect(x: 90 - width + 4, y: 1, width: width, height: 22)
-            chatBadgeLabel.layer.cornerRadius = 11
-        } else {
-            chatBadgeLabel.isHidden = true
-            chatBadgeLabel.text = nil
+    private func refreshUnreadMessageBadge() {
+        Task {
+            do {
+                let count = try await MessagesService.shared.fetchUnreadMessageCount()
+                print("📝 Unread Messages Count: \(count)")
+                await MainActor.run {
+                    if let badge = self.chatBadgeView, let label = badge.viewWithTag(100) as? UILabel {
+                        label.text = "\(count)"
+                        badge.isHidden = (count == 0 || count < 0)
+                        badge.backgroundColor = CineMystTheme.accent
+                    }
+                }
+            } catch {
+                print("❌ Message badge fetch failed: \(error)")
+            }
         }
     }
-
     // MARK: - Table
     private func setupTable() {
         tableView.dataSource  = self; tableView.delegate = self
@@ -511,19 +553,26 @@ final class HomeDashboardViewController: UIViewController {
         host.view.backgroundColor = .clear; host.view.isOpaque = false
         addChild(host); view.addSubview(host.view)
         host.view.translatesAutoresizingMaskIntoConstraints = false
+        
+        floatMenuWidthConst = host.view.widthAnchor.constraint(equalToConstant: 100)
+        floatMenuHeightConst = host.view.heightAnchor.constraint(equalToConstant: 100)
+        
         NSLayoutConstraint.activate([
             host.view.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             host.view.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -6),
-            host.view.widthAnchor.constraint(equalToConstant: 300),
-            host.view.heightAnchor.constraint(equalToConstant: 320)
+            floatMenuWidthConst!, floatMenuHeightConst!
         ])
         host.didMove(toParent: self)
         view.bringSubviewToFront(host.view)
     }
 
     private func setFloatingMenuDimmed(_ isDimmed: Bool) {
+        floatMenuWidthConst?.constant = isDimmed ? 300 : 100
+        floatMenuHeightConst?.constant = isDimmed ? 320 : 100
+        
         UIView.animate(withDuration: 0.22, delay: 0, options: [.curveEaseInOut]) {
             self.floatingMenuDimView.alpha = isDimmed ? 1 : 0
+            self.view.layoutIfNeeded()
         }
     }
 

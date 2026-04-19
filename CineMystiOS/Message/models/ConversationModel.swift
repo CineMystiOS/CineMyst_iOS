@@ -15,7 +15,7 @@ struct ConversationModel: Codable, Identifiable {
     let lastMessageId: UUID?
     let lastMessageContent: String?
     let lastMessageTime: Date?
-    let unreadCount: Int
+    var unreadCount: Int
     let createdAt: Date
     let updatedAt: Date
     
