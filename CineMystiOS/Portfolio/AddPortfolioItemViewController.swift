@@ -27,8 +27,8 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
     var onItemAdded: ((PortfolioItemData) -> Void)?
     private var selectedImage: UIImage?
     private var uploadedImageUrl: String?
-    private var uploadedMediaUrl: String?
-    private var uploadedMediaIsVideo = false
+    private var uploadedMediaUrls: [String] = []
+    private var isUploading = false
     
     // MARK: - UI Components
     private let scrollView = UIScrollView()
@@ -265,7 +265,7 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
     
     private func openPhotoGallery() {
         var config = PHPickerConfiguration()
-        config.selectionLimit = 1
+        config.selectionLimit = 0 // 0 allows unlimited multiple selection
         config.filter = .any(of: [.images, .videos])
         
         let picker = PHPickerViewController(configuration: config)
@@ -273,17 +273,39 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
         present(picker, animated: true)
     }
     
-    // MARK: - UIImagePickerDelegate
+    // MARK: - UIImagePickerDelegate (Camera)
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
         defer { picker.dismiss(animated: true) }
         
-        if let image = info[.originalImage] as? UIImage {
-            selectedImage = image
-            displaySelectedImage(image)
-            uploadImageToSupabase(image)
-        } else if let mediaURL = info[.mediaURL] as? URL {
-            displaySelectedVideo(from: mediaURL)
-            uploadVideoToSupabase(fileURL: mediaURL)
+        self.uploadButton.isHidden = true
+        self.saveButton.isEnabled = false
+        self.uploadProgressLabel.text = "Uploading camera media..."
+        self.isUploading = true
+        
+        Task {
+            var url: String?
+            if let image = info[.originalImage] as? UIImage {
+                await MainActor.run { self.displaySelectedImage(image) }
+                url = try? await uploadImageAsync(image)
+                if let u = url { self.uploadedImageUrl = u }
+            } else if let mediaURL = info[.mediaURL] as? URL {
+                await MainActor.run { self.displaySelectedVideo(from: mediaURL) }
+                let tempDir = FileManager.default.temporaryDirectory
+                let destinationURL = tempDir.appendingPathComponent("temp_\(UUID().uuidString).\(mediaURL.pathExtension.isEmpty ? "mov" : mediaURL.pathExtension)")
+                try? FileManager.default.copyItem(at: mediaURL, to: destinationURL)
+                url = try? await uploadVideoAsync(fileURL: destinationURL)
+            }
+            
+            await MainActor.run {
+                if let url = url {
+                    self.uploadedMediaUrls.append(url)
+                    self.uploadProgressLabel.text = "✅ File uploaded successfully"
+                } else {
+                    self.uploadProgressLabel.text = "❌ Upload failed"
+                }
+                self.saveButton.isEnabled = true
+                self.isUploading = false
+            }
         }
     }
     
@@ -291,35 +313,97 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
         picker.dismiss(animated: true)
     }
     
-    // MARK: - PHPickerDelegate
+    // MARK: - PHPickerDelegate (Multi-Gallery)
     func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
         defer { picker.dismiss(animated: true) }
+        guard !results.isEmpty else { return }
         
-        guard let result = results.first else { return }
-
-        if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
-            result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { url, _ in
-                guard let url else { return }
-                DispatchQueue.main.async {
-                    self.displaySelectedVideo(from: url)
+        self.uploadButton.isHidden = true
+        self.saveButton.isEnabled = false
+        self.uploadProgressLabel.text = "Preparing \(results.count) files..."
+        self.isUploading = true
+        
+        Task {
+            var successfulUrls: [String] = []
+            
+            for (index, result) in results.enumerated() {
+                await MainActor.run { self.uploadProgressLabel.text = "Uploading... (\(index + 1)/\(results.count))" }
+                
+                if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
+                    if let url = try? await loadFileRepresentation(from: result.itemProvider, type: UTType.movie.identifier) {
+                        if index == 0 { await MainActor.run { self.displaySelectedVideo(from: url) } }
+                        if let uploadedUrl = try? await uploadVideoAsync(fileURL: url) {
+                            successfulUrls.append(uploadedUrl)
+                        }
+                    }
+                } else if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                    if let url = try? await loadFileRepresentation(from: result.itemProvider, type: UTType.image.identifier),
+                       let data = try? Data(contentsOf: url),
+                       let image = UIImage(data: data) {
+                        if index == 0 { await MainActor.run { self.displaySelectedImage(image) } }
+                        if let uploadedUrl = try? await uploadImageAsync(image) {
+                            successfulUrls.append(uploadedUrl)
+                            if index == 0 { self.uploadedImageUrl = uploadedUrl }
+                        }
+                    }
                 }
-                self.uploadVideoToSupabase(fileURL: url)
             }
-            return
-        }
-
-        result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.image.identifier) { url, _ in
-            if let url = url, let imageData = try? Data(contentsOf: url), let image = UIImage(data: imageData) {
-                DispatchQueue.main.async {
-                    self.selectedImage = image
-                    self.displaySelectedImage(image)
-                    self.uploadImageToSupabase(image)
+            
+            await MainActor.run {
+                self.uploadedMediaUrls.append(contentsOf: successfulUrls)
+                if successfulUrls.count == results.count {
+                    self.uploadProgressLabel.text = "✅ \(successfulUrls.count) files uploaded successfully"
+                } else {
+                    self.uploadProgressLabel.text = "⚠️ \(successfulUrls.count)/\(results.count) files uploaded"
                 }
+                self.saveButton.isEnabled = true
+                self.isUploading = false
             }
         }
     }
     
-    // MARK: - Image Upload
+    // MARK: - Async Upload Helpers
+    private func loadFileRepresentation(from provider: NSItemProvider, type: String) async throws -> URL {
+        return try await withCheckedThrowingContinuation { continuation in
+            provider.loadFileRepresentation(forTypeIdentifier: type) { url, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else if let url = url {
+                    let tempDir = FileManager.default.temporaryDirectory
+                    let destinationURL = tempDir.appendingPathComponent("temp_\(UUID().uuidString).\(url.pathExtension)")
+                    do {
+                        if FileManager.default.fileExists(atPath: destinationURL.path) {
+                            try FileManager.default.removeItem(at: destinationURL)
+                        }
+                        try FileManager.default.copyItem(at: url, to: destinationURL)
+                        continuation.resume(returning: destinationURL)
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                } else {
+                    continuation.resume(throwing: NSError(domain: "Provider", code: -1))
+                }
+            }
+        }
+    }
+
+    private func uploadImageAsync(_ image: UIImage) async throws -> String {
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else { throw NSError(domain: "Image Error", code: -1) }
+        let fileName = "portfolio_\(UUID().uuidString).jpg"
+        try await supabase.storage.from("portfolio-media").upload(fileName, data: imageData)
+        return try supabase.storage.from("portfolio-media").getPublicURL(path: fileName).absoluteString
+    }
+
+    private func uploadVideoAsync(fileURL: URL) async throws -> String {
+        let videoData = try Data(contentsOf: fileURL)
+        let fileExtension = fileURL.pathExtension.isEmpty ? "mov" : fileURL.pathExtension
+        let fileName = "portfolio_\(UUID().uuidString).\(fileExtension)"
+        try await supabase.storage.from("portfolio-media").upload(fileName, data: videoData)
+        try? FileManager.default.removeItem(at: fileURL)
+        return try supabase.storage.from("portfolio-media").getPublicURL(path: fileName).absoluteString
+    }
+    
+    // MARK: - Previews
     private func displaySelectedImage(_ image: UIImage) {
         DispatchQueue.main.async {
             self.imagePreview.image = image
@@ -355,109 +439,7 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
         }
     }
     
-    private func uploadImageToSupabase(_ image: UIImage) {
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-            showAlert(title: "Error", message: "Failed to process image")
-            return
-        }
-        
-        Task {
-            do {
-                let fileName = "portfolio_\(UUID().uuidString).jpg"
-                
-                try await supabase
-                    .storage
-                    .from("portfolio-media")
-                    .upload(fileName, data: imageData)
-                
-                // Get public URL
-                let publicUrl = try supabase
-                    .storage
-                    .from("portfolio-media")
-                    .getPublicURL(path: fileName)
-                
-                DispatchQueue.main.async {
-                    self.uploadedImageUrl = publicUrl.absoluteString
-                    self.uploadedMediaUrl = publicUrl.absoluteString
-                    self.uploadedMediaIsVideo = false
-                    self.uploadProgressLabel.text = "✅ Image uploaded successfully"
-                }
-                
-                print("✅ Image uploaded: \(publicUrl)")
-            } catch {
-                DispatchQueue.main.async {
-                    self.uploadProgressLabel.text = "❌ Upload failed"
-                    self.imagePreview.isHidden = true
-                    self.uploadButton.isHidden = false
-                    self.showAlert(title: "Upload Error", message: error.localizedDescription)
-                }
-                print("❌ Upload error: \(error)")
-            }
-        }
-    }
 
-    private func uploadVideoToSupabase(fileURL: URL) {
-        // PERMISSION: Some URLs require explicit startAccessing
-        let _ = fileURL.startAccessingSecurityScopedResource()
-        
-        // COPY: PHPicker temp URLs are deleted when the provider block ends. 
-        // We must copy to a permanent temp file for the upload Task.
-        let tempDir = FileManager.default.temporaryDirectory
-        let destinationURL = tempDir.appendingPathComponent("upload_\(UUID().uuidString).\(fileURL.pathExtension)")
-        
-        do {
-            if FileManager.default.fileExists(atPath: destinationURL.path) {
-                try? FileManager.default.removeItem(at: destinationURL)
-            }
-            try FileManager.default.copyItem(at: fileURL, to: destinationURL)
-            fileURL.stopAccessingSecurityScopedResource()
-        } catch {
-            fileURL.stopAccessingSecurityScopedResource()
-            self.uploadProgressLabel.text = "❌ Copy failed"
-            self.showAlert(title: "Processing Error", message: "Failed to prepare video for upload: \(error.localizedDescription)")
-            return
-        }
-
-        Task {
-            do {
-                let videoData = try Data(contentsOf: destinationURL)
-                let fileExtension = destinationURL.pathExtension.isEmpty ? "mov" : destinationURL.pathExtension
-                let fileName = "portfolio_\(UUID().uuidString).\(fileExtension)"
-
-                try await supabase
-                    .storage
-                    .from("portfolio-media")
-                    .upload(fileName, data: videoData)
-
-                let publicUrl = try supabase
-                    .storage
-                    .from("portfolio-media")
-                    .getPublicURL(path: fileName)
-
-                // CLEANUP
-                try? FileManager.default.removeItem(at: destinationURL)
-
-                DispatchQueue.main.async {
-                    self.uploadedImageUrl = nil
-                    self.uploadedMediaUrl = publicUrl.absoluteString
-                    self.uploadedMediaIsVideo = true
-                    self.uploadProgressLabel.text = "✅ Video uploaded successfully"
-                }
-
-                print("✅ Video uploaded: \(publicUrl)")
-            } catch {
-                try? FileManager.default.removeItem(at: destinationURL)
-                DispatchQueue.main.async {
-                    self.uploadProgressLabel.text = "❌ Upload failed"
-                    self.imagePreview.isHidden = true
-                    self.uploadButton.isHidden = false
-                    self.imagePreview.contentMode = .scaleAspectFill
-                    self.showAlert(title: "Upload Error", message: error.localizedDescription)
-                }
-                print("❌ Video upload error: \(error)")
-            }
-        }
-    }
     
     // MARK: - Save Item
     @objc private func saveItem() {
@@ -484,8 +466,8 @@ class AddPortfolioItemViewController: UIViewController, UIImagePickerControllerD
             genre: genreField.text?.isEmpty == true ? nil : genreField.text,
             durationMinutes: .none,
             description: descriptionView.text?.isEmpty == true ? nil : descriptionView.text,
-            posterUrl: uploadedMediaIsVideo ? nil : uploadedImageUrl,
-            mediaUrls: uploadedMediaUrl.map { [$0] }
+            posterUrl: uploadedImageUrl,
+            mediaUrls: uploadedMediaUrls.isEmpty ? nil : uploadedMediaUrls
         )
         
         Task {

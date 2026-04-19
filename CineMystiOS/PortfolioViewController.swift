@@ -586,7 +586,7 @@ class PortfolioViewController: UIViewController {
         for (idx, (title, content)) in actorSections.enumerated() {
             let formattedList = normalizedProjects(from: content)
             if !formattedList.isEmpty {
-                contentStack.addArrangedSubview(makeProjectSectionCard(title: title, projects: formattedList))
+                contentStack.addArrangedSubview(makeProjectSectionCard(title: title, tag: idx, projects: formattedList))
                 contentStack.addArrangedSubview(makeSectionSpacer())
             } else if isOwnProfile {
                 contentStack.addArrangedSubview(makeEmptyActorSection(title: title, tag: idx))
@@ -1269,7 +1269,7 @@ class PortfolioViewController: UIViewController {
         return trimmed
     }
 
-    private func makeProjectSectionCard(title: String, projects: [[String: Any]]) -> UIView {
+    private func makeProjectSectionCard(title: String, tag: Int, projects: [[String: Any]]) -> UIView {
         let card = UIView()
         card.translatesAutoresizingMaskIntoConstraints = false
         card.backgroundColor = PDS.glass
@@ -1301,10 +1301,25 @@ class PortfolioViewController: UIViewController {
             stack.addArrangedSubview(makeProjectMediaCard(project))
         }
 
+        if isOwnProfile {
+            let addBtn = UIButton(type: .system)
+            addBtn.setTitle("+ Add", for: .normal)
+            addBtn.setTitleColor(PDS.accent, for: .normal)
+            addBtn.titleLabel?.font = .systemFont(ofSize: 12, weight: .bold)
+            addBtn.translatesAutoresizingMaskIntoConstraints = false
+            addBtn.tag = tag
+            addBtn.addTarget(self, action: #selector(addItemTapped(_:)), for: .touchUpInside)
+            
+            card.addSubview(addBtn)
+            NSLayoutConstraint.activate([
+                addBtn.centerYAnchor.constraint(equalTo: sectionTitle.centerYAnchor),
+                addBtn.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16)
+            ])
+        }
+
         NSLayoutConstraint.activate([
             sectionTitle.topAnchor.constraint(equalTo: card.topAnchor, constant: 14),
             sectionTitle.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
-            sectionTitle.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
 
             scroll.topAnchor.constraint(equalTo: sectionTitle.bottomAnchor, constant: 10),
             scroll.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
