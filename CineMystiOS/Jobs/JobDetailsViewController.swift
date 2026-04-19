@@ -55,8 +55,8 @@ class JobDetailsViewController: UIViewController {
         view.backgroundColor = CineMystTheme.pinkPale
         navigationItem.hidesBackButton = true
         setupBackground()
-        setupScrollView()
         setupLayout()
+        setupScrollView()
         
         applyButton.addTarget(self, action: #selector(ctaTapped), for: .touchUpInside)
         backButton.addTarget(self, action: #selector(backTapped), for: .touchUpInside)
@@ -187,12 +187,14 @@ class JobDetailsViewController: UIViewController {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        navigationController?.setNavigationBarHidden(true, animated: animated)
         tabBarController?.tabBar.isHidden = true
         buildContentCards()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        navigationController?.setNavigationBarHidden(false, animated: animated)
         tabBarController?.tabBar.isHidden = false
     }
 
@@ -213,12 +215,14 @@ class JobDetailsViewController: UIViewController {
         scrollView.addSubview(contentView)
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         contentView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.showsVerticalScrollIndicator = false
         
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            // Start below our custom header
+            scrollView.topAnchor.constraint(equalTo: topHeaderView.bottomAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: applyButton.topAnchor, constant: -10),
             
             contentView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
             contentView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
@@ -228,42 +232,53 @@ class JobDetailsViewController: UIViewController {
         ])
     }
     
+    private let topHeaderView = UIView()
+
     private func setupLayout() {
-        contentView.addSubview(backButton)
-        contentView.addSubview(titleLabel)
-        contentView.addSubview(applyButton)
+        topHeaderView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(topHeaderView)
+        
+        topHeaderView.addSubview(backButton)
+        topHeaderView.addSubview(titleLabel)
+        view.addSubview(applyButton)
+        
         applyButton.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            backButton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 6),
-            backButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            backButton.widthAnchor.constraint(equalToConstant: 48),
-            backButton.heightAnchor.constraint(equalToConstant: 48),
+            topHeaderView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            topHeaderView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            topHeaderView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            topHeaderView.heightAnchor.constraint(equalToConstant: 70),
+            
+            backButton.centerYAnchor.constraint(equalTo: topHeaderView.centerYAnchor),
+            backButton.leadingAnchor.constraint(equalTo: topHeaderView.leadingAnchor, constant: 20),
+            backButton.widthAnchor.constraint(equalToConstant: 44),
+            backButton.heightAnchor.constraint(equalToConstant: 44),
 
             titleLabel.centerYAnchor.constraint(equalTo: backButton.centerYAnchor),
-            titleLabel.leadingAnchor.constraint(equalTo: backButton.trailingAnchor, constant: 8),
-            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            titleLabel.leadingAnchor.constraint(equalTo: backButton.trailingAnchor, constant: 12),
+            titleLabel.trailingAnchor.constraint(equalTo: topHeaderView.trailingAnchor, constant: -20),
 
-            applyButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            applyButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            applyButton.heightAnchor.constraint(equalToConstant: 54),
-            applyButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40)
+            applyButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            applyButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            applyButton.heightAnchor.constraint(equalToConstant: 58),
+            applyButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16)
         ])
     }
 
     private func buildContentCards() {
-        contentView.subviews.forEach { if $0 is UIStackView && $0 != titleLabel { $0.removeFromSuperview() } }
+        contentView.subviews.forEach { $0.removeFromSuperview() }
         let cardStack = UIStackView()
         cardStack.axis = .vertical
         cardStack.spacing = 18
         contentView.addSubview(cardStack)
         cardStack.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            cardStack.topAnchor.constraint(equalTo: backButton.bottomAnchor, constant: 16),
+            cardStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
             cardStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             cardStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            cardStack.bottomAnchor.constraint(equalTo: applyButton.topAnchor, constant: -30)
+            cardStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20)
         ])
         
         if let job = job {

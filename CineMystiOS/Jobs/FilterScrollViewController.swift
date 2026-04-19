@@ -18,7 +18,6 @@ class FilterScrollViewController: UIViewController {
     private let roleOptions = ["Acting", "Modeling", "Theatre", "Voice Over", "Anchoring"]
     private let positionOptions = ["Lead Actor", "Supporting", "Junior Artist", "Child Artist"]
     private let projectOptions = ["Web Series", "TV", "Film", "Short Film", "Ad/Commercial"]
-    private let locationOptions = ["Bhubaneswar", "Mumbai", "Kolkata", "Delhi", "Chennai", "Hyderabad", "Bangalore"]
     
     // MARK: - Lifecycle
     override func viewDidLoad() {
@@ -150,9 +149,17 @@ extension FilterScrollViewController: UITableViewDelegate, UITableViewDataSource
                 self.selectedProjectType = val; self.tableView.reloadData()
             }
         case 3:
-            showSelectionSheet(title: "Location", options: locationOptions, current: selectedLocation) { val in
-                self.selectedLocation = val; self.tableView.reloadData()
+            let picker = JobLocationPickerViewController()
+            picker.onLocationSelected = { [weak self] location in
+                self?.selectedLocation = location
+                self?.tableView.reloadData()
             }
+            let nav = UINavigationController(rootViewController: picker)
+            if let sheet = nav.sheetPresentationController {
+                sheet.detents = [.medium(), .large()]
+                sheet.prefersGrabberVisible = true
+            }
+            present(nav, animated: true)
         default: break
         }
     }

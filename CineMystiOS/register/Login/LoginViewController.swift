@@ -7,6 +7,7 @@
 
 import UIKit
 import Supabase
+import CoreLocation
 
 class LoginViewController: UIViewController {
 
@@ -24,6 +25,7 @@ class LoginViewController: UIViewController {
 
     private var activityIndicator: UIActivityIndicatorView!
     private var loginTimeoutTimer: Timer?
+    private let locationManagerForAuth = CLLocationManager()
     
     // MARK: - Gradient Layer
     private var gradientLayer: CAGradientLayer?
@@ -480,6 +482,11 @@ class LoginViewController: UIViewController {
     }
     
     private func navigateToHomeDashboard() {
+        // Request location permission right after sign-in (once, silently)
+        if locationManagerForAuth.authorizationStatus == .notDetermined {
+            locationManagerForAuth.requestWhenInUseAuthorization()
+        }
+        
         let tabBarVC = CineMystTabBarController()
         tabBarVC.modalPresentationStyle = .fullScreen
         

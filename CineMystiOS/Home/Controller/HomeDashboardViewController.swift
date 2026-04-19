@@ -518,6 +518,7 @@ final class HomeDashboardViewController: UIViewController {
             host.view.heightAnchor.constraint(equalToConstant: 320)
         ])
         host.didMove(toParent: self)
+        view.bringSubviewToFront(host.view)
     }
 
     private func setFloatingMenuDimmed(_ isDimmed: Bool) {
@@ -2349,20 +2350,10 @@ final class AdBannerCell: UITableViewCell {
 // to the table view below, fixing the "scrolling blocked" issue.
 
 private final class PassthroughHostingController<Content: View>: UIHostingController<Content> {
-    override func loadView() {
-        super.loadView()
-        // We replace the view with a PassthroughView but keep the original view as a subview
-        // However, a cleaner way is to just override hitTest on the view if we can.
-        // Since we can't easily change the class of UIHostingController.view after it's created,
-        // we override loadView to use our custom PassthroughView.
-        let rootView = PassthroughView()
-        rootView.backgroundColor = .clear
-        self.view = rootView
-    }
-
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .clear
+        view.isOpaque = false
     }
 }
 

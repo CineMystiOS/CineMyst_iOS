@@ -522,6 +522,12 @@ class ProfileInfoViewController: UIViewController {
     }
 
     @objc private func submitTapped() {
+        // Validation for mandatory fields
+        if governmentIdUrl == nil {
+            showAlert(title: "Missing Information", message: "Please upload your Government ID to proceed. This is mandatory for verification.")
+            return
+        }
+        
         Task {
             do {
                 try await saveDirectorProfile()
@@ -717,17 +723,24 @@ class ProfileInfoViewController: UIViewController {
 
         // 2. Identity Verification
         stack.addArrangedSubview(sectionHeader("Identity Verification"))
-        stack.addArrangedSubview(documentUploadRow(title: "Government ID", icon: "doc.text.viewfinder", identifier: "gov_id"))
+        stack.addArrangedSubview(documentUploadRow(title: "Government ID *", icon: "doc.text.viewfinder", identifier: "gov_id"))
         stack.addArrangedSubview(documentUploadRow(title: "Live Selfie", icon: "person.badge.shield.fill", identifier: "selfie"))
+        
+        // 3. Guild & Affiliations (Moved up as requested)
+        stack.addArrangedSubview(sectionHeader("Guild & Affiliations"))
+        stack.addArrangedSubview(documentUploadRow(title: "Guild ID Card", icon: "card.fill", identifier: "guild_card"))
+        stack.addArrangedSubview(inputField(title: "Guild Name", placeholder: "e.g. DGA, WGA"))
+        stack.addArrangedSubview(inputField(title: "Membership Number", placeholder: "ID number"))
+        stack.addArrangedSubview(selectionCell(title: "Membership Expiry", value: "Select date", tag: 20))
 
-        // 3. Experience & Projects
+        // 4. Experience & Projects
         stack.addArrangedSubview(sectionHeader("Experience & Projects"))
         stack.addArrangedSubview(textViewField(title: "Past Project Details", placeholder: "List your major projects..."))
         stack.addArrangedSubview(inputField(title: "Role in Projects", placeholder: "e.g. Lead Director"))
         stack.addArrangedSubview(inputField(title: "Production House / Studio Name", placeholder: "e.g. Dharma Productions"))
         stack.addArrangedSubview(inputField(title: "IMDb / YouTube / OTT Links", placeholder: "Links to your work"))
 
-        // 4. Professional Links
+        // 5. Professional Links
         stack.addArrangedSubview(sectionHeader("Professional Links"))
         stack.addArrangedSubview(inputField(title: "Company / Organization Name", placeholder: "Your current company"))
         stack.addArrangedSubview(inputField(title: "Official Work Email", placeholder: "work@company.com"))
@@ -735,12 +748,6 @@ class ProfileInfoViewController: UIViewController {
         stack.addArrangedSubview(inputField(title: "Instagram / Professional Social Media", placeholder: "@handle"))
         stack.addArrangedSubview(inputField(title: "Portfolio Website", placeholder: "https://..."))
 
-        // 5. Guild & Affiliations
-        stack.addArrangedSubview(sectionHeader("Guild & Affiliations"))
-        stack.addArrangedSubview(documentUploadRow(title: "Guild ID Card", icon: "card.fill", identifier: "guild_card"))
-        stack.addArrangedSubview(inputField(title: "Guild Name", placeholder: "e.g. DGA, WGA"))
-        stack.addArrangedSubview(inputField(title: "Membership Number", placeholder: "ID number"))
-        stack.addArrangedSubview(selectionCell(title: "Membership Expiry", value: "Select date", tag: 20))
 
         // 6. References
         stack.addArrangedSubview(sectionHeader("Industry References"))

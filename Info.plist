@@ -32,6 +32,8 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>CineMyst uses your location to find casting calls and job opportunities in your city.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>6.0</string>
 	<key>NSMicrophoneUsageDescription</key>

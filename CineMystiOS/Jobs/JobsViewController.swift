@@ -1,5 +1,7 @@
 import UIKit
 import Supabase
+import CoreLocation
+import MapKit
 
 // MARK: - Colors & Helpers
 fileprivate extension UIColor {
@@ -35,8 +37,21 @@ fileprivate class CineMystGradientButton: UIButton {
 }
 
 // MARK: - JobsViewController
-final class JobsViewController: UIViewController, UIScrollViewDelegate {
+final class JobsViewController: UIViewController, UIScrollViewDelegate, CLLocationManagerDelegate, MKLocalSearchCompleterDelegate, UITableViewDataSource, UITableViewDelegate {
     
+    private let locationManager = CLLocationManager()
+    private let searchCompleter = MKLocalSearchCompleter()
+    private var completerResults: [MKLocalSearchCompletion] = []
+    
+    // Suggestion List
+    private let suggestionsTableView: UITableView = {
+        let tv = UITableView()
+        tv.backgroundColor = .white
+        tv.layer.cornerRadius = 16
+        tv.layer.masksToBounds = true
+        tv.isHidden = true
+        return tv
+    }()
     // Theme
     private let themeColor = UIColor.themePlum
     private let backgroundGradient = CAGradientLayer()
@@ -47,13 +62,22 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
     private let scrollView = UIScrollView()
     private let contentView = UIView()
     
-    // Search Bar
+    // Search Bar (Location)
     private let searchBar: UISearchBar = {
         let sb = UISearchBar()
-        sb.placeholder = "Search castings"
+        sb.placeholder = "Enter location..."
         sb.searchBarStyle = .minimal
         sb.backgroundImage = UIImage()
         return sb
+    }()
+    
+    private lazy var locationFetchButton: UIButton = {
+        let btn = UIButton(type: .system)
+        let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .bold)
+        btn.setImage(UIImage(systemName: "location.fill", withConfiguration: config), for: .normal)
+        btn.tintColor = CineMystTheme.brandPlum
+        btn.addTarget(self, action: #selector(fetchMyLocationTapped), for: .touchUpInside)
+        return btn
     }()
     
     // Title bar with gradient
@@ -114,6 +138,53 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
         l.numberOfLines = 2
         return l
     }()
+    private lazy var seeAllButton: UIButton = {
+        var config = UIButton.Configuration.plain()
+        config.title = "All"
+        config.image = UIImage(systemName: "chevron.right", withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold))
+        config.imagePlacement = .trailing
+        config.imagePadding = 4
+        config.baseForegroundColor = CineMystTheme.brandPlum
+        config.contentInsets = .zero
+        
+        let btn = UIButton(configuration: config)
+        btn.addTarget(self, action: #selector(didTapSeeAll), for: .touchUpInside)
+        return btn
+    }()
+    private var currentUserCity: String?
+    
+    // Empty state
+    private let emptyStateLabel: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 15, weight: .medium)
+        l.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.5)
+        l.textAlignment = .center
+        l.numberOfLines = 0
+        l.isHidden = true
+        return l
+    }()
+    
+    // Finding-roles overlay
+    private let findingOverlay: UIView = {
+        let v = UIView()
+        v.backgroundColor = UIColor.black.withAlphaComponent(0.55)
+        v.alpha = 0
+        v.isUserInteractionEnabled = false
+        return v
+    }()
+    private let findingLabel: UILabel = {
+        let l = UILabel()
+        l.text = "Finding roles near you..."
+        l.font = .systemFont(ofSize: 18, weight: .semibold)
+        l.textColor = .white
+        l.textAlignment = .center
+        return l
+    }()
+    private let findingSpinner: UIActivityIndicatorView = {
+        let s = UIActivityIndicatorView(style: .large)
+        s.color = .white
+        return s
+    }()
     
     // Job list
     private let jobListStack: UIStackView = {
@@ -145,11 +216,11 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
         setupBackground()
         
         searchBar.delegate = self
-        setupScrollView()
         setupTitleBar()
         setupSearchBar()
         setupPostButtons()
         setupCuratedAndJobs()
+        setupScrollView()
         setupBottomSpacing()
         
         filterButton.addTarget(self, action: #selector(openFilter), for: .touchUpInside)
@@ -158,6 +229,50 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
         let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
         tap.cancelsTouchesInView = false
         view.addGestureRecognizer(tap)
+        
+        // Finding overlay
+        findingOverlay.translatesAutoresizingMaskIntoConstraints = false
+        findingLabel.translatesAutoresizingMaskIntoConstraints = false
+        findingSpinner.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(findingOverlay)
+        findingOverlay.addSubview(findingLabel)
+        findingOverlay.addSubview(findingSpinner)
+        NSLayoutConstraint.activate([
+            findingOverlay.topAnchor.constraint(equalTo: view.topAnchor),
+            findingOverlay.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            findingOverlay.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            findingOverlay.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            findingSpinner.centerXAnchor.constraint(equalTo: findingOverlay.centerXAnchor),
+            findingSpinner.centerYAnchor.constraint(equalTo: findingOverlay.centerYAnchor),
+            findingLabel.topAnchor.constraint(equalTo: findingSpinner.bottomAnchor, constant: 16),
+            findingLabel.centerXAnchor.constraint(equalTo: findingOverlay.centerXAnchor)
+        ])
+        
+        locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        
+        searchCompleter.delegate = self
+        searchCompleter.resultTypes = .address
+        setupSuggestionsTableView()
+    }
+    
+    private func checkLocationAuthorization() {
+        let status = locationManager.authorizationStatus
+        switch status {
+        case .authorizedAlways, .authorizedWhenInUse:
+            // Already authorized: Start fetching and show animation
+            showFindingAnimation()
+            locationManager.startUpdatingLocation()
+        case .notDetermined:
+            // Permission not yet asked: Request it and load all jobs as a starting point
+            locationManager.requestWhenInUseAuthorization()
+            reloadJobCards()
+        case .denied, .restricted:
+            // Specifically denied: Just load all jobs
+            reloadJobCards()
+        @unknown default:
+            reloadJobCards()
+        }
     }
 
     @objc private func dismissKeyboard() {
@@ -173,7 +288,24 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        reloadJobCards()
+        navigationController?.setNavigationBarHidden(true, animated: animated)
+    }
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        // Show navigation bar for other screens
+        navigationController?.setNavigationBarHidden(false, animated: animated)
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // Check authorization and start fetch when view is fully visible
+        checkLocationAuthorization()
+    }
+    
+    private func setupSuggestionsTableView() {
+        suggestionsTableView.separatorStyle = .none
+        suggestionsTableView.showsVerticalScrollIndicator = false
     }
     
     // MARK: - Setup UI
@@ -208,8 +340,8 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
         NSLayoutConstraint.activate([
             ambientGlowTop.widthAnchor.constraint(equalToConstant: 220),
             ambientGlowTop.heightAnchor.constraint(equalToConstant: 220),
-            ambientGlowTop.topAnchor.constraint(equalTo: view.topAnchor, constant: -26),
-            ambientGlowTop.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: 22),
+            ambientGlowTop.topAnchor.constraint(equalTo: view.topAnchor, constant: -10),
+            ambientGlowTop.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: 30),
 
             ambientGlowBottom.widthAnchor.constraint(equalToConstant: 240),
             ambientGlowBottom.heightAnchor.constraint(equalToConstant: 240),
@@ -229,7 +361,8 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
         contentView.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            // Scroll view starts below the fixed section header separator
+            scrollView.topAnchor.constraint(equalTo: separatorView.bottomAnchor, constant: 0),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -252,40 +385,71 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
         titleBar.spacing = 8
         titleBar.translatesAutoresizingMaskIntoConstraints = false
         
-        contentView.addSubview(titleBar)
-        contentView.addSubview(subtitleLabel)
+        view.addSubview(titleBar)
+        view.addSubview(subtitleLabel)
         
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            titleBar.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
-            titleBar.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            titleBar.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            titleBar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+            titleBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            titleBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             
             subtitleLabel.topAnchor.constraint(equalTo: titleBar.bottomAnchor, constant: 4),
             subtitleLabel.leadingAnchor.constraint(equalTo: titleBar.leadingAnchor),
-            subtitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -16)
+            subtitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -16)
         ])
     }
     
     private func setupSearchBar() {
-        contentView.addSubview(searchBarContainer)
+        view.addSubview(searchBarContainer)
         searchBarContainer.translatesAutoresizingMaskIntoConstraints = false
         
         searchBarContainer.addSubview(searchBar)
         searchBar.translatesAutoresizingMaskIntoConstraints = false
         
+        searchBarContainer.addSubview(locationFetchButton)
+        locationFetchButton.translatesAutoresizingMaskIntoConstraints = false
+        
         NSLayoutConstraint.activate([
             searchBarContainer.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 24),
-            searchBarContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            searchBarContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            searchBarContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            searchBarContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             searchBarContainer.heightAnchor.constraint(equalToConstant: 46),
             
             searchBar.topAnchor.constraint(equalTo: searchBarContainer.topAnchor),
             searchBar.leadingAnchor.constraint(equalTo: searchBarContainer.leadingAnchor),
-            searchBar.trailingAnchor.constraint(equalTo: searchBarContainer.trailingAnchor),
+            searchBar.trailingAnchor.constraint(equalTo: searchBarContainer.trailingAnchor, constant: -44),
             searchBar.bottomAnchor.constraint(equalTo: searchBarContainer.bottomAnchor),
+            
+            locationFetchButton.trailingAnchor.constraint(equalTo: searchBarContainer.trailingAnchor, constant: -10),
+            locationFetchButton.centerYAnchor.constraint(equalTo: searchBarContainer.centerYAnchor),
+            locationFetchButton.widthAnchor.constraint(equalToConstant: 34),
+            locationFetchButton.heightAnchor.constraint(equalToConstant: 34)
         ])
+        
+        // Also add suggestionsTableView to view hierarchy, above other things
+        view.addSubview(suggestionsTableView)
+        suggestionsTableView.translatesAutoresizingMaskIntoConstraints = false
+        suggestionsTableView.dataSource = self
+        suggestionsTableView.delegate = self
+        suggestionsTableView.register(UITableViewCell.self, forCellReuseIdentifier: "SuggestCell")
+        
+        NSLayoutConstraint.activate([
+            suggestionsTableView.topAnchor.constraint(equalTo: searchBarContainer.bottomAnchor, constant: 4),
+            suggestionsTableView.leadingAnchor.constraint(equalTo: searchBarContainer.leadingAnchor),
+            suggestionsTableView.trailingAnchor.constraint(equalTo: searchBarContainer.trailingAnchor),
+            suggestionsTableView.heightAnchor.constraint(lessThanOrEqualToConstant: 240)
+        ])
+        
+        suggestionsTableView.layer.cornerRadius = 16
+        suggestionsTableView.clipsToBounds = true
+        
+        // Shadow for suggestions
+        suggestionsTableView.layer.shadowColor = UIColor.black.cgColor
+        suggestionsTableView.layer.shadowOpacity = 0.1
+        suggestionsTableView.layer.shadowRadius = 10
+        suggestionsTableView.layer.shadowOffset = CGSize(width: 0, height: 4)
 
         let textField = searchBar.searchTextField
         textField.backgroundColor = UIColor.white.withAlphaComponent(0.85)
@@ -311,7 +475,7 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
             .foregroundColor: CineMystTheme.ink.withAlphaComponent(0.35),
             .font: UIFont.systemFont(ofSize: 14, weight: .regular)
         ]
-        textField.attributedPlaceholder = NSAttributedString(string: "Search castings", attributes: placeholderAttr)
+        textField.attributedPlaceholder = NSAttributedString(string: "Enter location...", attributes: placeholderAttr)
         
         // Fix magnification icon color
         if let iconView = textField.leftView as? UIImageView {
@@ -320,13 +484,13 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
     }
     
     private func setupPostButtons() {
-        contentView.addSubview(postButtonsStack)
+        view.addSubview(postButtonsStack)
         postButtonsStack.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
             postButtonsStack.topAnchor.constraint(equalTo: searchBarContainer.bottomAnchor, constant: 24),
-            postButtonsStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            postButtonsStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            postButtonsStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            postButtonsStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             postButtonsStack.heightAnchor.constraint(equalToConstant: 44)
         ])
         
@@ -370,33 +534,46 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
         }
     }
     
+    private let separatorView = UIView()
+
     private func setupCuratedAndJobs() {
-        [curatedLabel, curatedSubtitle, jobListStack].forEach {
+        [curatedLabel, curatedSubtitle, seeAllButton].forEach {
+            $0.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview($0)
+        }
+        
+        [jobListStack, emptyStateLabel].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
             contentView.addSubview($0)
         }
         
-        let separator = UIView()
-        separator.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.08)
-        separator.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(separator)
+        separatorView.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.08)
+        separatorView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(separatorView)
         
         NSLayoutConstraint.activate([
             curatedLabel.topAnchor.constraint(equalTo: postButtonsStack.bottomAnchor, constant: 32),
-            curatedLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            curatedLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            
+            seeAllButton.centerYAnchor.constraint(equalTo: curatedLabel.centerYAnchor),
+            seeAllButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             
             curatedSubtitle.topAnchor.constraint(equalTo: curatedLabel.bottomAnchor, constant: 4),
             curatedSubtitle.leadingAnchor.constraint(equalTo: curatedLabel.leadingAnchor),
-            curatedSubtitle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            curatedSubtitle.trailingAnchor.constraint(equalTo: seeAllButton.leadingAnchor, constant: -8),
             
-            separator.topAnchor.constraint(equalTo: curatedSubtitle.bottomAnchor, constant: 16),
-            separator.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            separator.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            separator.heightAnchor.constraint(equalToConstant: 0.5),
+            separatorView.topAnchor.constraint(equalTo: curatedSubtitle.bottomAnchor, constant: 16),
+            separatorView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            separatorView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            separatorView.heightAnchor.constraint(equalToConstant: 0.5),
             
-            jobListStack.topAnchor.constraint(equalTo: separator.bottomAnchor, constant: 16),
+            jobListStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 16),
             jobListStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             jobListStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            
+            emptyStateLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 40),
+            emptyStateLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+            emptyStateLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
         ])
     }
 
@@ -432,15 +609,33 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
         do {
             let jobs = try await JobsService.shared.fetchActiveJobs()
             self.allJobs = jobs
-            self.filteredJobs = jobs
+            
+            // Re-apply current search text if active, otherwise show all
+            let currentSearch = await MainActor.run { self.searchBar.text?.trimmingCharacters(in: .whitespaces) ?? "" }
+            if currentSearch.isEmpty {
+                self.filteredJobs = jobs
+            } else {
+                self.filteredJobs = jobs.filter {
+                    ($0.location ?? "").lowercased().contains(currentSearch.lowercased())
+                }
+            }
             
             await MainActor.run { [weak self] in
                 guard let self = self else { return }
+                self.emptyStateLabel.isHidden = true
                 self.jobListStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+                
+                if self.filteredJobs.isEmpty {
+                    let msg = currentSearch.isEmpty
+                        ? "No casting calls available right now."
+                        : "No roles found in \(currentSearch).\nTry a different location or tap \"All\" to browse everything."
+                    self.emptyStateLabel.text = msg
+                    self.emptyStateLabel.isHidden = false
+                    return
+                }
                 
                 for job in self.filteredJobs {
                     let card = JobCardView()
-                    
                     Task {
                         let directorUuid = job.directorId ?? UUID()
                         let (productionHouse, _) = await self.fetchProductionHouse(directorId: directorUuid)
@@ -641,6 +836,132 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
         present(alert, animated: true)
     }
 
+    // MARK: - Location Logic
+    @objc private func fetchMyLocationTapped() {
+        let status = locationManager.authorizationStatus
+        switch status {
+        case .notDetermined:
+            locationManager.requestWhenInUseAuthorization()
+        case .restricted, .denied:
+            showAlert(title: "Location Disabled", message: "Please enable location services in Settings to fetch your current city.")
+        case .authorizedAlways, .authorizedWhenInUse:
+            showFindingAnimation()
+            locationManager.startUpdatingLocation()
+        @unknown default:
+            break
+        }
+    }
+    
+    private func showFindingAnimation() {
+        view.bringSubviewToFront(findingOverlay)
+        findingSpinner.startAnimating()
+        UIView.animate(withDuration: 0.3) { self.findingOverlay.alpha = 1 }
+    }
+    
+    private func hideFindingAnimation() {
+        UIView.animate(withDuration: 0.4, animations: {
+            self.findingOverlay.alpha = 0
+        }) { _ in
+            self.findingSpinner.stopAnimating()
+        }
+    }
+    
+    @objc private func myJobsTapped() {
+        self.navigationController?.pushViewController(MyApplicationsViewController(), animated: true)
+    }
+    @objc private func didTapPosted() {
+        self.navigationController?.pushViewController(PostedJobsDashboardViewController(), animated: true)
+    }
+    @objc private func didTapSeeAll() {
+        let vc = AllCastingsViewController()
+        self.navigationController?.pushViewController(vc, animated: true)
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.first else { return }
+        locationManager.stopUpdatingLocation()
+        
+        let geocoder = CLGeocoder()
+        geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
+            guard let self = self else { return }
+            self.hideFindingAnimation()
+            if let city = placemarks?.first?.locality {
+                self.currentUserCity = city
+                self.searchBar.text = city
+                self.subtitleLabel.text = city
+                self.curatedSubtitle.text = "Casting calls near \(city)"
+                // Reload cards filtered by the detected city
+                self.reloadJobCards()
+            } else {
+                self.subtitleLabel.text = "Discover your next role"
+                self.reloadJobCards()
+            }
+        }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        print("❌ Location fetch failed: \(error)")
+        subtitleLabel.text = "Discover your next role"
+        hideFindingAnimation()
+    }
+
+    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        if status == .authorizedAlways || status == .authorizedWhenInUse {
+            showFindingAnimation()
+            locationManager.startUpdatingLocation()
+        } else if status != .notDetermined {
+            // Permission denied or restricted: load all jobs normally
+            reloadJobCards()
+        }
+    }
+    
+    // MARK: - MKLocalSearchCompleterDelegate
+    func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+        // Filter to cities/localities only — exclude restaurants, airports, streets
+        completerResults = completer.results.filter { result in
+            let subtitle = result.subtitle.lowercased()
+            // Keep only results that have a country or state in subtitle and no street number (avoids street-level POIs)
+            return !subtitle.isEmpty && !result.title.contains("Airport") && !result.title.contains("Station")
+        }
+        suggestionsTableView.reloadData()
+        suggestionsTableView.isHidden = completerResults.isEmpty
+        view.bringSubviewToFront(suggestionsTableView)
+    }
+    
+    func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
+        print("❌ Completer error: \(error)")
+    }
+    
+    // MARK: - Suggestion Handlers
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        return completerResults.count
+    }
+    
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "SuggestCell", for: indexPath)
+        let suggestion = completerResults[indexPath.row]
+        
+        var config = cell.defaultContentConfiguration()
+        config.text = suggestion.title
+        config.secondaryText = suggestion.subtitle
+        config.textProperties.font = .systemFont(ofSize: 15, weight: .medium)
+        config.textProperties.color = CineMystTheme.ink
+        config.secondaryTextProperties.font = .systemFont(ofSize: 12)
+        config.secondaryTextProperties.color = .systemGray
+        
+        cell.contentConfiguration = config
+        cell.selectionStyle = .none
+        return cell
+    }
+    
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        let selection = completerResults[indexPath.row]
+        searchBar.text = selection.title
+        searchBar(searchBar, textDidChange: selection.title)
+        suggestionsTableView.isHidden = true
+        searchBar.resignFirstResponder()
+    }
+
     // MARK: - Selectors
     @objc private func postJobTapped() {
         Task {
@@ -663,12 +984,6 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
         } catch { return false }
     }
 
-    @objc private func myJobsTapped() {
-        self.navigationController?.pushViewController(MyApplicationsViewController(), animated: true)
-    }
-    @objc private func didTapPosted() {
-        self.navigationController?.pushViewController(PostedJobsDashboardViewController(), animated: true)
-    }
     @objc private func openSavedPosts() {
         self.navigationController?.pushViewController(SavedPostViewController(), animated: true)
     }
@@ -722,6 +1037,17 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate {
         await MainActor.run { [weak self] in
             guard let self = self else { return }
             self.jobListStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+            
+            if self.filteredJobs.isEmpty {
+                let location = self.searchBar.text?.trimmingCharacters(in: .whitespaces) ?? ""
+                let msg = location.isEmpty
+                    ? "No casting calls available right now."
+                    : "No roles found in \(location).\nTry a different location or tap \"All\" to browse everything."
+                self.emptyStateLabel.text = msg
+                self.emptyStateLabel.isHidden = false
+            } else {
+                self.emptyStateLabel.isHidden = true
+            }
             for job in self.filteredJobs {
                 let card = JobCardView()
                 Task {
@@ -779,16 +1105,23 @@ extension JobsViewController: UISearchBarDelegate {
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
         if searchText.isEmpty {
             filteredJobs = allJobs
+            subtitleLabel.text = "Discover your next role"
+            curatedSubtitle.text = "Opportunities that match your profile"
+            suggestionsTableView.isHidden = true
+            searchCompleter.queryFragment = ""
         } else {
+            searchCompleter.queryFragment = searchText
             filteredJobs = allJobs.filter { job in
-                (job.title ?? "").lowercased().contains(searchText.lowercased()) ||
-                (job.companyName ?? "").lowercased().contains(searchText.lowercased())
+                (job.location ?? "").lowercased().contains(searchText.lowercased())
             }
+            subtitleLabel.text = searchText
+            curatedSubtitle.text = "Casting calls in \(searchText)"
         }
         Task { await displayFilteredJobs() }
     }
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         searchBar.resignFirstResponder()
+        suggestionsTableView.isHidden = true
     }
 }
 
