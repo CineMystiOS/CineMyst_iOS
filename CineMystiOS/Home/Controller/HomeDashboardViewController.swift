@@ -567,12 +567,30 @@ final class HomeDashboardViewController: UIViewController {
     }
 
     private func setFloatingMenuDimmed(_ isDimmed: Bool) {
-        floatMenuWidthConst?.constant = isDimmed ? 300 : 100
-        floatMenuHeightConst?.constant = isDimmed ? 320 : 100
-        
-        UIView.animate(withDuration: 0.22, delay: 0, options: [.curveEaseInOut]) {
-            self.floatingMenuDimView.alpha = isDimmed ? 1 : 0
-            self.view.layoutIfNeeded()
+        if isDimmed {
+            // Expand instantly so SwiftUI can animate outwards
+            self.floatMenuWidthConst?.constant = 300
+            self.floatMenuHeightConst?.constant = 320
+            
+            UIView.animate(withDuration: 0.22, delay: 0, options: [.curveEaseInOut]) {
+                self.floatingMenuDimView.alpha = 1
+                self.view.layoutIfNeeded()
+            }
+        } else {
+            // Animate alpha out
+            UIView.animate(withDuration: 0.22, delay: 0, options: [.curveEaseInOut]) {
+                self.floatingMenuDimView.alpha = 0
+            }
+            
+            // DELAY the frame shrink until AFTER the SwiftUI fly-in animation completes
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                // If it was opened again during the delay, don't shrink it
+                guard self.floatingMenuDimView.alpha == 0 else { return }
+                
+                self.floatMenuWidthConst?.constant = 100
+                self.floatMenuHeightConst?.constant = 100
+                self.view.layoutIfNeeded()
+            }
         }
     }
 
