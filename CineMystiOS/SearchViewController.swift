@@ -2,7 +2,8 @@
 //  SearchViewController.swift
 //  CineMystApp
 //
-//  LinkedIn-style user search
+//  LinkedIn-style user search and Instagram-style Explore Flicks
+//
 
 import UIKit
 import Supabase
@@ -13,6 +14,87 @@ struct UserSearchResult {
     let fullName: String?
     let profilePictureUrl: String?
     let role: String?
+}
+
+// MARK: - Explore Flick Cell
+class ExploreFlickCell: UICollectionViewCell {
+    private let imageView = UIImageView()
+    private let playIcon = UIImageView()
+    
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupUI()
+    }
+    
+    required init?(coder: NSCoder) { fatalError() }
+    
+    private func setupUI() {
+        imageView.contentMode = .scaleAspectFill
+        imageView.clipsToBounds = true
+        imageView.backgroundColor = .systemGray6
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(imageView)
+        
+        playIcon.image = UIImage(systemName: "play.fill")
+        playIcon.tintColor = .white
+        playIcon.contentMode = .scaleAspectFit
+        playIcon.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Add subtle shadow to icon for visibility
+        playIcon.layer.shadowColor = UIColor.black.cgColor
+        playIcon.layer.shadowOffset = .zero
+        playIcon.layer.shadowOpacity = 0.5
+        playIcon.layer.shadowRadius = 2
+        contentView.addSubview(playIcon)
+        
+        NSLayoutConstraint.activate([
+            imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            imageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            
+            playIcon.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
+            playIcon.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+            playIcon.widthAnchor.constraint(equalToConstant: 16),
+            playIcon.heightAnchor.constraint(equalToConstant: 16)
+        ])
+    }
+    
+    func configureShimmer() {
+        imageView.image = nil
+        imageView.backgroundColor = .systemGray5
+        playIcon.isHidden = true
+        
+        UIView.animate(withDuration: 0.8, delay: 0, options: [.autoreverse, .repeat, .allowUserInteraction], animations: {
+            self.imageView.alpha = 0.5
+        })
+    }
+    
+    func configure(with flick: Flick) {
+        imageView.layer.removeAllAnimations()
+        imageView.alpha = 1.0
+        imageView.backgroundColor = .systemGray6
+        playIcon.isHidden = false
+        
+        if let urlString = flick.thumbnailUrl, let url = URL(string: urlString) {
+            URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+                guard let data = data, let image = UIImage(data: data) else { return }
+                DispatchQueue.main.async {
+                    self?.imageView.image = image
+                }
+            }.resume()
+        } else {
+            imageView.image = nil
+        }
+    }
+    
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        imageView.layer.removeAllAnimations()
+        imageView.alpha = 1.0
+        imageView.image = nil
+        playIcon.isHidden = false
+    }
 }
 
 // MARK: - Custom Search Result Cell
@@ -128,9 +210,23 @@ final class SearchViewController: UIViewController {
     private let tableView = UITableView(frame: .zero, style: .plain)
     private let emptyStateLabel = UILabel()
     
+    private lazy var exploreCollectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.minimumInteritemSpacing = 1
+        layout.minimumLineSpacing = 1
+        let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        cv.backgroundColor = .systemBackground
+        cv.showsVerticalScrollIndicator = false
+        cv.register(ExploreFlickCell.self, forCellWithReuseIdentifier: "ExploreFlickCell")
+        return cv
+    }()
+    
     private var searchResults: [UserSearchResult] = []
     private var isSearching = false
     private var searchTask: Task<Void, Never>?
+    
+    private var exploreFlicks: [Flick] = []
+    private var isLoadingFlicks = false
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -141,8 +237,15 @@ final class SearchViewController: UIViewController {
         navigationItem.leftBarButtonItem = nil
         
         setupSearchController()
+        setupExploreGrid()
         setupTableView()
         setupEmptyState()
+        
+        tableView.isHidden = true
+        exploreCollectionView.isHidden = false
+        emptyStateLabel.isHidden = true
+        
+        fetchExploreFlicks()
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -171,6 +274,20 @@ final class SearchViewController: UIViewController {
         definesPresentationContext = true
     }
     
+    private func setupExploreGrid() {
+        exploreCollectionView.translatesAutoresizingMaskIntoConstraints = false
+        exploreCollectionView.delegate = self
+        exploreCollectionView.dataSource = self
+        view.addSubview(exploreCollectionView)
+        
+        NSLayoutConstraint.activate([
+            exploreCollectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            exploreCollectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            exploreCollectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            exploreCollectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+    }
+    
     private func setupTableView() {
         tableView.translatesAutoresizingMaskIntoConstraints = false
         tableView.register(SearchUserCell.self, forCellReuseIdentifier: "SearchUserCell")
@@ -190,7 +307,7 @@ final class SearchViewController: UIViewController {
     }
     
     private func setupEmptyState() {
-        emptyStateLabel.text = "Search for people to connect"
+        emptyStateLabel.text = "No results found"
         emptyStateLabel.textAlignment = .center
         emptyStateLabel.textColor = .systemGray
         emptyStateLabel.font = .systemFont(ofSize: 16)
@@ -201,6 +318,24 @@ final class SearchViewController: UIViewController {
             emptyStateLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             emptyStateLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
+    }
+    
+    private func fetchExploreFlicks() {
+        guard !isLoadingFlicks else { return }
+        isLoadingFlicks = true
+        Task {
+            do {
+                let flicks = try await FlicksService.shared.fetchFlicks(limit: 30)
+                await MainActor.run {
+                    self.exploreFlicks = flicks
+                    self.exploreCollectionView.reloadData()
+                    self.isLoadingFlicks = false
+                }
+            } catch {
+                print("❌ Error fetching explore flicks: \(error)")
+                await MainActor.run { self.isLoadingFlicks = false }
+            }
+        }
     }
     
     private func searchUsers(query: String) {
@@ -235,6 +370,7 @@ final class SearchViewController: UIViewController {
                     }
                     self.tableView.reloadData()
                     self.isSearching = false
+                    self.emptyStateLabel.isHidden = !self.searchResults.isEmpty
                 }
             } catch {
                 print("❌ Error searching users: \(error)")
@@ -242,6 +378,7 @@ final class SearchViewController: UIViewController {
                     self.searchResults = []
                     self.tableView.reloadData()
                     self.isSearching = false
+                    self.emptyStateLabel.isHidden = false
                 }
             }
         }
@@ -253,12 +390,16 @@ extension SearchViewController: UISearchResultsUpdating, UISearchBarDelegate {
         guard let text = searchController.searchBar.text?.trimmingCharacters(in: .whitespaces),
               !text.isEmpty else {
             searchResults.removeAll()
-            emptyStateLabel.isHidden = false
+            emptyStateLabel.isHidden = true
+            tableView.isHidden = true
+            exploreCollectionView.isHidden = false
             tableView.reloadData()
             return
         }
         
         emptyStateLabel.isHidden = true
+        exploreCollectionView.isHidden = true
+        tableView.isHidden = false
         searchUsers(query: text)
     }
 }
@@ -289,5 +430,40 @@ extension SearchViewController: UITableViewDelegate, UITableViewDataSource {
         // Navigate to the tapped user's profile using the designated init
         let profileVC = ActorProfileViewController(userId: UUID(uuidString: result.id))
         navigationController?.pushViewController(profileVC, animated: true)
+    }
+}
+
+extension SearchViewController: UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        if isLoadingFlicks && exploreFlicks.isEmpty {
+            return 15 // Skeleton loading count
+        }
+        return exploreFlicks.count
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "ExploreFlickCell", for: indexPath) as! ExploreFlickCell
+        
+        if isLoadingFlicks && exploreFlicks.isEmpty {
+            cell.configureShimmer()
+        } else {
+            cell.configure(with: exploreFlicks[indexPath.item])
+        }
+        return cell
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+        let totalSpacing: CGFloat = 2 // 1pt between cal 1-2, 1pt between col 2-3
+        let width = (collectionView.bounds.width - totalSpacing) / 3
+        let height = width * 1.5 // vertical aspect ratio like reels
+        return CGSize(width: width, height: height)
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        // Open the full screen viewer
+        guard indexPath.item < exploreFlicks.count else { return }
+        let reelVC = UserFlicksFeedViewController_FullScreen(flicks: exploreFlicks, startIndex: indexPath.item)
+        reelVC.hidesBottomBarWhenPushed = true
+        navigationController?.pushViewController(reelVC, animated: true)
     }
 }

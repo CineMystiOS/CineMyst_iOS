@@ -176,6 +176,11 @@ final class ReelCell: UICollectionViewCell {
         gradientLayer.frame = contentView.bounds
     }
 
+    // Layout constraints that differ based on tab visibility
+    private var actionStackBottomCostraint: NSLayoutConstraint?
+    private var audioRowBottomConstraint: NSLayoutConstraint?
+    private var shareStackTopConstraint: NSLayoutConstraint?
+
     // MARK: - Setup Views
 
     private func setupViews() {
@@ -185,12 +190,10 @@ final class ReelCell: UICollectionViewCell {
         contentView.addSubview(heartBurst)
         contentView.addSubview(actionStack)
 
-        // Action stack — 2 buttons (Like, Comment)
+        // Action stack — 3 buttons (Like, Comment, Share)
         actionStack.addArrangedSubview(likeStack)
         actionStack.addArrangedSubview(commentStack)
-        
-        // Share stack stands alone now
-        contentView.addSubview(shareStack)
+        actionStack.addArrangedSubview(shareStack)
 
         contentView.addSubview(avatarView)
         contentView.addSubview(nameLabel)
@@ -201,8 +204,11 @@ final class ReelCell: UICollectionViewCell {
         audioRow.addSubview(audioIcon)
         audioRow.addSubview(audioLabel)
 
-        // Tab bar ≈ 83pt (49 bar + 34 safe area on Face ID) + buffer = 130
-        let tabOffset: CGFloat = 96
+        let actionBottom = actionStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -(96 + 95))
+        let audioBottom = audioRow.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -96)
+        
+        actionStackBottomCostraint = actionBottom
+        audioRowBottomConstraint = audioBottom
 
         NSLayoutConstraint.activate([
             // Heart burst — centred
@@ -213,15 +219,11 @@ final class ReelCell: UICollectionViewCell {
 
             // Action stack pinned to right edge, above tab bar
             actionStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            actionStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -(tabOffset + 95)),
-
-            // Share stack pinned to top right
-            shareStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            shareStack.topAnchor.constraint(equalTo: contentView.safeAreaLayoutGuide.topAnchor, constant: 16),
+            actionBottom,
 
             // Audio row — bottom left, above tab bar
             audioRow.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
-            audioRow.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -tabOffset),
+            audioBottom,
             audioRow.heightAnchor.constraint(equalToConstant: 34),
             audioRow.trailingAnchor.constraint(lessThanOrEqualTo: actionStack.leadingAnchor, constant: -16),
 
@@ -259,6 +261,14 @@ final class ReelCell: UICollectionViewCell {
             followButton.trailingAnchor.constraint(lessThanOrEqualTo: actionStack.leadingAnchor, constant: -16),
             followButton.heightAnchor.constraint(equalToConstant: 30),
         ])
+    }
+    
+    // Updates UI paddings dynamically based on context where cell is placed
+    func setFullscreenMode(_ isFullscreen: Bool) {
+        let bottomPadding: CGFloat = isFullscreen ? 30 : 96
+        actionStackBottomCostraint?.constant = -(bottomPadding + 95)
+        audioRowBottomConstraint?.constant = -bottomPadding
+        layoutIfNeeded()
     }
 
 

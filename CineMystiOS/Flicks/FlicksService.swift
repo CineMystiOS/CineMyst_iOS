@@ -11,14 +11,14 @@ import Supabase
 // MARK: - Flick Model
 struct Flick: Codable, Identifiable {
     let id: String
-    let userId: String
+    var userId: String
     let videoUrl: String
     let thumbnailUrl: String?
     var caption: String?
     let audioTitle: String?
-    let likesCount: Int
+    var likesCount: Int
     var commentsCount: Int
-    let sharesCount: Int
+    var sharesCount: Int
     let location: String?
     let taggedUsers: [String]?
     let hashtags: [String]?
@@ -50,6 +50,71 @@ struct Flick: Codable, Identifiable {
         case username
         case fullName = "full_name"
         case profilePictureUrl = "profile_picture_url"
+    }
+
+    init(id: String, userId: String, videoUrl: String, thumbnailUrl: String?, caption: String?, audioTitle: String?, likesCount: Int, commentsCount: Int, sharesCount: Int, location: String?, taggedUsers: [String]?, hashtags: [String]?, createdAt: String, audience: String?, allowComments: Bool?, username: String? = nil, fullName: String? = nil, profilePictureUrl: String? = nil) {
+        self.id = id
+        self.userId = userId
+        self.videoUrl = videoUrl
+        self.thumbnailUrl = thumbnailUrl
+        self.caption = caption
+        self.audioTitle = audioTitle
+        self.likesCount = likesCount
+        self.commentsCount = commentsCount
+        self.sharesCount = sharesCount
+        self.location = location
+        self.taggedUsers = taggedUsers
+        self.hashtags = hashtags
+        self.createdAt = createdAt
+        self.audience = audience
+        self.allowComments = allowComments
+        self.username = username
+        self.fullName = fullName
+        self.profilePictureUrl = profilePictureUrl
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? container.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString
+        self.userId = (try? container.decodeIfPresent(String.self, forKey: .userId)) ?? "unknown_user"
+        self.videoUrl = (try? container.decodeIfPresent(String.self, forKey: .videoUrl)) ?? ""
+        self.thumbnailUrl = try? container.decodeIfPresent(String.self, forKey: .thumbnailUrl)
+        self.caption = try? container.decodeIfPresent(String.self, forKey: .caption)
+        self.audioTitle = try? container.decodeIfPresent(String.self, forKey: .audioTitle)
+        self.likesCount = (try? container.decodeIfPresent(Int.self, forKey: .likesCount)) ?? 0
+        self.commentsCount = (try? container.decodeIfPresent(Int.self, forKey: .commentsCount)) ?? 0
+        self.sharesCount = (try? container.decodeIfPresent(Int.self, forKey: .sharesCount)) ?? 0
+        self.location = try? container.decodeIfPresent(String.self, forKey: .location)
+        self.taggedUsers = try? container.decodeIfPresent([String].self, forKey: .taggedUsers)
+        self.hashtags = try? container.decodeIfPresent([String].self, forKey: .hashtags)
+        self.createdAt = (try? container.decodeIfPresent(String.self, forKey: .createdAt)) ?? ""
+        self.audience = try? container.decodeIfPresent(String.self, forKey: .audience)
+        self.allowComments = try? container.decodeIfPresent(Bool.self, forKey: .allowComments)
+        self.username = try? container.decodeIfPresent(String.self, forKey: .username)
+        self.fullName = try? container.decodeIfPresent(String.self, forKey: .fullName)
+        self.profilePictureUrl = try? container.decodeIfPresent(String.self, forKey: .profilePictureUrl)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(userId, forKey: .userId)
+        try container.encode(videoUrl, forKey: .videoUrl)
+        try container.encodeIfPresent(thumbnailUrl, forKey: .thumbnailUrl)
+        try container.encodeIfPresent(caption, forKey: .caption)
+        try container.encodeIfPresent(audioTitle, forKey: .audioTitle)
+        try container.encode(likesCount, forKey: .likesCount)
+        try container.encode(commentsCount, forKey: .commentsCount)
+        try container.encode(sharesCount, forKey: .sharesCount)
+        try container.encodeIfPresent(location, forKey: .location)
+        try container.encodeIfPresent(taggedUsers, forKey: .taggedUsers)
+        try container.encodeIfPresent(hashtags, forKey: .hashtags)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encodeIfPresent(audience, forKey: .audience)
+        try container.encodeIfPresent(allowComments, forKey: .allowComments)
+        try container.encodeIfPresent(username, forKey: .username)
+        try container.encodeIfPresent(fullName, forKey: .fullName)
+        try container.encodeIfPresent(profilePictureUrl, forKey: .profilePictureUrl)
     }
 }
 

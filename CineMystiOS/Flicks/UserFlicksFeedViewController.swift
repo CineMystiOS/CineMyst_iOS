@@ -241,13 +241,22 @@ class UserFlicksFeedViewController_FullScreen: UIViewController, UICollectionVie
         backButton.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(backButton)
         NSLayoutConstraint.activate([
-            backButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
+            backButton.topAnchor.constraint(equalTo: view.topAnchor, constant: 55),
             backButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16)
         ])
     }
     
     @objc private func backTapped() { navigationController?.popViewController(animated: true) }
     
+    override var preferredStatusBarStyle: UIStatusBarStyle {
+        return .lightContent
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        navigationController?.setNavigationBarHidden(true, animated: animated)
+    }
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         if isFirstAppearance {
@@ -259,6 +268,7 @@ class UserFlicksFeedViewController_FullScreen: UIViewController, UICollectionVie
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        navigationController?.setNavigationBarHidden(false, animated: animated)
         pauseAllVideos()
     }
     
@@ -279,6 +289,7 @@ class UserFlicksFeedViewController_FullScreen: UIViewController, UICollectionVie
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: ReelCell.identifier, for: indexPath) as! ReelCell
         let flick = flicks[indexPath.item]
         cell.configure(with: Reel.from(flick: flick))
+        cell.setFullscreenMode(true)
         return cell
     }
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize { return collectionView.bounds.size }
