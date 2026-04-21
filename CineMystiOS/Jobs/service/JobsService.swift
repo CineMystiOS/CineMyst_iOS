@@ -167,14 +167,14 @@ class JobsService {
 
     // MARK: - Storage Support
     
-    func uploadFile(fileData: Data, fileName: String, bucket: String, folder: String) async throws -> String {
+    func uploadFile(fileData: Data, fileName: String, bucket: String, folder: String, upsert: Bool = false) async throws -> String {
         let path = "\(folder)/\(fileName)"
         _ = try await supabase.storage
             .from(bucket)
             .upload(
                 path: path,
                 file: fileData,
-                options: FileOptions(contentType: nil, upsert: true)
+                options: FileOptions(contentType: nil, upsert: upsert)
             )
         
         let url = try supabase.storage
