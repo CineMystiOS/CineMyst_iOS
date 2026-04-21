@@ -1749,12 +1749,12 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
             }
         case .flicks:
             mediaItems = userFlicks.compactMap { flick in
-                let previewURL = flick.thumbnailUrl ?? flick.videoUrl
+                let previewURL = flick.thumbnailUrl ?? flick.videoUrl ?? ""
                 guard !previewURL.isEmpty else { return nil }
                 return ProfileMediaItem(
                     id: flick.id,
                     previewURL: previewURL,
-                    contentURL: flick.videoUrl,
+                    contentURL: flick.videoUrl ?? "",
                     type: "video",
                     source: .flick
                 )

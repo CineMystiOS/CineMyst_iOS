@@ -20,9 +20,9 @@ struct Flick: Codable, Identifiable {
     var commentsCount: Int
     var sharesCount: Int
     let location: String?
-    let taggedUsers: [String]?
-    let hashtags: [String]?
-    let createdAt: String
+    // let taggedUsers: [String]?
+    // let hashtags: [String]?
+    let createdAt: String?
     let audience: String?       // "everyone" | "friends"
     let allowComments: Bool?    // true = comments allowed
     
@@ -42,8 +42,8 @@ struct Flick: Codable, Identifiable {
         case commentsCount = "comments_count"
         case sharesCount = "shares_count"
         case location
-        case taggedUsers = "tagged_users"
-        case hashtags
+        // case taggedUsers = "tagged_users"
+        // case hashtags
         case createdAt = "created_at"
         case audience
         case allowComments = "allow_comments"
@@ -208,20 +208,14 @@ class FlicksService {
 
         var flicks = try JSONDecoder().decode([Flick].self, from: response.data)
 
-        // Filter: hide friends-only flicks from non-friends
-        if let currentUserId {
-            flicks = flicks.filter { flick in
-                if flick.audience == "friends" {
-                    // Show if it's your own flick OR the poster is a connected friend
-                    return flick.userId == currentUserId || friendIds.contains(flick.userId)
-                }
-                return true // "everyone" or nil (legacy rows) are always visible
-            }
-        }
-
+        // Removed client-side filtering: 
+        // 1. Supabase RLS should handle visibility for 'friends'
+        // 2. Client filtering was bugged if currentUserId wasn't fetched in time or if audience casing ("everyone" vs "Everyone") didn't match perfectly.
         // Enrich each flick with profile info via separate lookup
         for i in flicks.indices {
-            let uid = flicks[i].userId
+            let uid = flicks[i].userId ?? ""
+            if uid.isEmpty { continue }
+            
             if let profileData = try? await supabase
                 .from("profiles")
                 .select("username, full_name, profile_picture_url")

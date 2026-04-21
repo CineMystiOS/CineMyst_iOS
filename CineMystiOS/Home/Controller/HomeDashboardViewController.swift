@@ -2543,13 +2543,13 @@ final class FlickFeedCell: UITableViewCell {
         
         if let thumb = flick.thumbnailUrl, let url = URL(string: thumb) {
             loadImage(from: url)
-        } else if let video = URL(string: flick.videoUrl) {
+        } else if let videoUrl = flick.videoUrl, let video = URL(string: videoUrl) {
             // In a real app we'd generate a thumbnail
         }
         
         // Ownership check for kebab menu
         if let currentUserId = AuthManager.shared.currentUser?.id.uuidString.lowercased() {
-            moreButton.isHidden = flick.userId.lowercased() != currentUserId
+            moreButton.isHidden = flick.userId?.lowercased() != currentUserId
         } else {
             moreButton.isHidden = true
         }

@@ -21,7 +21,7 @@ class PostTaskViewController: UIViewController {
         return stack
     }()
 
-    private let postButton = UIButton.createFilledButton(title: "Post Job with Task")
+    private let postButton = UIButton.createFilledButton(title: "Post Role with Task")
     private let backButton = UIButton.createOutlineButton(title: "Back")
     
     // MARK: - Form Fields
@@ -44,6 +44,51 @@ class PostTaskViewController: UIViewController {
         return picker
     }()
 
+    private let loadingOverlay: UIView = {
+        let view = UIView()
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.4)
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.isHidden = true
+        view.alpha = 0
+        
+        let blurEffect = UIBlurEffect(style: .systemUltraThinMaterialDark)
+        let blurView = UIVisualEffectView(effect: blurEffect)
+        blurView.translatesAutoresizingMaskIntoConstraints = false
+        blurView.layer.cornerRadius = 16
+        blurView.clipsToBounds = true
+        
+        let indicator = UIActivityIndicatorView(style: .large)
+        indicator.color = .white
+        indicator.startAnimating()
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        
+        let label = UILabel()
+        label.text = "Posting..."
+        label.textColor = .white
+        label.font = .systemFont(ofSize: 14, weight: .semibold)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        
+        blurView.contentView.addSubview(indicator)
+        blurView.contentView.addSubview(label)
+        
+        NSLayoutConstraint.activate([
+            indicator.centerXAnchor.constraint(equalTo: blurView.centerXAnchor),
+            indicator.centerYAnchor.constraint(equalTo: blurView.centerYAnchor, constant: -12),
+            label.centerXAnchor.constraint(equalTo: blurView.centerXAnchor),
+            label.topAnchor.constraint(equalTo: indicator.bottomAnchor, constant: 12)
+        ])
+        
+        view.addSubview(blurView)
+        NSLayoutConstraint.activate([
+            blurView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            blurView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            blurView.widthAnchor.constraint(equalToConstant: 120),
+            blurView.heightAnchor.constraint(equalToConstant: 120)
+        ])
+        
+        return view
+    }()
+
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -54,6 +99,14 @@ class PostTaskViewController: UIViewController {
         buildForm()
         setupBottomButtons()
         setupKeyboardDismissal()
+        
+        view.addSubview(loadingOverlay)
+        NSLayoutConstraint.activate([
+            loadingOverlay.topAnchor.constraint(equalTo: view.topAnchor),
+            loadingOverlay.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            loadingOverlay.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            loadingOverlay.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
     }
 
     override func viewDidLayoutSubviews() {
@@ -175,55 +228,115 @@ class PostTaskViewController: UIViewController {
     }
 
     @objc private func postTapped() {
-        guard let job = job else { return }
+        guard let initialJob = job else { return }
         
-        // Show loading or disable button
-        postButton.isEnabled = false
+        // Show loading overlay and prevent interaction without fading the button
+        postButton.isUserInteractionEnabled = false
+        postButton.setTitle("Posting...", for: .normal)
+        
+        loadingOverlay.isHidden = false
+        UIView.animate(withDuration: 0.2) {
+            self.loadingOverlay.alpha = 1
+        }
+        view.isUserInteractionEnabled = false
         
         Task {
-            do {
-                // 1. Create Job
-                let savedJob = try await JobsService.shared.createJob(job)
-                
-                // 2. Upload reference if any
-                var refUrl: String? = nil
-                if let url = uploadedFileURL {
+            // 1. Upload reference if any
+            var refUrl: String? = nil
+            if let url = uploadedFileURL {
+                do {
                     refUrl = try await uploadReferenceFile(url)
+                } catch {
+                    await MainActor.run {
+                        self.hideLoading()
+                        self.showAlert(title: "Storage Upload Error", message: "Failed to upload file. Check storage bucket RLS. Error: \(error.localizedDescription)")
+                    }
+                    return
                 }
-                
-                // 3. Create Task
-                let finalTask = JobTask(
-                    id: UUID(),
-                    jobId: savedJob.id,
-                    taskTitle: taskTitleTextField?.text,
-                    taskDescription: taskDescriptionTextView?.text,
-                    characterName: taskToPost?.characterName,
-                    characterDescription: taskToPost?.characterDescription,
-                    characterAgeRange: taskToPost?.characterAgeRange,
-                    characterGender: taskToPost?.characterGender,
-                    genre: taskToPost?.genre,
-                    personalityTraits: taskToPost?.personalityTraits,
-                    sceneTitle: sceneTitleTextField?.text,
-                    sceneSetting: settingDescriptionTextView?.text,
-                    expectedDuration: expectedDurationTextField?.text,
-                    referenceMaterialUrl: refUrl,
-                    requirements: nil,
-                    dueDate: selectedDueDate,
-                    createdAt: Date()
-                )
-                
-                _ = try await JobsService.shared.createTask(finalTask)
-                
+            }
+            
+            // 2. Create the final job object with the reference url attached
+            let finalJob = Job(
+                id: initialJob.id,
+                directorId: initialJob.directorId,
+                title: initialJob.title,
+                companyName: initialJob.companyName,
+                location: initialJob.location,
+                ratePerDay: initialJob.ratePerDay,
+                jobType: initialJob.jobType,
+                description: initialJob.description,
+                requirements: initialJob.requirements,
+                status: initialJob.status,
+                applicationDeadline: initialJob.applicationDeadline,
+                referenceMaterialUrl: refUrl,
+                createdAt: initialJob.createdAt,
+                updatedAt: initialJob.updatedAt
+            )
+            
+            // 3. Save Job to DB
+            let savedJob: Job
+            do {
+                savedJob = try await JobsService.shared.createJob(finalJob)
+            } catch {
                 await MainActor.run {
+                    self.hideLoading()
+                    self.showAlert(title: "Jobs Table Error", message: "Failed to insert into jobs table. Check jobs RLS. Error: \(error.localizedDescription)")
+                }
+                return
+            }
+            
+            // 4. Create Task
+            let finalTask = JobTask(
+                id: UUID(),
+                jobId: savedJob.id,
+                taskTitle: taskTitleTextField?.text,
+                taskDescription: taskDescriptionTextView?.text,
+                characterName: taskToPost?.characterName,
+                characterDescription: taskToPost?.characterDescription,
+                characterAgeRange: taskToPost?.characterAgeRange,
+                characterGender: taskToPost?.characterGender,
+                genre: taskToPost?.genre,
+                personalityTraits: taskToPost?.personalityTraits,
+                sceneTitle: sceneTitleTextField?.text,
+                sceneSetting: settingDescriptionTextView?.text,
+                expectedDuration: expectedDurationTextField?.text,
+                referenceMaterialUrl: refUrl,
+                requirements: nil,
+                dueDate: selectedDueDate,
+                createdAt: Date()
+            )
+            
+            do {
+                _ = try await JobsService.shared.createTask(finalTask)
+                await MainActor.run {
+                    self.hideLoading()
                     self.showSuccess()
                 }
             } catch {
                 await MainActor.run {
-                    self.postButton.isEnabled = true
-                    self.showAlert(title: "Error", message: error.localizedDescription)
+                    self.hideLoading()
+                    self.showAlert(title: "Tasks Table Error", message: "Failed to insert into tasks table. Check tasks RLS. Error: \(error.localizedDescription)")
                 }
             }
         }
+    }
+
+    private func hideLoading() {
+        postButton.isUserInteractionEnabled = true
+        postButton.setTitle("Post Role with Task", for: .normal)
+        view.isUserInteractionEnabled = true
+        
+        UIView.animate(withDuration: 0.2, animations: {
+            self.loadingOverlay.alpha = 0
+        }) { _ in
+            self.loadingOverlay.isHidden = true
+        }
+    }
+
+    private func showAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
     }
 
     private func showSuccess() {
@@ -424,7 +537,9 @@ class PostTaskViewController: UIViewController {
     }
 
     private func uploadReferenceFile(_ fileURL: URL) async throws -> String {
-        let fileName = "\(UUID().uuidString)_\(fileURL.lastPathComponent)"
+        // Sanitize file name to avoid "Invalid key" for files with special chars/spaces
+        let fileExtension = fileURL.pathExtension.isEmpty ? "mp4" : fileURL.pathExtension
+        let fileName = "\(UUID().uuidString).\(fileExtension)"
         let fileData = try Data(contentsOf: fileURL)
         return try await JobsService.shared.uploadFile(fileData: fileData, fileName: fileName, bucket: "job-files", folder: "reference_materials")
     }

@@ -10,6 +10,7 @@ final class ReelsViewController: UIViewController {
     private var reels: [Reel] = []
     private var currentIndex: Int = 0
     private var isLoadingMore = false
+    private var emptyStateButton: UIButton?
     
     private lazy var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -22,9 +23,16 @@ final class ReelsViewController: UIViewController {
         cv.showsVerticalScrollIndicator = false
         cv.translatesAutoresizingMaskIntoConstraints = false
         cv.backgroundColor = .black
+        cv.alwaysBounceVertical = true
         cv.delegate = self
         cv.dataSource = self
         cv.register(ReelCell.self, forCellWithReuseIdentifier: ReelCell.identifier)
+        
+        let refresh = UIRefreshControl()
+        refresh.tintColor = .white
+        refresh.addTarget(self, action: #selector(handleRefresh), for: .valueChanged)
+        cv.refreshControl = refresh
+        
         return cv
     }()
     
@@ -96,10 +104,12 @@ final class ReelsViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(true, animated: false)
-        reels = []
-        currentIndex = 0
-        collectionView.reloadData()
-        Task { await fetchReelsFromSupabase() }
+        
+        // Use the property for cleaner removal
+        emptyStateButton?.removeFromSuperview()
+        emptyStateButton = nil
+        
+        refreshFlicks()
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -201,7 +211,13 @@ final class ReelsViewController: UIViewController {
     private func fetchReelsFromSupabase() async {
         do {
             let offset = reels.count
+            print("🚀 Fetching Flicks: offset=\(offset)")
             let flicks = try await FlicksService.shared.fetchFlicks(limit: 10, offset: offset)
+            print("✅ Fetched \(flicks.count) Flicks from DB")
+            
+            if flicks.isEmpty {
+                print("⚠️ DB returned no flicks")
+            }
 
             // Batch-check liked status concurrently for all fetched flicks
             var likedMap: [String: Bool] = [:]
@@ -217,20 +233,29 @@ final class ReelsViewController: UIViewController {
                 }
             }
 
-            let newReels = flicks.map { flick in
-                Reel.from(flick: flick, isLiked: likedMap[flick.id] ?? false)
+            let newReels = flicks.compactMap { flick -> Reel? in
+                if flick.videoUrl == nil || flick.videoUrl?.isEmpty == true { return nil }
+                return Reel.from(flick: flick, isLiked: likedMap[flick.id] ?? false)
             }
 
             if offset == 0 {
                 reels = newReels
+                if !reels.isEmpty {
+                    emptyStateButton?.removeFromSuperview()
+                    emptyStateButton = nil
+                }
             } else {
                 reels.append(contentsOf: newReels)
             }
             collectionView.reloadData()
             
-            // Auto-play the first video once data is loaded
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self.playCurrentVideo()
+            if reels.isEmpty {
+                showEmptyState()
+            } else {
+                // Auto-play the first video once data is loaded
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.playCurrentVideo()
+                }
             }
 
         } catch {
@@ -239,9 +264,18 @@ final class ReelsViewController: UIViewController {
         }
     }
 
+    @objc private func handleRefresh() {
+        refreshFlicks()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.collectionView.refreshControl?.endRefreshing()
+        }
+    }
+
     // Call this to force a fresh reload (e.g. after posting)
     func refreshFlicks() {
+        print("🔄 Refreshing Flicks...")
         reels = []
+        currentIndex = 0
         collectionView.reloadData()
         Task { await fetchReelsFromSupabase() }
     }
@@ -279,19 +313,23 @@ final class ReelsViewController: UIViewController {
     }
     
     private func showEmptyState() {
-        let label = UILabel()
-        label.text = "No flicks yet\n\nBe the first to post!"
-        label.textColor = .white
-        label.textAlignment = .center
-        label.numberOfLines = 0
-        label.font = .systemFont(ofSize: 18, weight: .medium)
-        label.translatesAutoresizingMaskIntoConstraints = false
+        if emptyStateButton != nil { return } // Already showing
         
-        view.addSubview(label)
+        let button = UIButton(type: .system)
+        button.setTitle("No flicks yet\n\nTap to reload", for: .normal)
+        button.setTitleColor(.white, for: .normal)
+        button.titleLabel?.textAlignment = .center
+        button.titleLabel?.numberOfLines = 0
+        button.titleLabel?.font = .systemFont(ofSize: 18, weight: .medium)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.addTarget(self, action: #selector(handleRefresh), for: .touchUpInside)
+        
+        view.addSubview(button)
         NSLayoutConstraint.activate([
-            label.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            label.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+            button.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            button.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
+        self.emptyStateButton = button
     }
     
     private func updateShareCount(at index: Int) async {

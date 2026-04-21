@@ -186,7 +186,7 @@ extension UserFlicksFeedViewController: UITableViewDataSource, UITableViewDelega
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         // Open the full screen player if desired, or stay in card view
         let flick = flicks[indexPath.row]
-        let item = ProfileMediaItem(id: flick.id, previewURL: flick.thumbnailUrl ?? "", contentURL: flick.videoUrl, type: "video", source: .flick)
+        let item = ProfileMediaItem(id: flick.id, previewURL: flick.thumbnailUrl ?? "", contentURL: flick.videoUrl ?? "", type: "video", source: .flick)
         
         // Show the existing Reel-style viewer if tapped on the card
         let reelVC = UserFlicksFeedViewController_FullScreen(flicks: flicks, startIndex: indexPath.row)
