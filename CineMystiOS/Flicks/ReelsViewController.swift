@@ -234,7 +234,7 @@ final class ReelsViewController: UIViewController {
             }
 
             let newReels = flicks.compactMap { flick -> Reel? in
-                if flick.videoUrl == nil || flick.videoUrl?.isEmpty == true { return nil }
+                if flick.videoUrl.isEmpty { return nil }
                 return Reel.from(flick: flick, isLiked: likedMap[flick.id] ?? false)
             }
 

@@ -2375,7 +2375,9 @@ final class AdBannerCell: UITableViewCell {
         ctaButton.setTitleColor(.white, for: .normal); ctaButton.titleLabel?.font = .systemFont(ofSize: 12, weight: .semibold)
         ctaButton.layer.cornerRadius = 12; ctaButton.layer.borderWidth = 1.5
         ctaButton.layer.borderColor = UIColor.white.withAlphaComponent(0.65).cgColor
-        ctaButton.contentEdgeInsets = UIEdgeInsets(top:6,left:14,bottom:6,right:14)
+        var config = UIButton.Configuration.plain()
+        config.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14)
+        ctaButton.configuration = config
         ctaButton.addTarget(self, action: #selector(ctaTapped), for: .touchUpInside)
         ctaButton.translatesAutoresizingMaskIntoConstraints = false; card.addSubview(ctaButton)
         NSLayoutConstraint.activate([
@@ -2543,13 +2545,13 @@ final class FlickFeedCell: UITableViewCell {
         
         if let thumb = flick.thumbnailUrl, let url = URL(string: thumb) {
             loadImage(from: url)
-        } else if let videoUrl = flick.videoUrl, let video = URL(string: videoUrl) {
+        } else if let video = URL(string: flick.videoUrl) {
             // In a real app we'd generate a thumbnail
         }
         
         // Ownership check for kebab menu
         if let currentUserId = AuthManager.shared.currentUser?.id.uuidString.lowercased() {
-            moreButton.isHidden = flick.userId?.lowercased() != currentUserId
+            moreButton.isHidden = flick.userId.lowercased() != currentUserId
         } else {
             moreButton.isHidden = true
         }

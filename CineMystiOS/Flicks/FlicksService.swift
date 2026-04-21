@@ -20,8 +20,8 @@ struct Flick: Codable, Identifiable {
     var commentsCount: Int
     var sharesCount: Int
     let location: String?
-    // let taggedUsers: [String]?
-    // let hashtags: [String]?
+    let taggedUsers: [String]?
+    let hashtags: [String]?
     let createdAt: String?
     let audience: String?       // "everyone" | "friends"
     let allowComments: Bool?    // true = comments allowed
@@ -42,8 +42,8 @@ struct Flick: Codable, Identifiable {
         case commentsCount = "comments_count"
         case sharesCount = "shares_count"
         case location
-        // case taggedUsers = "tagged_users"
-        // case hashtags
+        case taggedUsers = "tagged_users"
+        case hashtags
         case createdAt = "created_at"
         case audience
         case allowComments = "allow_comments"
