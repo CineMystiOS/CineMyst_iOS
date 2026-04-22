@@ -50,6 +50,10 @@ class JobDetailsViewController: UIViewController {
         return btn
     }()
 
+    // Profile Data
+    private var productionHouseName: String?
+    private var profilePictureUrl: URL?
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = CineMystTheme.pinkPale
@@ -63,6 +67,38 @@ class JobDetailsViewController: UIViewController {
         
         Task {
             await checkTaskStatus()
+            await fetchCompanyInfo()
+            await MainActor.run {
+                self.buildContentCards()
+            }
+        }
+    }
+    
+    private func fetchCompanyInfo() async {
+        guard let directorId = job?.directorId else { return }
+        do {
+            let directorProfile = try await ProfileService.shared.fetchUserProfile(userId: directorId)
+            
+            struct CastingProfile: Codable {
+                let companyName: String?
+                let productionHouse: String?
+                enum CodingKeys: String, CodingKey { 
+                    case companyName = "company_name" 
+                    case productionHouse = "production_house"
+                }
+            }
+            if let prof = try? await supabase.from("casting_profiles")
+                .select("company_name, production_house")
+                .eq("id", value: directorId.uuidString)
+                .single().execute().value as CastingProfile {
+                productionHouseName = prof.productionHouse ?? prof.companyName
+            }
+            
+            if let urlStr = directorProfile.profile.profilePictureUrl {
+                profilePictureUrl = URL(string: urlStr)
+            }
+        } catch {
+            print("Failed to fetch company info: \(error)")
         }
     }
 
@@ -271,19 +307,20 @@ class JobDetailsViewController: UIViewController {
         contentView.subviews.forEach { $0.removeFromSuperview() }
         let cardStack = UIStackView()
         cardStack.axis = .vertical
-        cardStack.spacing = 18
+        cardStack.spacing = 20
         contentView.addSubview(cardStack)
         cardStack.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             cardStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
             cardStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             cardStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            cardStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20)
+            cardStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40)
         ])
         
         if let job = job {
-            cardStack.addArrangedSubview(makeHeroCard(for: job))
-            if let req = job.requirements, !req.isEmpty { cardStack.addArrangedSubview(makeRequirementsCard(requirements: req)) }
+            cardStack.addArrangedSubview(makeTopHeroCard(for: job))
+            cardStack.addArrangedSubview(makeSettingsStyleDetailsCard(for: job))
+            
             let infoRow = UIStackView(arrangedSubviews: [
                 makeMetricCard(title: "Compensation", body: "₹\(job.ratePerDay ?? 0)/day", icon: "banknote"),
                 makeMetricCard(
@@ -298,79 +335,186 @@ class JobDetailsViewController: UIViewController {
             infoRow.spacing = 14
             infoRow.distribution = .fillEqually
             cardStack.addArrangedSubview(infoRow)
+            
+            cardStack.addArrangedSubview(makeDescriptionCard(title: "Role Description", body: job.description ?? "No description available."))
+            
+            if let req = job.requirements, !req.isEmpty {
+                cardStack.addArrangedSubview(makeDescriptionCard(title: "Requirements", body: req))
+            }
         }
     }
 
-    private func makeGlassCard() -> UIVisualEffectView {
-        let card = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialLight))
-        card.contentView.backgroundColor = UIColor.white.withAlphaComponent(0.46)
+    private func makeGlassCard() -> UIView {
+        let card = UIView()
+        card.backgroundColor = UIColor.white.withAlphaComponent(0.85)
         card.layer.cornerRadius = 20
         card.layer.borderWidth = 1
-        card.layer.borderColor = UIColor.white.withAlphaComponent(0.68).cgColor
+        card.layer.borderColor = UIColor.white.withAlphaComponent(0.9).cgColor
         card.clipsToBounds = true
-        card.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.09).cgColor
+        card.layer.shadowColor = CineMystTheme.brandPlum.withAlphaComponent(0.08).cgColor
         card.layer.shadowOpacity = 1
-        card.layer.shadowRadius = 24
-        card.layer.shadowOffset = CGSize(width: 0, height: 14)
+        card.layer.shadowRadius = 18
+        card.layer.shadowOffset = CGSize(width: 0, height: 8)
         return card
     }
 
-    private func makeCard(title: String, body: String) -> UIView {
+    private func makeTopHeroCard(for job: Job) -> UIView {
         let card = makeGlassCard()
-        let titleLabel = UILabel(); titleLabel.text = title; titleLabel.font = .systemFont(ofSize: 19, weight: .bold); titleLabel.textColor = CineMystTheme.ink
-        let bodyLabel = UILabel(); bodyLabel.text = body; bodyLabel.numberOfLines = 0; bodyLabel.font = UIFont.systemFont(ofSize: 15); bodyLabel.textColor = CineMystTheme.ink.withAlphaComponent(0.7)
-        let stack = UIStackView(arrangedSubviews: [titleLabel, bodyLabel]); stack.axis = .vertical; stack.spacing = 8
-        card.contentView.addSubview(stack); stack.translatesAutoresizingMaskIntoConstraints = false
+
+        let profileImageView = UIImageView()
+        profileImageView.contentMode = .scaleAspectFill
+        profileImageView.clipsToBounds = true
+        profileImageView.layer.cornerRadius = 30
+        profileImageView.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.1)
+        profileImageView.tintColor = CineMystTheme.brandPlum
+        profileImageView.translatesAutoresizingMaskIntoConstraints = false
+        
+        if let url = profilePictureUrl {
+            Task {
+                if let (data, _) = try? await URLSession.shared.data(from: url) {
+                    await MainActor.run { profileImageView.image = UIImage(data: data) }
+                }
+            }
+        } else {
+            profileImageView.image = UIImage(systemName: "person.circle.fill")
+        }
+
+        let title = UILabel()
+        title.text = job.title ?? "Untitled"
+        title.font = .systemFont(ofSize: 24, weight: .bold)
+        title.textColor = CineMystTheme.ink
+        title.numberOfLines = 0
+
+        let company = UILabel()
+        let companyName = productionHouseName ?? job.companyName ?? "CineMyst Production"
+        company.text = companyName
+        company.font = .systemFont(ofSize: 15, weight: .semibold)
+        company.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.8)
+
+        let textStack = UIStackView(arrangedSubviews: [title, company])
+        textStack.axis = .vertical
+        textStack.spacing = 6
+        textStack.alignment = .leading
+        
+        let headerStack = UIStackView(arrangedSubviews: [profileImageView, textStack])
+        headerStack.axis = .horizontal
+        headerStack.spacing = 16
+        headerStack.alignment = .center
+        headerStack.translatesAutoresizingMaskIntoConstraints = false
+        
+        card.addSubview(headerStack)
+        
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: card.contentView.topAnchor, constant: 18),
-            stack.leadingAnchor.constraint(equalTo: card.contentView.leadingAnchor, constant: 18),
-            stack.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor, constant: -18),
-            stack.bottomAnchor.constraint(equalTo: card.contentView.bottomAnchor, constant: -18)
+            profileImageView.widthAnchor.constraint(equalToConstant: 60),
+            profileImageView.heightAnchor.constraint(equalToConstant: 60),
+            headerStack.topAnchor.constraint(equalTo: card.topAnchor, constant: 20),
+            headerStack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 20),
+            headerStack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -20),
+            headerStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -20)
+        ])
+        
+        return card
+    }
+    
+    private func makeSettingsStyleDetailsCard(for job: Job) -> UIView {
+        let card = makeGlassCard()
+        let stack = UIStackView()
+        stack.axis = .vertical
+        stack.spacing = 0
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        
+        func makeRow(icon: String, title: String, value: String?, isLast: Bool = false) -> UIView {
+            let container = UIView()
+            
+            let iconView = UIImageView(image: UIImage(systemName: icon))
+            iconView.tintColor = CineMystTheme.brandPlum
+            iconView.translatesAutoresizingMaskIntoConstraints = false
+            iconView.contentMode = .scaleAspectFit
+            
+            let titleLbl = UILabel()
+            titleLbl.text = title
+            titleLbl.font = .systemFont(ofSize: 15, weight: .medium)
+            titleLbl.textColor = CineMystTheme.ink.withAlphaComponent(0.6)
+            titleLbl.translatesAutoresizingMaskIntoConstraints = false
+            
+            let valLbl = UILabel()
+            valLbl.text = value ?? "Not Specified"
+            valLbl.font = .systemFont(ofSize: 15, weight: .bold)
+            valLbl.textColor = CineMystTheme.ink
+            valLbl.textAlignment = .right
+            valLbl.translatesAutoresizingMaskIntoConstraints = false
+            
+            container.addSubview(iconView)
+            container.addSubview(titleLbl)
+            container.addSubview(valLbl)
+            
+            NSLayoutConstraint.activate([
+                container.heightAnchor.constraint(equalToConstant: 50),
+                iconView.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
+                iconView.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+                iconView.widthAnchor.constraint(equalToConstant: 20),
+                iconView.heightAnchor.constraint(equalToConstant: 20),
+                
+                titleLbl.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 12),
+                titleLbl.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+                
+                valLbl.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -20),
+                valLbl.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+                valLbl.leadingAnchor.constraint(greaterThanOrEqualTo: titleLbl.trailingAnchor, constant: 16)
+            ])
+            
+            if !isLast {
+                let div = UIView()
+                div.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.1)
+                div.translatesAutoresizingMaskIntoConstraints = false
+                container.addSubview(div)
+                NSLayoutConstraint.activate([
+                    div.leadingAnchor.constraint(equalTo: titleLbl.leadingAnchor),
+                    div.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+                    div.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+                    div.heightAnchor.constraint(equalToConstant: 1)
+                ])
+            }
+            
+            return container
+        }
+        
+        stack.addArrangedSubview(makeRow(icon: "mappin.and.ellipse", title: "Location", value: job.location))
+        stack.addArrangedSubview(makeRow(icon: "video.fill", title: "Project Type", value: job.projectType))
+        stack.addArrangedSubview(makeRow(icon: "person.fill", title: "Position", value: job.positionType))
+        stack.addArrangedSubview(makeRow(icon: "sparkles", title: "Genre", value: job.jobType, isLast: true))
+        
+        card.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: card.topAnchor),
+            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor),
+            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor)
         ])
         return card
     }
 
-    private func makeHeroCard(for job: Job) -> UIView {
+    private func makeDescriptionCard(title: String, body: String) -> UIView {
         let card = makeGlassCard()
-
-        let eyebrow = UILabel()
-        eyebrow.text = "Role Brief"
-        eyebrow.font = .systemFont(ofSize: 11, weight: .bold)
-        eyebrow.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.72)
-
-        let title = UILabel()
-        title.text = job.title ?? "Untitled"
-        title.font = .systemFont(ofSize: 22, weight: .bold)
-        title.textColor = CineMystTheme.ink
-        title.numberOfLines = 0
-
-        let description = UILabel()
-        description.text = job.description ?? "No description available."
-        description.font = .systemFont(ofSize: 16, weight: .medium)
-        description.textColor = CineMystTheme.ink.withAlphaComponent(0.72)
-        description.numberOfLines = 0
-
-        let chipRow = UIStackView()
-        chipRow.axis = .horizontal
-        chipRow.spacing = 8
-
-        if let location = job.location, !location.isEmpty {
-            chipRow.addArrangedSubview(makeInfoChip(text: location, icon: "mappin.and.ellipse"))
-        }
-        if let jobType = job.jobType, !jobType.isEmpty {
-            chipRow.addArrangedSubview(makeInfoChip(text: jobType, icon: "sparkles"))
-        }
-        let stack = UIStackView(arrangedSubviews: [eyebrow, title, description, chipRow])
-        stack.axis = .vertical
-        stack.spacing = 10
-        stack.alignment = .leading
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        card.contentView.addSubview(stack)
+        let titleLabel = UILabel(); titleLabel.text = title; titleLabel.font = .systemFont(ofSize: 18, weight: .bold); titleLabel.textColor = CineMystTheme.ink
+        
+        let bodyLabel = UILabel()
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineSpacing = 6
+        bodyLabel.attributedText = NSAttributedString(string: body, attributes: [
+            .paragraphStyle: paragraphStyle,
+            .font: UIFont.systemFont(ofSize: 15),
+            .foregroundColor: CineMystTheme.ink.withAlphaComponent(0.75)
+        ])
+        bodyLabel.numberOfLines = 0
+        
+        let stack = UIStackView(arrangedSubviews: [titleLabel, bodyLabel]); stack.axis = .vertical; stack.spacing = 10
+        card.addSubview(stack); stack.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: card.contentView.topAnchor, constant: 18),
-            stack.leadingAnchor.constraint(equalTo: card.contentView.leadingAnchor, constant: 18),
-            stack.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor, constant: -18),
-            stack.bottomAnchor.constraint(equalTo: card.contentView.bottomAnchor, constant: -18)
+            stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 18),
+            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 20),
+            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -20),
+            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -20)
         ])
         return card
     }
@@ -405,58 +549,12 @@ class JobDetailsViewController: UIViewController {
         containerStack.spacing = 8
         containerStack.translatesAutoresizingMaskIntoConstraints = false
 
-        card.contentView.addSubview(containerStack)
+        card.addSubview(containerStack)
         NSLayoutConstraint.activate([
-            containerStack.topAnchor.constraint(equalTo: card.contentView.topAnchor, constant: 18),
-            containerStack.leadingAnchor.constraint(equalTo: card.contentView.leadingAnchor, constant: 18),
-            containerStack.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor, constant: -18),
-            containerStack.bottomAnchor.constraint(equalTo: card.contentView.bottomAnchor, constant: -18)
-        ])
-        return card
-    }
-
-    private func makeInfoChip(text: String, icon: String) -> UIView {
-        let chip = UIView()
-        chip.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.08)
-        chip.layer.cornerRadius = 14
-        chip.layer.borderWidth = 1
-        chip.layer.borderColor = CineMystTheme.brandPlum.withAlphaComponent(0.14).cgColor
-
-        let iconView = UIImageView(image: UIImage(systemName: icon))
-        iconView.tintColor = CineMystTheme.brandPlum.withAlphaComponent(0.82)
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-
-        let label = UILabel()
-        label.text = text
-        label.font = .systemFont(ofSize: 12, weight: .semibold)
-        label.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.82)
-
-        let stack = UIStackView(arrangedSubviews: [iconView, label])
-        stack.axis = .horizontal
-        stack.spacing = 6
-        stack.alignment = .center
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        chip.addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: chip.topAnchor, constant: 8),
-            stack.bottomAnchor.constraint(equalTo: chip.bottomAnchor, constant: -8),
-            stack.leadingAnchor.constraint(equalTo: chip.leadingAnchor, constant: 10),
-            stack.trailingAnchor.constraint(equalTo: chip.trailingAnchor, constant: -10)
-        ])
-        return chip
-    }
-
-    private func makeRequirementsCard(requirements: String) -> UIView {
-        let card = makeGlassCard()
-        let title = UILabel(); title.text = "Requirements"; title.font = .systemFont(ofSize: 19, weight: .bold); title.textColor = CineMystTheme.ink
-        let body = UILabel(); body.text = requirements; body.numberOfLines = 0; body.font = UIFont.systemFont(ofSize: 15); body.textColor = CineMystTheme.ink.withAlphaComponent(0.7)
-        let stack = UIStackView(arrangedSubviews: [title, body]); stack.axis = .vertical; stack.spacing = 10
-        card.contentView.addSubview(stack); stack.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: card.contentView.topAnchor, constant: 18),
-            stack.leadingAnchor.constraint(equalTo: card.contentView.leadingAnchor, constant: 18),
-            stack.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor, constant: -18),
-            stack.bottomAnchor.constraint(equalTo: card.contentView.bottomAnchor, constant: -18)
+            containerStack.topAnchor.constraint(equalTo: card.topAnchor, constant: 18),
+            containerStack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
+            containerStack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
+            containerStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -18)
         ])
         return card
     }

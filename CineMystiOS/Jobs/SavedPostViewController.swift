@@ -149,7 +149,9 @@ class SavedPostViewController: UIViewController {
                         location: job.location ?? "Remote",
                         salary: "₹ \(job.ratePerDay ?? 0)/day",
                         daysLeft: job.daysLeftText,
-                        tag: job.jobType ?? "Film",
+                        tag: job.projectType ?? "",
+                        position: job.positionType,
+                        genre: job.jobType,
                         appliedCount: "0 applied"
                     )
                 }

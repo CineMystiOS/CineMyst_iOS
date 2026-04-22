@@ -665,7 +665,9 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate, CLLocati
                                 location: job.location ?? "Remote",
                                 salary: (job.ratePerDay ?? 0) > 0 ? "₹ \(job.ratePerDay!)/day" : "Negotiable",
                                 daysLeft: job.daysLeftText,
-                                tag: job.jobType ?? "Film",
+                                tag: job.projectType ?? "",
+                                position: job.positionType,
+                                genre: job.jobType,
                                 appliedCount: "\(applicationCount) applied",
                                 hasTask: hasTask
                             )
@@ -1074,7 +1076,19 @@ final class JobsViewController: UIViewController, UIScrollViewDelegate, CLLocati
                         let hasTask = associatedTask != nil
                         let companyToUse = (productionHouse != "Production House" && !productionHouse.isEmpty) ? productionHouse : (job.companyName.flatMap { $0.isEmpty ? nil : $0 } ?? "CineMyst Production")
                         let rateString = (job.ratePerDay ?? 0) > 0 ? "₹ \(job.ratePerDay!)/day" : "Negotiable"
-                        card.configure(image: profileImage ?? UIImage(named: "avatar_placeholder"), title: job.title ?? "Untitled", company: companyToUse, location: job.location ?? "Remote", salary: rateString, daysLeft: job.daysLeftText, tag: job.jobType ?? "Film", appliedCount: "\(applicationCount) applied", hasTask: hasTask)
+                        card.configure(
+                            image: profileImage ?? UIImage(named: "avatar_placeholder"),
+                            title: job.title ?? "Untitled",
+                            company: companyToUse,
+                            location: job.location ?? "Remote",
+                            salary: rateString,
+                            daysLeft: job.daysLeftText,
+                            tag: job.projectType ?? "",
+                            position: job.positionType,
+                            genre: job.jobType,
+                            appliedCount: "\(applicationCount) applied",
+                            hasTask: hasTask
+                        )
                         card.onApplyTap = { [weak self] in
                             if let task = associatedTask {
                                 let vc = TaskDetailsViewController()

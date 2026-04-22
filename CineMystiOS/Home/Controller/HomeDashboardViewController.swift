@@ -648,14 +648,16 @@ final class HomeDashboardViewController: UIViewController {
         posts = []
         jobs = [
             Job(id: UUID(), directorId: UUID(), title: "Lead Actor - City of Dreams",
-                companyName: "YRF Casting", location: "Mumbai", ratePerDay: 5000, jobType: "Web Series",
+                companyName: "YRF Casting", location: "Mumbai", ratePerDay: 5000, jobType: "Drama",
+                positionType: "Lead Actor", projectType: "Web Series",
                 description: "Looking for a lead actor for a web series.",
                 requirements: "Acting experience preferred", status: .active,
                 applicationDeadline: Calendar.current.date(byAdding: .day, value: 10, to: Date()),
                 referenceMaterialUrl: nil,
                 createdAt: Date(), updatedAt: Date()),
             Job(id: UUID(), directorId: UUID(), title: "Assistant Director - Feature Film",
-                companyName: "Red Chillies Entertainment", location: "Mumbai", ratePerDay: 3000, jobType: "Film",
+                companyName: "Red Chillies Entertainment", location: "Mumbai", ratePerDay: 3000, jobType: "Action",
+                positionType: "Supporting", projectType: "Film",
                 description: "Assist director during film production.", requirements: "Prior AD experience",
                 status: .active,
                 applicationDeadline: Calendar.current.date(byAdding: .day, value: 5, to: Date()),
@@ -2245,7 +2247,8 @@ final class CastingFeedCell: UITableViewCell {
                 self.posterName.text = (productionHouse != "Production House" && !productionHouse.isEmpty) ? productionHouse : (job.companyName ?? "CineMyst Production")
             }
         }
-        roleMeta.text = job.jobType ?? "Project"
+        let metaParts = [job.projectType, job.positionType, job.jobType].compactMap { $0 }.filter { !$0.isEmpty }
+        roleMeta.text = metaParts.isEmpty ? "Project" : metaParts.joined(separator: " · ")
         timeMeta.text = "2h"
         captionLabel.text = "CASTING CALL: \(job.title ?? "Untitled"). \(job.description ?? "")"
         jobTitleLabel.text = job.title ?? "Untitled Job"

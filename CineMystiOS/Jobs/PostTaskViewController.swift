@@ -264,6 +264,8 @@ class PostTaskViewController: UIViewController {
                 location: initialJob.location,
                 ratePerDay: initialJob.ratePerDay,
                 jobType: initialJob.jobType,
+                positionType: initialJob.positionType,
+                projectType: initialJob.projectType,
                 description: initialJob.description,
                 requirements: initialJob.requirements,
                 status: initialJob.status,

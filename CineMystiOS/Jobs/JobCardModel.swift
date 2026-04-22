@@ -7,6 +7,8 @@ struct JobCardModel: Equatable {
     let location: String
     let rate: String
     let type: String
+    let projectType: String?
+    let positionType: String?
     let statusText: String
     let statusColor: UIColor
     let applicationsCount: Int
@@ -24,6 +26,8 @@ struct JobCardModel: Equatable {
          location: String,
          rate: String,
          type: String,
+         projectType: String? = nil,
+         positionType: String? = nil,
          statusText: String,
          statusColor: UIColor,
          applicationsCount: Int,
@@ -36,6 +40,8 @@ struct JobCardModel: Equatable {
         self.location = location
         self.rate = rate
         self.type = type
+        self.projectType = projectType
+        self.positionType = positionType
         self.statusText = statusText
         self.statusColor = statusColor
         self.applicationsCount = applicationsCount

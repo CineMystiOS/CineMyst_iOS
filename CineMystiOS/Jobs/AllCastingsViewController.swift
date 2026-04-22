@@ -154,7 +154,9 @@ final class AllCastingsViewController: UIViewController, UIScrollViewDelegate {
                         location: job.location ?? "Remote",
                         salary: rate,
                         daysLeft: job.daysLeftText,
-                        tag: job.jobType ?? "Film",
+                        tag: job.projectType ?? "",
+                        position: job.positionType,
+                        genre: job.jobType,
                         appliedCount: "\(appCount) applied",
                         hasTask: assocTask != nil
                     )

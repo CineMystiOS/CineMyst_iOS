@@ -15,6 +15,8 @@ struct Job: Codable, Identifiable {
     let location: String?
     let ratePerDay: Int?
     let jobType: String?
+    let positionType: String?
+    let projectType: String?
     let description: String?
     let requirements: String?
     let status: JobStatus?
@@ -33,6 +35,8 @@ struct Job: Codable, Identifiable {
         case companyName = "company_name"
         case ratePerDay = "rate_per_day"
         case jobType = "job_type"
+        case positionType = "position_type"
+        case projectType = "project_type"
         case referenceMaterialUrl = "reference_material_url"
         case applicationDeadline = "application_deadline"
         case createdAt = "created_at"
@@ -72,7 +76,9 @@ extension Job {
             company: companyName ?? "Production House",
             location: location ?? "Remote/TBD",
             rate: "₹\(ratePerDay ?? 0)/day",
-            type: jobType ?? "Project",
+            type: jobType ?? "Film",
+            projectType: projectType,
+            positionType: positionType,
             statusText: statusText,
             statusColor: statusColor,
             applicationsCount: applicationsCount,

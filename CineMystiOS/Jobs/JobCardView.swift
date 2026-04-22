@@ -6,13 +6,14 @@ class JobCardView: UIView {
     private let titleLabel = UILabel()
     private let companyTagContainer = UIView()
     private let companyTagLabel = UILabel()
+    private let projectTypeLabel = UILabel() // New label beside company tag
     private let bookmarkButton = UIButton(type: .system)
     private let locationIcon = UIImageView(image: UIImage(systemName: "mappin.and.ellipse"))
     private let locationLabel = UILabel()
     private let salaryLabel = UILabel()
     private let clockIcon = UIImageView(image: UIImage(systemName: "clock"))
     private let daysLeftLabel = UILabel()
-    private let tagLabel = UILabel()
+    private let tagsStack = UIStackView()
     private let appliedLabel = UILabel()
     private let applyButton = UIButton(type: .system)
     
@@ -41,6 +42,8 @@ class JobCardView: UIView {
         salary: String,
         daysLeft: String,
         tag: String,
+        position: String? = nil,
+        genre: String? = nil,
         appliedCount: String = "0 applied",
         hasTask: Bool = false
     ) {
@@ -50,7 +53,13 @@ class JobCardView: UIView {
         locationLabel.text = location
         salaryLabel.text = salary
         daysLeftLabel.text = daysLeft
-        tagLabel.text = "  \(tag)  "
+        let projectText = (tag.isEmpty || tag.lowercased() == "project") ? nil : tag
+        projectTypeLabel.text = projectText != nil ? "  ·  \(projectText!)" : nil
+        projectTypeLabel.isHidden = projectText == nil
+        
+        // At the bottom, we show Position and Genre. 
+        // We do NOT show project type here as it is at the top now.
+        configureTags(project: nil, position: position, genre: genre)
         appliedLabel.text = appliedCount
         
         if hasTask {
@@ -130,6 +139,10 @@ class JobCardView: UIView {
         companyTagLabel.heightAnchor.constraint(equalToConstant: 24).isActive = true
         companyTagLabel.adjustsFontSizeToFitWidth = false
         
+        projectTypeLabel.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        projectTypeLabel.textColor = CineMystTheme.ink.withAlphaComponent(0.54)
+        projectTypeLabel.translatesAutoresizingMaskIntoConstraints = false
+        
         // Bookmark button - top right floating
         bookmarkButton.setImage(UIImage(systemName: "bookmark"), for: .normal)
         bookmarkButton.tintColor = CineMystTheme.brandPlum
@@ -156,14 +169,10 @@ class JobCardView: UIView {
         daysLeftLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
         daysLeftLabel.textColor = CineMystTheme.ink.withAlphaComponent(0.58)
         
-        tagLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
-        tagLabel.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.9)
-        tagLabel.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.08)
-        tagLabel.layer.cornerRadius = 13
-        tagLabel.clipsToBounds = true
-        tagLabel.textAlignment = .center
-        tagLabel.translatesAutoresizingMaskIntoConstraints = false
-        tagLabel.heightAnchor.constraint(equalToConstant: 26).isActive = true
+        tagsStack.axis = .horizontal
+        tagsStack.spacing = 6
+        tagsStack.alignment = .center
+        tagsStack.distribution = .fill
         
         appliedLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
         appliedLabel.textColor = CineMystTheme.ink.withAlphaComponent(0.42)
@@ -192,8 +201,14 @@ class JobCardView: UIView {
             companyTagLabel.leadingAnchor.constraint(equalTo: companyContainer.leadingAnchor),
             companyTagLabel.topAnchor.constraint(equalTo: companyContainer.topAnchor),
             companyTagLabel.bottomAnchor.constraint(equalTo: companyContainer.bottomAnchor),
-            companyTagLabel.trailingAnchor.constraint(lessThanOrEqualTo: companyContainer.trailingAnchor),
             companyTagLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 80)
+        ])
+        
+        companyContainer.addSubview(projectTypeLabel)
+        NSLayoutConstraint.activate([
+            projectTypeLabel.leadingAnchor.constraint(equalTo: companyTagLabel.trailingAnchor, constant: 4),
+            projectTypeLabel.centerYAnchor.constraint(equalTo: companyTagLabel.centerYAnchor),
+            projectTypeLabel.trailingAnchor.constraint(lessThanOrEqualTo: companyContainer.trailingAnchor)
         ])
         
         let titleStack = UIStackView(arrangedSubviews: [titleLabel, companyContainer])
@@ -210,11 +225,13 @@ class JobCardView: UIView {
         salaryLocationRow.alignment = .center
         
         let tagAppliedRow = UIStackView(arrangedSubviews: [
-            tagLabel,
+            tagsStack,
+            UIView(), // middle spacer
             appliedLabel
         ])
         tagAppliedRow.axis = .horizontal
-        tagAppliedRow.distribution = .equalSpacing
+        tagAppliedRow.alignment = .center
+        tagAppliedRow.spacing = 8
         
         let topRow = UIStackView(arrangedSubviews: [profileImageView, titleStack])
         topRow.axis = .horizontal
@@ -260,6 +277,63 @@ class JobCardView: UIView {
         stack.spacing = 4
         return stack
     }
+    private func configureTags(project: String?, position: String?, genre: String?) {
+        // Clear old tags
+        tagsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        // Add Project Type
+        if let p = project, !p.isEmpty, p.lowercased() != "project" {
+            tagsStack.addArrangedSubview(createTag(text: p, icon: "video.fill"))
+        }
+        
+        // Add Position
+        if let pos = position, !pos.isEmpty {
+            tagsStack.addArrangedSubview(createTag(text: pos, icon: "person.fill"))
+        }
+        
+        // Add Genre
+        if let g = genre, !g.isEmpty {
+            tagsStack.addArrangedSubview(createTag(text: g, icon: "sparkles"))
+        }
+    }
+
+    private func createTag(text: String, icon: String) -> UIView {
+        let view = UIView()
+        view.backgroundColor = CineMystTheme.brandPlum.withAlphaComponent(0.06)
+        view.layer.cornerRadius = 10
+        view.clipsToBounds = true
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.heightAnchor.constraint(equalToConstant: 24).isActive = true
+        
+        let iconView = UIImageView(image: UIImage(systemName: icon))
+        iconView.tintColor = CineMystTheme.brandPlum.withAlphaComponent(0.6)
+        iconView.contentMode = .scaleAspectFit
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        
+        let label = UILabel()
+        label.text = text
+        label.font = UIFont.systemFont(ofSize: 11.5, weight: .bold)
+        label.textColor = CineMystTheme.brandPlum.withAlphaComponent(0.85)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        
+        let stack = UIStackView(arrangedSubviews: [iconView, label])
+        stack.axis = .horizontal
+        stack.spacing = 4
+        stack.alignment = .center
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        
+        view.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
+            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+            stack.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            iconView.widthAnchor.constraint(equalToConstant: 12),
+            iconView.heightAnchor.constraint(equalToConstant: 11)
+        ])
+        
+        return view
+    }
+
     @objc private func bookmarkTapped() {
         onBookmarkTap?()
     }
@@ -267,5 +341,4 @@ class JobCardView: UIView {
         let icon = isBookmarked ? "bookmark.fill" : "bookmark"
         bookmarkButton.setImage(UIImage(systemName: icon), for: .normal)
     }
-
 }

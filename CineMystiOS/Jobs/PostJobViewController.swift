@@ -30,10 +30,17 @@ class PostJobViewController: UIViewController {
     private var applicationDeadlineTextField: UITextField?
     private var genreLabel: UILabel?
     private var genderLabel: UILabel?
+    private var positionLabel: UILabel?
+    private var projectTypeLabel: UILabel?
     
     private var selectedDeadlineDate: Date?
     private var selectedGenre: String?
     private var selectedGender: String?
+    private var selectedPosition: String?
+    private var selectedProjectType: String?
+    private var selectedLocation: String?
+    
+    private var locationLabel: UILabel?
     
     private let statusLabelView = UILabel()
     private var currentStatus: String = "pending"
@@ -166,8 +173,10 @@ class PostJobViewController: UIViewController {
         formStack.addArrangedSubview(
             createCardContainer {
                 $0.addArrangedSubview(createTextField(title: "Project Title (Serial/Movie/Show)", placeholder: "e.g., The Midnight Echo", textField: &projectTitleTextField))
+                $0.addArrangedSubview(createDropdown(title: "Project Type", placeholder: "Select Type", label: &projectTypeLabel, action: #selector(projectTypeTapped)))
                 $0.addArrangedSubview(createTextField(title: "Payment Amount/Day (₹)", placeholder: "5000", textField: &paymentAmountTextField))
                 $0.addArrangedSubview(createDateField(title: "Application Deadline", placeholder: "dd/mm/yyyy", datePicker: deadlineDatePicker, textField: &applicationDeadlineTextField))
+                $0.addArrangedSubview(createDropdown(title: "Role Location", placeholder: "Select Location", label: &locationLabel, action: #selector(locationTapped)))
             }
         )
 
@@ -186,6 +195,7 @@ class PostJobViewController: UIViewController {
                 hStack.addArrangedSubview(createTextField(title: "Age Range", placeholder: "e.g., 20-30", textField: &ageTextField))
                 
                 $0.addArrangedSubview(hStack)
+                $0.addArrangedSubview(createDropdown(title: "Position", placeholder: "Select Position", label: &positionLabel, action: #selector(positionTapped)))
                 $0.addArrangedSubview(createDropdown(title: "Genre", placeholder: "Select", label: &genreLabel, action: #selector(genreTapped)))
             }
         )
@@ -238,6 +248,35 @@ class PostJobViewController: UIViewController {
             self.genreLabel?.text = choice
             self.genreLabel?.textColor = .label
         }
+    }
+
+    @objc private func positionTapped() {
+        let positions = ["Lead Actor", "Supporting", "Junior Artist", "Child Artist"]
+        showPicker(title: "Select Position", options: positions) { choice in
+            self.selectedPosition = choice
+            self.positionLabel?.text = choice
+            self.positionLabel?.textColor = .label
+        }
+    }
+
+    @objc private func projectTypeTapped() {
+        let types = ["Web Series", "TV", "Film", "Short Film", "Ad/Commercial"]
+        showPicker(title: "Select Project Type", options: types) { choice in
+            self.selectedProjectType = choice
+            self.projectTypeLabel?.text = choice
+            self.projectTypeLabel?.textColor = .label
+        }
+    }
+
+    @objc private func locationTapped() {
+        let vc = JobLocationPickerViewController()
+        vc.onLocationSelected = { [weak self] location in
+            self?.selectedLocation = location
+            self?.locationLabel?.text = location
+            self?.locationLabel?.textColor = .label
+        }
+        let nav = UINavigationController(rootViewController: vc)
+        present(nav, animated: true)
     }
 
     private func showPicker(title: String, options: [String], completion: @escaping (String) -> Void) {
@@ -353,6 +392,10 @@ class PostJobViewController: UIViewController {
             showAlert(title: "Required", message: "Project Title is required")
             return false
         }
+        if selectedLocation == nil {
+            showAlert(title: "Required", message: "Role Location is required")
+            return false
+        }
         return true
     }
 
@@ -366,9 +409,11 @@ class PostJobViewController: UIViewController {
             directorId: userId,
             title: projectTitleTextField?.text,
             companyName: userProductionHouse ?? "CineMyst Production",
-            location: "Mumbai",
+            location: selectedLocation ?? "Mumbai",
             ratePerDay: rate,
             jobType: selectedGenre,
+            positionType: selectedPosition,
+            projectType: selectedProjectType,
             description: characterDescriptionTextView?.text,
             requirements: nil,
             status: .active,
