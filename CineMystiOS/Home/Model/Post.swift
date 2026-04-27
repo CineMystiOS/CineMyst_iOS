@@ -25,7 +25,7 @@ struct Post: Identifiable {
     var caption: String?
     let mediaUrls: [PostMedia]
     let likesCount: Int
-    let commentsCount: Int
+    var commentsCount: Int
     let sharesCount: Int
     let createdAt: Date
     var isLiked: Bool

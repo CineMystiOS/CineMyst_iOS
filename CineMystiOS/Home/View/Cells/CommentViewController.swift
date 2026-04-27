@@ -29,6 +29,9 @@ final class CommentViewController: UIViewController {
     private var isLoadingComments = false
     private var currentUserProfileUrl: String?
     
+    var onCommentAdded: (() -> Void)?
+    var onCommentDeleted: (() -> Void)?
+    
     // MARK: - UI Elements
     private let tableView = UITableView()
     private let inputContainer = UIView()
@@ -95,8 +98,9 @@ final class CommentViewController: UIViewController {
         inputContainer.addSubview(commentField)
         
         // Send Button
-        sendButton.setImage(UIImage(systemName: "paperplane.fill"), for: .normal)
-        sendButton.tintColor = UIColor(red: 67/255, green: 22/255, blue: 49/255, alpha: 1)
+        let cfg = UIImage.SymbolConfiguration(pointSize: 22, weight: .semibold)
+        sendButton.setImage(UIImage(systemName: "arrow.up.circle.fill", withConfiguration: cfg), for: .normal)
+        sendButton.tintColor = UIColor(red: 0.80, green: 0.45, blue: 0.66, alpha: 1)
         sendButton.addTarget(self, action: #selector(sendComment), for: .touchUpInside)
         sendButton.translatesAutoresizingMaskIntoConstraints = false
         inputContainer.addSubview(sendButton)
@@ -230,6 +234,7 @@ final class CommentViewController: UIViewController {
                     
                     // Reload comments to show the new one
                     self.fetchComments()
+                    self.onCommentAdded?()
                     
                     print("✅ Comment sent successfully")
                 }
@@ -374,6 +379,7 @@ extension CommentViewController: UITableViewDataSource, UITableViewDelegate {
                     if let index = self.comments.firstIndex(where: { $0.id == comment.id }) {
                         self.comments.remove(at: index)
                         self.tableView.deleteRows(at: [IndexPath(row: index, section: 0)], with: .fade)
+                        self.onCommentDeleted?()
                     }
                 }
             } catch {

@@ -87,6 +87,15 @@ class UserPostsFeedViewController: UIViewController {
     
     private func openComments(for post: Post) {
         let commentVC = CommentViewController(post: post)
+        
+        commentVC.onCommentAdded = { [weak self] in
+            self?.incrementCommentCount(for: post)
+        }
+        
+        commentVC.onCommentDeleted = { [weak self] in
+            self?.decrementCommentCount(for: post)
+        }
+        
         let nav = UINavigationController(rootViewController: commentVC)
         
         let closeItem = UIBarButtonItem(title: "Close", style: .done, target: self, action: #selector(dismissPresentedVC))
@@ -235,6 +244,20 @@ extension UserPostsFeedViewController: UITableViewDataSource, UITableViewDelegat
                     self.present(errorAlert, animated: true)
                 }
             }
+        }
+    }
+    
+    private func incrementCommentCount(for post: Post) {
+        if let idx = posts.firstIndex(where: { $0.id == post.id }) {
+            posts[idx].commentsCount += 1
+            tableView.reloadRows(at: [IndexPath(row: idx, section: 0)], with: .none)
+        }
+    }
+    
+    private func decrementCommentCount(for post: Post) {
+        if let idx = posts.firstIndex(where: { $0.id == post.id }) {
+            posts[idx].commentsCount = max(0, posts[idx].commentsCount - 1)
+            tableView.reloadRows(at: [IndexPath(row: idx, section: 0)], with: .none)
         }
     }
     
