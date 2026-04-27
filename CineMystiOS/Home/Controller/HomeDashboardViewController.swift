@@ -2470,10 +2470,18 @@ private final class PassthroughView: UIView {
 
 final class FlickFeedCell: UITableViewCell {
     static let reuseId = "FlickFeedCell"
+
+    private enum DS {
+        static let deepPlum = UIColor(red: 0.263, green: 0.082, blue: 0.188, alpha: 1)
+        static let rose = UIColor(red: 0.854, green: 0.553, blue: 0.742, alpha: 1)
+        static let blush = UIColor(red: 1.0, green: 0.987, blue: 0.994, alpha: 0.82)
+        static let cream = UIColor(red: 1.0, green: 0.997, blue: 0.992, alpha: 0.95)
+    }
     
     var onMoreTap: ((UIButton) -> Void)?
     
     private let card           = UIView()
+    private let cardGlow       = UIView()
     private let videoPreview   = UIImageView()
     private let playIcon       = UIImageView()
     private let captionLabel   = UILabel()
@@ -2481,6 +2489,7 @@ final class FlickFeedCell: UITableViewCell {
     private let headerRow      = UIStackView()
     private let nameLabel      = UILabel()
     private let timeLabel      = UILabel()
+    private let shimmerLayer   = CAGradientLayer()
     
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -2492,27 +2501,34 @@ final class FlickFeedCell: UITableViewCell {
     required init?(coder: NSCoder) { fatalError() }
     
     private func setupUI() {
-        card.backgroundColor = UIColor(red: 1.0, green: 0.995, blue: 0.985, alpha: 0.96)
+        contentView.addSubview(cardGlow)
+        cardGlow.translatesAutoresizingMaskIntoConstraints = false
+        cardGlow.backgroundColor = DS.rose.withAlphaComponent(0.09)
+        cardGlow.layer.cornerRadius = CineMystTheme.cardRadius + 4
+        cardGlow.layer.shadowColor = DS.deepPlum.withAlphaComponent(0.08).cgColor
+        cardGlow.layer.shadowOpacity = 1
+        cardGlow.layer.shadowRadius = 22
+        cardGlow.layer.shadowOffset = CGSize(width: 0, height: 12)
+
+        card.backgroundColor = DS.cream
         card.layer.cornerRadius = CineMystTheme.cardRadius
-        card.layer.borderWidth = 0.5
-        card.layer.borderColor = UIColor(red: 0.92, green: 0.87, blue: 0.78, alpha: 1).cgColor
-        card.layer.shadowColor = CineMystTheme.ink.cgColor
-        card.layer.shadowOpacity = 0.06
-        card.layer.shadowRadius = 16
-        card.layer.shadowOffset = CGSize(width: 0, height: 8)
+        card.layer.borderWidth = 1
+        card.layer.borderColor = UIColor.white.withAlphaComponent(0.72).cgColor
+        card.layer.shadowColor = UIColor.clear.cgColor
         contentView.addSubview(card)
         card.translatesAutoresizingMaskIntoConstraints = false
         
-        nameLabel.font = .systemFont(ofSize: 14, weight: .semibold)
-        nameLabel.textColor = CineMystTheme.ink
-        timeLabel.font = .systemFont(ofSize: 11)
-        timeLabel.textColor = .secondaryLabel
+        nameLabel.font = .systemFont(ofSize: 17, weight: .bold)
+        nameLabel.textColor = DS.deepPlum
+        timeLabel.font = .systemFont(ofSize: 12.5, weight: .medium)
+        timeLabel.textColor = DS.rose
         
         let infoStack = UIStackView(arrangedSubviews: [nameLabel, timeLabel])
         infoStack.axis = .vertical; infoStack.spacing = 2
         
-        moreButton.setImage(UIImage(systemName: "ellipsis"), for: .normal)
-        moreButton.tintColor = .secondaryLabel
+        let moreConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .bold)
+        moreButton.setImage(UIImage(systemName: "ellipsis", withConfiguration: moreConfig), for: .normal)
+        moreButton.tintColor = DS.deepPlum.withAlphaComponent(0.62)
         moreButton.addTarget(self, action: #selector(moreTapped), for: .touchUpInside)
         
         let header = UIStackView(arrangedSubviews: [infoStack, UIView(), moreButton])
@@ -2522,54 +2538,74 @@ final class FlickFeedCell: UITableViewCell {
         
         videoPreview.contentMode = .scaleAspectFill
         videoPreview.clipsToBounds = true
-        videoPreview.layer.cornerRadius = CineMystTheme.cardRadiusSm
-        videoPreview.backgroundColor = .systemGray6
+        videoPreview.layer.cornerRadius = 28
+        videoPreview.layer.cornerCurve = .continuous
+        videoPreview.backgroundColor = DS.blush
         card.addSubview(videoPreview)
         videoPreview.translatesAutoresizingMaskIntoConstraints = false
+
+        shimmerLayer.colors = [
+            UIColor.white.withAlphaComponent(0.10).cgColor,
+            UIColor.white.withAlphaComponent(0.02).cgColor,
+            UIColor.black.withAlphaComponent(0.08).cgColor
+        ]
+        shimmerLayer.startPoint = CGPoint(x: 0, y: 0)
+        shimmerLayer.endPoint = CGPoint(x: 1, y: 1)
+        shimmerLayer.cornerRadius = 28
+        videoPreview.layer.addSublayer(shimmerLayer)
         
         playIcon.image = UIImage(systemName: "play.fill")
         playIcon.tintColor = .white
         playIcon.contentMode = .scaleAspectFit
+        playIcon.backgroundColor = DS.deepPlum.withAlphaComponent(0.38)
+        playIcon.layer.cornerRadius = 34
+        playIcon.clipsToBounds = true
         videoPreview.addSubview(playIcon)
         playIcon.translatesAutoresizingMaskIntoConstraints = false
         
-        captionLabel.font = .systemFont(ofSize: 13.5)
-        captionLabel.textColor = CineMystTheme.ink.withAlphaComponent(0.92)
+        captionLabel.font = .systemFont(ofSize: 14, weight: .medium)
+        captionLabel.textColor = DS.deepPlum.withAlphaComponent(0.78)
         captionLabel.numberOfLines = 0
         card.addSubview(captionLabel)
         captionLabel.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
+            cardGlow.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 11),
+            cardGlow.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 18),
+            cardGlow.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -18),
+            cardGlow.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -11),
+
             card.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 7),
             card.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
             card.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -14),
             card.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -7),
             
-            header.topAnchor.constraint(equalTo: card.topAnchor, constant: 14),
-            header.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
-            header.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -14),
+            header.topAnchor.constraint(equalTo: card.topAnchor, constant: 18),
+            header.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 18),
+            header.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -18),
             
-            videoPreview.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 12),
-            videoPreview.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 10),
-            videoPreview.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -10),
+            videoPreview.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 14),
+            videoPreview.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
+            videoPreview.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -14),
             videoPreview.heightAnchor.constraint(equalTo: videoPreview.widthAnchor, multiplier: 1.2), // Vertical rectangular
             
             playIcon.centerXAnchor.constraint(equalTo: videoPreview.centerXAnchor),
             playIcon.centerYAnchor.constraint(equalTo: videoPreview.centerYAnchor),
-            playIcon.widthAnchor.constraint(equalToConstant: 40),
-            playIcon.heightAnchor.constraint(equalToConstant: 40),
+            playIcon.widthAnchor.constraint(equalToConstant: 68),
+            playIcon.heightAnchor.constraint(equalToConstant: 68),
             
-            captionLabel.topAnchor.constraint(equalTo: videoPreview.bottomAnchor, constant: 10),
-            captionLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
-            captionLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -14),
-            captionLabel.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -14)
+            captionLabel.topAnchor.constraint(equalTo: videoPreview.bottomAnchor, constant: 14),
+            captionLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 18),
+            captionLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -18),
+            captionLabel.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -18)
         ])
     }
     
     func configure(with flick: Flick) {
         nameLabel.text = flick.fullName ?? flick.username ?? "User"
-        timeLabel.text = "Flick"
-        captionLabel.text = flick.caption
+        timeLabel.text = "Scene Stealer"
+        captionLabel.text = flick.caption?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? flick.caption : nil
+        videoPreview.image = nil
         
         if let thumb = flick.thumbnailUrl, let url = URL(string: thumb) {
             loadImage(from: url)
@@ -2583,6 +2619,11 @@ final class FlickFeedCell: UITableViewCell {
         } else {
             moreButton.isHidden = true
         }
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        shimmerLayer.frame = videoPreview.bounds
     }
     
     @objc private func moreTapped() {

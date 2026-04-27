@@ -10,7 +10,19 @@ import AVFoundation
 
 class UserFlicksFeedViewController: UIViewController {
     
+    private enum DS {
+        static let blushBackground = UIColor(red: 0.986, green: 0.958, blue: 0.975, alpha: 1)
+        static let mist = UIColor(red: 1.0, green: 0.992, blue: 0.997, alpha: 0.82)
+        static let deepPlum = UIColor(red: 0.263, green: 0.082, blue: 0.188, alpha: 1)
+        static let rose = UIColor(red: 0.854, green: 0.553, blue: 0.742, alpha: 1)
+    }
+
     private let tableView = UITableView()
+    private let backgroundGlowTop = UIView()
+    private let backgroundGlowBottom = UIView()
+    private let headerBarView = UIView()
+    private let backButton = UIButton(type: .system)
+    private let headerTitleLabel = UILabel()
     private var flicks: [Flick] = []
     private var initialIndex: Int = 0
     private var isFirstAppearance = true
@@ -45,23 +57,73 @@ class UserFlicksFeedViewController: UIViewController {
     
     // MARK: - Setup
     private func setupUI() {
-        title = "Flicks"
-        view.backgroundColor = .systemBackground
+        title = nil
+        view.backgroundColor = DS.blushBackground
+        navigationItem.title = ""
+        navigationItem.hidesBackButton = true
+        navigationItem.leftBarButtonItem = nil
+        navigationItem.backBarButtonItem = nil
+
+        backgroundGlowTop.backgroundColor = DS.mist
+        backgroundGlowTop.layer.cornerRadius = 140
+        backgroundGlowTop.alpha = 0.95
+        backgroundGlowTop.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(backgroundGlowTop)
+
+        backgroundGlowBottom.backgroundColor = DS.rose.withAlphaComponent(0.10)
+        backgroundGlowBottom.layer.cornerRadius = 170
+        backgroundGlowBottom.alpha = 0.9
+        backgroundGlowBottom.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(backgroundGlowBottom)
+
+        headerBarView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(headerBarView)
+
+        headerTitleLabel.text = "Flicks"
+        headerTitleLabel.font = .systemFont(ofSize: 31, weight: .heavy)
+        headerTitleLabel.textColor = DS.deepPlum
+        headerTitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        headerBarView.addSubview(headerTitleLabel)
         
-        // Add a back button with premium style
-        let backBtn = UIButton(type: .system)
         let cfg = UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold)
-        backBtn.setImage(UIImage(systemName: "chevron.left", withConfiguration: cfg), for: .normal)
-        backBtn.tintColor = UIColor(red: 0.263, green: 0.082, blue: 0.188, alpha: 1) // deepPlum
-        backBtn.backgroundColor = UIColor.white.withAlphaComponent(0.96)
-        backBtn.layer.cornerRadius = 18
-        backBtn.layer.shadowColor = UIColor.black.withAlphaComponent(0.08).cgColor
-        backBtn.layer.shadowOpacity = 1
-        backBtn.layer.shadowRadius = 10
-        backBtn.layer.shadowOffset = CGSize(width: 0, height: 4)
-        backBtn.frame = CGRect(x: 0, y: 0, width: 36, height: 36)
-        backBtn.addTarget(self, action: #selector(backTapped), for: .touchUpInside)
-        navigationItem.leftBarButtonItem = UIBarButtonItem(customView: backBtn)
+        backButton.setImage(UIImage(systemName: "chevron.left", withConfiguration: cfg), for: .normal)
+        backButton.tintColor = DS.deepPlum
+        backButton.backgroundColor = UIColor.white.withAlphaComponent(0.78)
+        backButton.layer.cornerRadius = 22
+        backButton.layer.borderWidth = 1
+        backButton.layer.borderColor = UIColor.white.withAlphaComponent(0.55).cgColor
+        backButton.layer.shadowColor = DS.deepPlum.withAlphaComponent(0.12).cgColor
+        backButton.layer.shadowOpacity = 1
+        backButton.layer.shadowRadius = 14
+        backButton.layer.shadowOffset = CGSize(width: 0, height: 6)
+        backButton.translatesAutoresizingMaskIntoConstraints = false
+        backButton.addTarget(self, action: #selector(backTapped), for: .touchUpInside)
+        headerBarView.addSubview(backButton)
+
+        NSLayoutConstraint.activate([
+            backgroundGlowTop.widthAnchor.constraint(equalToConstant: 280),
+            backgroundGlowTop.heightAnchor.constraint(equalToConstant: 280),
+            backgroundGlowTop.centerXAnchor.constraint(equalTo: view.leadingAnchor, constant: 96),
+            backgroundGlowTop.topAnchor.constraint(equalTo: view.topAnchor, constant: 84),
+
+            backgroundGlowBottom.widthAnchor.constraint(equalToConstant: 340),
+            backgroundGlowBottom.heightAnchor.constraint(equalToConstant: 340),
+            backgroundGlowBottom.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: 138),
+            backgroundGlowBottom.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: 96),
+
+            headerBarView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 2),
+            headerBarView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 18),
+            headerBarView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -18),
+            headerBarView.heightAnchor.constraint(equalToConstant: 44),
+
+            backButton.leadingAnchor.constraint(equalTo: headerBarView.leadingAnchor),
+            backButton.centerYAnchor.constraint(equalTo: headerBarView.centerYAnchor),
+            backButton.widthAnchor.constraint(equalToConstant: 44),
+            backButton.heightAnchor.constraint(equalToConstant: 44),
+
+            headerTitleLabel.centerXAnchor.constraint(equalTo: headerBarView.centerXAnchor),
+            headerTitleLabel.centerYAnchor.constraint(equalTo: headerBarView.centerYAnchor)
+        ])
     }
     
     private func setupTableView() {
@@ -70,6 +132,10 @@ class UserFlicksFeedViewController: UIViewController {
         tableView.separatorStyle = .none
         tableView.showsVerticalScrollIndicator = false
         tableView.backgroundColor = .clear
+        tableView.rowHeight = UITableView.automaticDimension
+        tableView.estimatedRowHeight = 560
+        tableView.contentInset = UIEdgeInsets(top: 68, left: 0, bottom: 28, right: 0)
+        tableView.scrollIndicatorInsets = UIEdgeInsets(top: 68, left: 0, bottom: 28, right: 0)
         tableView.register(FlickFeedCell.self, forCellReuseIdentifier: FlickFeedCell.reuseId)
         
         view.addSubview(tableView)
@@ -299,4 +365,3 @@ class UserFlicksFeedViewController_FullScreen: UIViewController, UICollectionVie
         if newIndex != currentIndex { currentIndex = newIndex; playCurrentVideo() }
     }
 }
-
