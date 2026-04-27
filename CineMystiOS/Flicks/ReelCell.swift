@@ -18,7 +18,7 @@ protocol ReelCellDelegate: AnyObject {
 
 // MARK: - ReelCell
 
-final class ReelCell: UICollectionViewCell {
+final class ReelCell: UICollectionViewCell, UIGestureRecognizerDelegate {
 
     static let identifier = "ReelCell"
     weak var delegate: ReelCellDelegate?
@@ -36,6 +36,7 @@ final class ReelCell: UICollectionViewCell {
     private var playerLooper: AVPlayerLooper?
     private var queuePlayer:  AVQueuePlayer?
     private var displayObserver: NSKeyValueObservation?
+    private var isPlaybackPaused = false
 
     // MARK: - Design tokens
     private enum DS {
@@ -180,6 +181,18 @@ final class ReelCell: UICollectionViewCell {
         return iv
     }()
 
+    private let playbackStateIcon: UIImageView = {
+        let iv = UIImageView(image: UIImage(systemName: "pause.fill"))
+        iv.tintColor = .white
+        iv.backgroundColor = UIColor.black.withAlphaComponent(0.26)
+        iv.layer.cornerRadius = 30
+        iv.clipsToBounds = true
+        iv.contentMode = .center
+        iv.alpha = 0
+        iv.translatesAutoresizingMaskIntoConstraints = false
+        return iv
+    }()
+
     // MARK: - Init
 
     override init(frame: CGRect) {
@@ -221,6 +234,7 @@ final class ReelCell: UICollectionViewCell {
         contentView.layer.addSublayer(gradientLayer)
 
         contentView.addSubview(heartBurst)
+        contentView.addSubview(playbackStateIcon)
         contentView.addSubview(actionStack)
 
         // Action stack — 3 buttons (Like, Comment, Share)
@@ -249,6 +263,11 @@ final class ReelCell: UICollectionViewCell {
             heartBurst.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             heartBurst.widthAnchor.constraint(equalToConstant: 90),
             heartBurst.heightAnchor.constraint(equalToConstant: 90),
+
+            playbackStateIcon.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            playbackStateIcon.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            playbackStateIcon.widthAnchor.constraint(equalToConstant: 60),
+            playbackStateIcon.heightAnchor.constraint(equalToConstant: 60),
 
             // Action stack pinned to right edge, above tab bar
             actionStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
@@ -311,7 +330,15 @@ final class ReelCell: UICollectionViewCell {
         // Double-tap to like
         let doubleTap = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap))
         doubleTap.numberOfTapsRequired = 2
+        doubleTap.delegate = self
         contentView.addGestureRecognizer(doubleTap)
+
+        let singleTap = UITapGestureRecognizer(target: self, action: #selector(handleSingleTap))
+        singleTap.numberOfTapsRequired = 1
+        singleTap.cancelsTouchesInView = false
+        singleTap.delegate = self
+        singleTap.require(toFail: doubleTap)
+        contentView.addGestureRecognizer(singleTap)
 
         let profileTap = UITapGestureRecognizer(target: self, action: #selector(handleProfileTap))
         avatarView.addGestureRecognizer(profileTap)
@@ -343,6 +370,10 @@ final class ReelCell: UICollectionViewCell {
             performLike()
         }
         showHeartBurst()
+    }
+
+    @objc private func handleSingleTap() {
+        togglePlayback()
     }
 
     @objc private func handleProfileTap() {
@@ -461,6 +492,35 @@ final class ReelCell: UICollectionViewCell {
             UIView.animate(withDuration: 0.25, delay: 0.3) {
                 self.heartBurst.alpha     = 0
                 self.heartBurst.transform = CGAffineTransform(scaleX: 1.8, y: 1.8)
+            }
+        }
+    }
+
+    private func togglePlayback() {
+        guard queuePlayer != nil else { return }
+        if isPlaybackPaused {
+            play()
+            showPlaybackStateIcon(systemName: "play.fill")
+        } else {
+            pause(manually: true)
+            showPlaybackStateIcon(systemName: "pause.fill")
+        }
+    }
+
+    private func showPlaybackStateIcon(systemName: String) {
+        playbackStateIcon.image = UIImage(
+            systemName: systemName,
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 24, weight: .semibold)
+        )
+        playbackStateIcon.transform = CGAffineTransform(scaleX: 0.72, y: 0.72)
+        playbackStateIcon.alpha = 0
+
+        UIView.animate(withDuration: 0.18, animations: {
+            self.playbackStateIcon.alpha = 1
+            self.playbackStateIcon.transform = .identity
+        }) { _ in
+            UIView.animate(withDuration: 0.2, delay: 0.35, options: [.allowUserInteraction]) {
+                self.playbackStateIcon.alpha = 0
             }
         }
     }
@@ -624,12 +684,18 @@ final class ReelCell: UICollectionViewCell {
     }
 
     func play() {
+        isPlaybackPaused = false
         queuePlayer?.isMuted = false
         queuePlayer?.volume  = 1
         queuePlayer?.play()
     }
 
     func pause() {
+        pause(manually: false)
+    }
+
+    func pause(manually: Bool) {
+        isPlaybackPaused = manually
         queuePlayer?.pause()
     }
 
@@ -642,6 +708,8 @@ final class ReelCell: UICollectionViewCell {
         playerLayer  = nil
         queuePlayer  = nil
         playerLooper = nil
+        isPlaybackPaused = false
+        playbackStateIcon.alpha = 0
     }
 
     override func prepareForReuse() {
@@ -653,6 +721,23 @@ final class ReelCell: UICollectionViewCell {
         connectionState    = "none"
         applyConnectionUI(animated: false)
         followButton.isHidden = false
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        guard let touchedView = touch.view else { return true }
+
+        if touchedView is UIControl {
+            return false
+        }
+
+        if touchedView.isDescendant(of: actionStack)
+            || touchedView.isDescendant(of: followButton)
+            || touchedView.isDescendant(of: avatarView)
+            || touchedView.isDescendant(of: nameLabel) {
+            return false
+        }
+
+        return true
     }
 
     deinit { cleanupPlayer() }

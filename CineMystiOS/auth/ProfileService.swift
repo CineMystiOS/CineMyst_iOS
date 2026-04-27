@@ -37,6 +37,73 @@ struct UserProfileData {
 class ProfileService {
     static let shared = ProfileService()
     
+    /// Fast profile fetch for first paint on the profile screen.
+    /// Avoids expensive derived counts like project totals.
+    func fetchUserProfileSummary(userId: UUID) async throws -> UserProfileData {
+        print("⚡️ Fetching lightweight profile for userId: \(userId.uuidString)")
+
+        let profileResponse = try await supabase
+            .from("profiles")
+            .select()
+            .eq("id", value: userId.uuidString)
+            .single()
+            .execute()
+            .value as ProfileResponse
+
+        async let artistProfilesTask: [ArtistProfileResponse] = supabase
+            .from("artist_profiles")
+            .select()
+            .eq("id", value: userId.uuidString)
+            .execute()
+            .value
+
+        async let connectionCountTask: Int = fetchConnectionCount(userId: userId)
+
+        let artistProfiles = try await artistProfilesTask
+        let connectionCount = await connectionCountTask
+
+        let profile = SupabaseProfileData(
+            id: UUID(uuidString: profileResponse.id) ?? userId,
+            username: profileResponse.username,
+            fullName: profileResponse.full_name,
+            bio: profileResponse.bio,
+            role: profileResponse.role,
+            profilePictureUrl: profileResponse.avatar_url ?? profileResponse.profile_picture_url,
+            bannerUrl: profileResponse.banner_url,
+            location: formatLocation(city: profileResponse.location_city, state: profileResponse.location_state),
+            isVerified: profileResponse.is_verified ?? false,
+            connectionCount: connectionCount,
+            email: profileResponse.email,
+            phoneNumber: profileResponse.phone_number
+        )
+
+        let artistProfile: SupabaseArtistProfileData?
+        if let artistResp = artistProfiles.first {
+            artistProfile = SupabaseArtistProfileData(
+                primaryRoles: artistResp.primary_roles,
+                skills: artistResp.skills,
+                yearsOfExperience: artistResp.years_of_experience,
+                careerStage: artistResp.career_stage
+            )
+        } else {
+            artistProfile = nil
+        }
+
+        return UserProfileData(
+            profile: profile,
+            artistProfile: artistProfile,
+            projectCount: 0,
+            rating: nil
+        )
+    }
+
+    func fetchCurrentUserProfileSummary() async throws -> UserProfileData {
+        guard let user = supabase.auth.currentSession?.user else {
+            throw NSError(domain: "ProfileService", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        }
+        return try await fetchUserProfileSummary(userId: user.id)
+    }
+
     /// Fetch complete profile data for a user
     func fetchUserProfile(userId: UUID) async throws -> UserProfileData {
         print("🔍 Fetching profile for userId: \(userId.uuidString)")

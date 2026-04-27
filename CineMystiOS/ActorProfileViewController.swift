@@ -1321,9 +1321,9 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
                 async let currentUserIdTask = try AuthManager.shared.currentSession()?.user.id
                 let combined: UserProfileData
                 if let userId = userId {
-                    combined = try await ProfileService.shared.fetchUserProfile(userId: userId)
+                    combined = try await ProfileService.shared.fetchUserProfileSummary(userId: userId)
                 } else {
-                    combined = try await ProfileService.shared.fetchCurrentUserProfile()
+                    combined = try await ProfileService.shared.fetchCurrentUserProfileSummary()
                 }
 
                 async let hasPortfolioTask = ProfileService.shared.hasPortfolio(userId: combined.profile.id)
