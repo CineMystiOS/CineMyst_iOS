@@ -153,7 +153,7 @@ class ActorProfileCardView: UIView {
     let editProfileButton        = GradientButton(type: .system)   // own profile — edit details
     let connectButton            = GradientButton(type: .system)   // other users — connect
     let avatarEditButton         = UIButton(type: .system)          // pencil badge on own profile
-    let discoverProfilesButton   = DiscoverIconButton(type: .system)   // profile discovery CTA
+    let discoverProfilesButton   = DiscoverIconButton(frame: .zero)   // profile discovery CTA
 
     // Stored so layoutSubviews can resize them
     private let bannerGradientLayer = CAGradientLayer()
@@ -1249,6 +1249,7 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
     private var hasPortfolio: Bool   = false
     private var hasCastingPortfolio: Bool = false
     private var isOwnProfile: Bool   = true
+    private var hasCompletedInitialProfileLoad = false
     /// "none" | "pending" | "connected"
     private var connectionState: String = "none"
     private var isVerifiedCasting: Bool = false
@@ -1313,8 +1314,11 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
     private func loadProfileData() {
         Task {
             do {
-                loadingView.startAnimating()
+                await MainActor.run {
+                    self.loadingView.startAnimating()
+                }
 
+                async let currentUserIdTask = try AuthManager.shared.currentSession()?.user.id
                 let combined: UserProfileData
                 if let userId = userId {
                     combined = try await ProfileService.shared.fetchUserProfile(userId: userId)
@@ -1322,33 +1326,62 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
                     combined = try await ProfileService.shared.fetchCurrentUserProfile()
                 }
 
-                let isFirstLoad    = self.profileData == nil
-                self.profileData   = combined
-                self.posts         = try await PostManager.shared.fetchUserPosts(userId: combined.profile.id.uuidString)
-                self.userFlicks    = try await self.fetchUserFlicks(userId: combined.profile.id)
-                self.hasPortfolio  = await ProfileService.shared.hasPortfolio(userId: combined.profile.id)
-                let castingProfile = await self.fetchCastingProfile(userId: combined.profile.id)
-                self.hasCastingPortfolio = (castingProfile != nil)
-                self.isVerifiedCasting = (castingProfile?.status == "verified")
+                async let hasPortfolioTask = ProfileService.shared.hasPortfolio(userId: combined.profile.id)
+                async let castingProfileTask = self.fetchCastingProfile(userId: combined.profile.id)
 
-                // Determine own vs other profile
-                let currentUserId  = try await AuthManager.shared.currentSession()?.user.id
-                self.isOwnProfile  = (self.userId == nil || self.userId == currentUserId)
+                let currentUserId = try await currentUserIdTask
+                let isOwnProfile = (self.userId == nil || self.userId == currentUserId)
+                let hasPortfolio = await hasPortfolioTask
+                let castingProfile = await castingProfileTask
 
-                // Fetch connection state for other profiles
-                if !self.isOwnProfile, let otherId = self.userId, let meId = currentUserId {
-                    self.connectionState = await ProfileService.shared.connectionState(
-                        requesterId: meId, receiverId: otherId)
+                let connectionState: String
+                if !isOwnProfile, let otherId = self.userId, let meId = currentUserId {
+                    connectionState = await ProfileService.shared.connectionState(
+                        requesterId: meId, receiverId: otherId
+                    )
+                } else {
+                    connectionState = "none"
                 }
 
+                let isFirstLoad = await MainActor.run { self.profileData == nil }
+
                 await MainActor.run {
+                    self.profileData = combined
+                    self.hasPortfolio = hasPortfolio
+                    self.hasCastingPortfolio = (castingProfile != nil)
+                    self.isVerifiedCasting = (castingProfile?.status == "verified")
+                    self.isOwnProfile = isOwnProfile
+                    self.connectionState = connectionState
                     self.loadingView.stopAnimating()
                     self.updateUIWithProfileData()
-                    if isFirstLoad { self.addAnimations() }
+                    if isFirstLoad && !self.hasCompletedInitialProfileLoad {
+                        self.hasCompletedInitialProfileLoad = true
+                        self.revealInitialProfileContent()
+                    }
+                }
+
+                Task {
+                    do {
+                        async let postsTask = PostManager.shared.fetchUserPosts(userId: combined.profile.id.uuidString)
+                        async let flicksTask = self.fetchUserFlicks(userId: combined.profile.id, profile: combined.profile)
+                        let (posts, flicks) = try await (postsTask, flicksTask)
+
+                        await MainActor.run {
+                            self.posts = posts
+                            self.userFlicks = flicks
+                            self.updateMediaContent()
+                        }
+                    } catch {
+                        print("⚠️ Failed to load profile media: \(error)")
+                    }
                 }
             } catch {
                 await MainActor.run {
                     self.loadingView.stopAnimating()
+                    if !self.hasCompletedInitialProfileLoad {
+                        self.scrollView.alpha = 1
+                        self.contentStackView.alpha = 1
+                    }
                     self.showErrorMessage("Failed to load profile: \(error.localizedDescription)")
                 }
             }
@@ -1910,7 +1943,7 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
         present(viewer, animated: true)
     }
 
-    private func fetchUserFlicks(userId: UUID) async throws -> [Flick] {
+    private func fetchUserFlicks(userId: UUID, profile: SupabaseProfileData? = nil) async throws -> [Flick] {
         let response = try await supabase
             .from("flicks")
             .select("*")
@@ -1921,11 +1954,12 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
         var flicks = try JSONDecoder().decode([Flick].self, from: response.data)
         
         // Inject user info from our loaded profileData
-        if let data = profileData {
+        let sourceProfile = profile ?? profileData?.profile
+        if let sourceProfile {
             for i in 0..<flicks.count {
-                flicks[i].username = data.profile.username
-                flicks[i].fullName = data.profile.fullName
-                flicks[i].profilePictureUrl = data.profile.profilePictureUrl
+                flicks[i].username = sourceProfile.username
+                flicks[i].fullName = sourceProfile.fullName
+                flicks[i].profilePictureUrl = sourceProfile.profilePictureUrl
             }
         }
         
@@ -2186,6 +2220,7 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
     private func setupUI() {
         scrollView.showsVerticalScrollIndicator = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.alpha = 0
         view.addSubview(scrollView)
 
         contentStackView.axis         = .vertical
@@ -2255,9 +2290,10 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
         ])
     }
 
-    private func addAnimations() {
+    private func revealInitialProfileContent() {
+        scrollView.alpha = 1
         contentStackView.alpha = 0
-        UIView.animate(withDuration: 0.6, delay: 0, options: .curveEaseOut) {
+        UIView.animate(withDuration: 0.45, delay: 0, options: .curveEaseOut) {
             self.contentStackView.alpha = 1
         }
         if let card = contentStackView.arrangedSubviews.first {
