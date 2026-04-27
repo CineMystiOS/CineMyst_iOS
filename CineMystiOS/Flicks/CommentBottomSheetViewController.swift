@@ -91,7 +91,7 @@ final class CommentBottomSheetViewController: UIViewController {
 
     private let emptyLabel: UILabel = {
         let l = UILabel()
-        l.text          = "No comments yet\nBe the first! ✨"
+        l.text          = "No comments yet\nBe the first!"
         l.font          = .systemFont(ofSize: 15, weight: .medium)
         l.textColor     = UIColor(white: 1, alpha: 0.4)
         l.textAlignment = .center
@@ -115,12 +115,17 @@ final class CommentBottomSheetViewController: UIViewController {
     private var comments: [DisplayComment] = []
 
     struct DisplayComment {
+        let id: String
+        let userId: String
         let username: String
         let avatarURL: String?
         let text: String
         let timeAgo: String
     }
-
+    
+    var onCommentAdded: (() -> Void)?
+    var onCommentDeleted: (() -> Void)?
+    
     // MARK: - Lifecycle
 
     override func viewDidLoad() {
@@ -249,6 +254,8 @@ final class CommentBottomSheetViewController: UIViewController {
                 let raw = try await FlicksService.shared.fetchComments(flickId: flickId)
                 let display = raw.map { c in
                     DisplayComment(
+                        id: c.id,
+                        userId: c.userId,
                         username: c.username ?? "User",
                         avatarURL: c.profilePictureUrl,
                         text: c.comment,
@@ -280,18 +287,27 @@ final class CommentBottomSheetViewController: UIViewController {
             do {
                 let c = try await FlicksService.shared.addComment(flickId: flickId, comment: text)
                 let d = DisplayComment(
+                    id: c.id,
+                    userId: c.userId,
                     username: c.username ?? "You",
                     avatarURL: nil,
                     text: c.comment,
                     timeAgo: "Just now"
                 )
-                self.comments.insert(d, at: 0)
-                self.tableView.insertRows(at: [IndexPath(row: 0, section: 0)], with: .fade)
-                self.emptyLabel.isHidden = true
+                
+                await MainActor.run {
+                    self.comments.insert(d, at: 0)
+                    self.tableView.insertRows(at: [IndexPath(row: 0, section: 0)], with: .fade)
+                    self.emptyLabel.isHidden = true
+                    self.sendButton.isEnabled = true
+                    self.onCommentAdded?()
+                }
             } catch {
                 print("❌ Comment post: \(error)")
+                await MainActor.run {
+                    self.sendButton.isEnabled = true
+                }
             }
-            self.sendButton.isEnabled = true
         }
     }
 
@@ -299,8 +315,14 @@ final class CommentBottomSheetViewController: UIViewController {
 
     private func timeAgo(_ iso: String) -> String {
         let f = ISO8601DateFormatter()
-        guard let d = f.date(from: iso) else { return "now" }
-        let s = Date().timeIntervalSince(d)
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var date = f.date(from: iso)
+        if date == nil {
+            let backupFormatter = ISO8601DateFormatter()
+            date = backupFormatter.date(from: iso)
+        }
+        guard let validDate = date else { return "now" }
+        let s = Date().timeIntervalSince(validDate)
         switch s {
         case ..<60:      return "Just now"
         case ..<3600:    return "\(Int(s/60))m"
@@ -315,14 +337,123 @@ final class CommentBottomSheetViewController: UIViewController {
 extension CommentBottomSheetViewController: UITableViewDelegate, UITableViewDataSource {
     func tableView(_ tv: UITableView, numberOfRowsInSection s: Int) -> Int { comments.count }
 
-    func tableView(_ tv: UITableView, cellForRowAt ip: IndexPath) -> UITableViewCell {
-        let cell = tv.dequeueReusableCell(withIdentifier: DarkCommentCell.id, for: ip) as! DarkCommentCell
-        cell.configure(with: comments[ip.row])
+    func tableView(_ tv: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let comment = comments[indexPath.row]
+        let cell = tv.dequeueReusableCell(withIdentifier: DarkCommentCell.id, for: indexPath) as! DarkCommentCell
+        
+        let currentUserId = AuthManager.shared.currentUser?.id.uuidString.lowercased()
+        let isOwner = (currentUserId == comment.userId.lowercased())
+        
+        cell.configure(with: comment, isOwner: isOwner)
+        cell.onOptionsTapped = { [weak self] in
+            self?.showOptionsActionSheet(for: comment)
+        }
+        
         return cell
     }
 
     func tableView(_ tv: UITableView, heightForRowAt ip: IndexPath) -> CGFloat { UITableView.automaticDimension }
     func tableView(_ tv: UITableView, estimatedHeightForRowAt ip: IndexPath) -> CGFloat { 70 }
+    
+    func tableView(_ tv: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tv.deselectRow(at: indexPath, animated: true)
+    }
+
+    func tableView(_ tv: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+        let comment = comments[indexPath.row]
+        let currentUserId = AuthManager.shared.currentUser?.id.uuidString.lowercased()
+        
+        // Only show swipe to delete if they own it
+        guard currentUserId == comment.userId.lowercased() else {
+            return nil
+        }
+        
+        let deleteAction = UIContextualAction(style: .destructive, title: "Delete") { [weak self] (_, _, completion) in
+            self?.deleteComment(comment)
+            completion(true)
+        }
+        deleteAction.image = UIImage(systemName: "trash")
+        
+        let config = UISwipeActionsConfiguration(actions: [deleteAction])
+        return config
+    }
+    
+    private func showOptionsActionSheet(for comment: DisplayComment) {
+        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+        
+        alert.addAction(UIAlertAction(title: "Edit", style: .default, handler: { [weak self] _ in
+            self?.showEditAlert(for: comment)
+        }))
+        
+        alert.addAction(UIAlertAction(title: "Delete", style: .destructive, handler: { [weak self] _ in
+            self?.deleteComment(comment)
+        }))
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        
+        present(alert, animated: true)
+    }
+    
+    private func showEditAlert(for comment: DisplayComment) {
+        let alert = UIAlertController(title: "Edit comment", message: nil, preferredStyle: .alert)
+        alert.addTextField { tf in
+            tf.text = comment.text
+            tf.tintColor = DS.rose
+        }
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Save", style: .default, handler: { _ in
+            guard let newText = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines), !newText.isEmpty else { return }
+            
+            Task {
+                do {
+                    try await FlicksService.shared.updateComment(commentId: comment.id, comment: newText)
+                    let updatedComment = DisplayComment(
+                        id: comment.id,
+                        userId: comment.userId,
+                        username: comment.username,
+                        avatarURL: comment.avatarURL,
+                        text: newText,
+                        timeAgo: comment.timeAgo
+                    )
+                    await MainActor.run {
+                        if let index = self.comments.firstIndex(where: { $0.id == comment.id }) {
+                            self.comments[index] = updatedComment
+                            self.tableView.reloadRows(at: [IndexPath(row: index, section: 0)], with: .automatic)
+                        }
+                    }
+                } catch {
+                    print("❌ Failed to edit comment: \(error)")
+                }
+            }
+        }))
+        
+        present(alert, animated: true)
+    }
+    
+    private func deleteComment(_ comment: DisplayComment) {
+        guard let flickId = self.flickId else { return }
+        Task {
+            do {
+                try await FlicksService.shared.deleteComment(commentId: comment.id, flickId: flickId)
+                await MainActor.run {
+                    if let index = self.comments.firstIndex(where: { $0.id == comment.id }) {
+                        self.comments.remove(at: index)
+                        self.tableView.deleteRows(at: [IndexPath(row: index, section: 0)], with: .fade)
+                        self.emptyLabel.isHidden = !self.comments.isEmpty
+                        self.onCommentDeleted?()
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    let alert = UIAlertController(title: "Failed to Delete", message: "Comment could not be deleted from the database. Please check your Supabase Row Level Security (RLS) policies to ensure DELETE is allowed.", preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: "OK", style: .default))
+                    self.present(alert, animated: true)
+                }
+                print("❌ Failed to delete comment: \(error)")
+            }
+        }
+    }
 }
 
 // MARK: - UITextFieldDelegate
@@ -373,6 +504,19 @@ final class DarkCommentCell: UITableViewCell {
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
+    
+    private lazy var optionsButton: UIButton = {
+        let b = UIButton(type: .system)
+        let image = UIImage(systemName: "ellipsis")
+        b.setImage(image, for: .normal)
+        b.tintColor = UIColor(white: 1, alpha: 0.6)
+        b.transform = CGAffineTransform(rotationAngle: .pi / 2) // Makes it vertical
+        b.translatesAutoresizingMaskIntoConstraints = false
+        b.addTarget(self, action: #selector(didTapOptions), for: .touchUpInside)
+        return b
+    }()
+    
+    var onOptionsTapped: (() -> Void)?
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -382,30 +526,42 @@ final class DarkCommentCell: UITableViewCell {
         contentView.addSubview(usernameLabel)
         contentView.addSubview(commentLabel)
         contentView.addSubview(timeLabel)
+        contentView.addSubview(optionsButton)
 
         NSLayoutConstraint.activate([
             avatar.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             avatar.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
             avatar.widthAnchor.constraint(equalToConstant: 36),
             avatar.heightAnchor.constraint(equalToConstant: 36),
-
-            usernameLabel.leadingAnchor.constraint(equalTo: avatar.trailingAnchor, constant: 10),
+            
+            usernameLabel.leadingAnchor.constraint(equalTo: avatar.trailingAnchor, constant: 12),
             usernameLabel.topAnchor.constraint(equalTo: avatar.topAnchor),
-            usernameLabel.trailingAnchor.constraint(equalTo: timeLabel.leadingAnchor, constant: -8),
-
-            timeLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            
+            optionsButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            optionsButton.centerYAnchor.constraint(equalTo: usernameLabel.centerYAnchor),
+            optionsButton.widthAnchor.constraint(equalToConstant: 24),
+            optionsButton.heightAnchor.constraint(equalToConstant: 24),
+            
+            timeLabel.trailingAnchor.constraint(equalTo: optionsButton.leadingAnchor, constant: -4),
             timeLabel.centerYAnchor.constraint(equalTo: usernameLabel.centerYAnchor),
-
+            
+            usernameLabel.trailingAnchor.constraint(lessThanOrEqualTo: timeLabel.leadingAnchor, constant: -8),
+            
             commentLabel.leadingAnchor.constraint(equalTo: usernameLabel.leadingAnchor),
-            commentLabel.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 3),
+            commentLabel.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 4),
             commentLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            commentLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
+            commentLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8)
         ])
     }
     required init?(coder: NSCoder) { fatalError() }
+    
+    @objc private func didTapOptions() {
+        onOptionsTapped?()
+    }
 
-    func configure(with c: CommentBottomSheetViewController.DisplayComment) {
+    func configure(with c: CommentBottomSheetViewController.DisplayComment, isOwner: Bool) {
         usernameLabel.text = "@\(c.username)"
+        optionsButton.isHidden = !isOwner
         commentLabel.text  = c.text
         timeLabel.text     = c.timeAgo
         avatar.image       = UIImage(systemName: "person.circle.fill")

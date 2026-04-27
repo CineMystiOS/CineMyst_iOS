@@ -276,14 +276,109 @@ extension CommentViewController: UITableViewDataSource, UITableViewDelegate {
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let comment = comments[indexPath.row]
         let cell = tableView.dequeueReusableCell(withIdentifier: CommentCell.reuseId, for: indexPath) as! CommentCell
-        cell.configure(with: comments[indexPath.row])
+        
+        let currentUserId = AuthManager.shared.currentUser?.id.uuidString.lowercased()
+        let isOwner = (currentUserId == comment.userId.lowercased())
+        
+        cell.configure(with: comment, isOwner: isOwner)
+        cell.onOptionsTapped = { [weak self] in
+            self?.showOptionsActionSheet(for: comment)
+        }
+        
         return cell
     }
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        // ✅ Tap profile or comment
-        let username = comments[indexPath.row].username
-        print("Tapped on \(username)'s profile or comment")
+        tableView.deselectRow(at: indexPath, animated: true)
+        // Handled via UIMenu now
+    }
+    
+    func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+        let comment = comments[indexPath.row]
+        let currentUserId = AuthManager.shared.currentUser?.id.uuidString.lowercased()
+        
+        // Only show swipe to delete if they own it
+        guard currentUserId == comment.userId.lowercased() else {
+            return nil
+        }
+        
+        let deleteAction = UIContextualAction(style: .destructive, title: "Delete") { [weak self] (_, _, completion) in
+            self?.deleteComment(comment)
+            completion(true)
+        }
+        deleteAction.image = UIImage(systemName: "trash")
+        
+        let config = UISwipeActionsConfiguration(actions: [deleteAction])
+        return config
+    }
+    
+    private func showOptionsActionSheet(for comment: PostComment) {
+        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+        
+        alert.addAction(UIAlertAction(title: "Edit", style: .default, handler: { [weak self] _ in
+            self?.showEditAlert(for: comment)
+        }))
+        
+        alert.addAction(UIAlertAction(title: "Delete", style: .destructive, handler: { [weak self] _ in
+            self?.deleteComment(comment)
+        }))
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        
+        present(alert, animated: true)
+    }
+    
+    private func showEditAlert(for comment: PostComment) {
+        let alert = UIAlertController(title: "Edit comment", message: nil, preferredStyle: .alert)
+        alert.addTextField { tf in
+            tf.text = comment.content
+        }
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Save", style: .default, handler: { _ in
+            guard let newText = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines), !newText.isEmpty else { return }
+            
+            Task {
+                do {
+                    try await PostManager.shared.updateComment(commentId: comment.id, text: newText)
+                    let updatedComment = PostComment(
+                        id: comment.id,
+                        postId: comment.postId,
+                        userId: comment.userId,
+                        content: newText,
+                        createdAt: comment.createdAt,
+                        profiles: comment.profiles
+                    )
+                    await MainActor.run {
+                        if let index = self.comments.firstIndex(where: { $0.id == comment.id }) {
+                            self.comments[index] = updatedComment
+                            self.tableView.reloadRows(at: [IndexPath(row: index, section: 0)], with: .automatic)
+                        }
+                    }
+                } catch {
+                    print("❌ Failed to edit comment: \(error)")
+                }
+            }
+        }))
+        
+        present(alert, animated: true)
+    }
+    
+    private func deleteComment(_ comment: PostComment) {
+        Task {
+            do {
+                try await PostManager.shared.deleteComment(commentId: comment.id)
+                await MainActor.run {
+                    if let index = self.comments.firstIndex(where: { $0.id == comment.id }) {
+                        self.comments.remove(at: index)
+                        self.tableView.deleteRows(at: [IndexPath(row: index, section: 0)], with: .fade)
+                    }
+                }
+            } catch {
+                print("❌ Failed to delete comment: \(error)")
+            }
+        }
     }
 }

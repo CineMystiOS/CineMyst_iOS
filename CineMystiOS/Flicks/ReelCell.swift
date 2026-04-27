@@ -589,6 +589,10 @@ final class ReelCell: UICollectionViewCell {
         self.isLiked = isLiked
         refreshLikeUI(animated: false)
     }
+    
+    func updateCommentCount(_ count: Int) {
+        actionLabel(in: commentStack)?.text = Reel.formatCount(count)
+    }
 
     // MARK: - Video
 

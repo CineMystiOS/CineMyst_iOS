@@ -16,12 +16,14 @@ struct Reel {
     let authorUsername: String?
     let authorAvatar: UIImage?
     let authorAvatarURL: String?
-    let likes: String
-    let comments: String
-    let shares: String
+    var likes: String
+    var comments: String
+    var shares: String
+    var rawCommentsCount: Int
+    var rawLikesCount: Int
     let audioTitle: String
     let caption: String?
-    let isLiked: Bool
+    var isLiked: Bool
     let allowComments: Bool   // from flick.allow_comments
     let thumbnailUrl: String? // Added for instant preview
     
@@ -38,6 +40,8 @@ struct Reel {
             likes: formatCount(flick.likesCount ?? 0),
             comments: formatCount(flick.commentsCount ?? 0),
             shares: formatCount(flick.sharesCount ?? 0),
+            rawCommentsCount: flick.commentsCount ?? 0,
+            rawLikesCount: flick.likesCount ?? 0,
             audioTitle: flick.audioTitle ?? "Original Audio",
             caption: flick.caption,
             isLiked: isLiked,
@@ -46,7 +50,7 @@ struct Reel {
         )
     }
     
-    private static func formatCount(_ count: Int) -> String {
+    static func formatCount(_ count: Int) -> String {
         if count >= 1000000 {
             return String(format: "%.1fM", Double(count) / 1000000.0)
         } else if count >= 1000 {

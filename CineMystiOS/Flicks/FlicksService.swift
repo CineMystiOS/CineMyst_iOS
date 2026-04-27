@@ -457,6 +457,33 @@ class FlicksService {
         return !(rows?.isEmpty ?? true)
     }
     
+    // MARK: - Update Comment
+    func updateComment(commentId: String, comment: String) async throws {
+        let _ = try await supabase
+            .from("flick_comments")
+            .update(["comment": comment])
+            .eq("id", value: commentId)
+            .select()
+            .single()
+            .execute()
+    }
+    
+    // MARK: - Delete Comment
+    func deleteComment(commentId: String, flickId: String) async throws {
+        let response = try await supabase
+            .from("flick_comments")
+            .delete()
+            .eq("id", value: commentId)
+            .select()
+            .single()
+            .execute()
+            
+        // Decrement comments count
+        try? await supabase
+            .rpc("decrement_flick_comments", params: ["flick_id": flickId])
+            .execute()
+    }
+    
     // MARK: - Add Comment
     func addComment(flickId: String, comment: String) async throws -> FlickComment {
         guard let userId = try? await supabase.auth.session.user.id.uuidString else {
@@ -483,7 +510,7 @@ class FlicksService {
             .execute()
         
         // Increment comments count
-        try await supabase
+        try? await supabase
             .rpc("increment_flick_comments", params: ["flick_id": flickId])
             .execute()
         

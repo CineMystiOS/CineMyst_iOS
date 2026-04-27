@@ -298,6 +298,8 @@ final class ReelsViewController: UIViewController {
                         likes: reel.likes,
                         comments: reel.comments,
                         shares: reel.shares,
+                        rawCommentsCount: reel.rawCommentsCount,
+                        rawLikesCount: reel.rawLikesCount,
                         audioTitle: reel.audioTitle,
                         caption: reel.caption,
                         isLiked: isLiked,
@@ -476,6 +478,24 @@ extension ReelsViewController: ReelCellDelegate {
         commentVC.flickId = reel.id
         commentVC.allowComments = reel.allowComments
         commentVC.modalPresentationStyle = .pageSheet
+        
+        commentVC.onCommentAdded = { [weak self] in
+            guard let self = self else { return }
+            self.reels[indexPath.item].rawCommentsCount += 1
+            self.reels[indexPath.item].comments = Reel.formatCount(self.reels[indexPath.item].rawCommentsCount)
+            if let cell = self.collectionView.cellForItem(at: indexPath) as? ReelCell {
+                cell.updateCommentCount(self.reels[indexPath.item].rawCommentsCount)
+            }
+        }
+        
+        commentVC.onCommentDeleted = { [weak self] in
+            guard let self = self else { return }
+            self.reels[indexPath.item].rawCommentsCount = max(0, self.reels[indexPath.item].rawCommentsCount - 1)
+            self.reels[indexPath.item].comments = Reel.formatCount(self.reels[indexPath.item].rawCommentsCount)
+            if let cell = self.collectionView.cellForItem(at: indexPath) as? ReelCell {
+                cell.updateCommentCount(self.reels[indexPath.item].rawCommentsCount)
+            }
+        }
         
         if let sheet = commentVC.sheetPresentationController {
             sheet.detents = [.medium(), .large()]

@@ -17,6 +17,19 @@ final class CommentCell: UITableViewCell {
     private let commentLabel = UILabel()
     private let timeLabel = UILabel()
     
+    private lazy var optionsButton: UIButton = {
+        let b = UIButton(type: .system)
+        let image = UIImage(systemName: "ellipsis")
+        b.setImage(image, for: .normal)
+        b.tintColor = .systemGray
+        b.transform = CGAffineTransform(rotationAngle: .pi / 2) // Makes it vertical
+        b.translatesAutoresizingMaskIntoConstraints = false
+        b.addTarget(self, action: #selector(didTapOptions), for: .touchUpInside)
+        return b
+    }()
+    
+    var onOptionsTapped: (() -> Void)?
+    
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         setupUI()
@@ -43,7 +56,7 @@ final class CommentCell: UITableViewCell {
     }
     
     private func layoutUI() {
-        [userImage, usernameLabel, commentLabel, timeLabel].forEach {
+        [userImage, usernameLabel, commentLabel, timeLabel, optionsButton].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
             contentView.addSubview($0)
         }
@@ -56,23 +69,34 @@ final class CommentCell: UITableViewCell {
             
             usernameLabel.leadingAnchor.constraint(equalTo: userImage.trailingAnchor, constant: 12),
             usernameLabel.topAnchor.constraint(equalTo: userImage.topAnchor),
-            usernameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             
-            timeLabel.leadingAnchor.constraint(equalTo: usernameLabel.leadingAnchor),
-            timeLabel.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 2),
-            timeLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            optionsButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            optionsButton.centerYAnchor.constraint(equalTo: usernameLabel.centerYAnchor),
+            optionsButton.widthAnchor.constraint(equalToConstant: 24),
+            optionsButton.heightAnchor.constraint(equalToConstant: 24),
+            
+            timeLabel.trailingAnchor.constraint(equalTo: optionsButton.leadingAnchor, constant: -4),
+            timeLabel.centerYAnchor.constraint(equalTo: usernameLabel.centerYAnchor),
+            
+            usernameLabel.trailingAnchor.constraint(lessThanOrEqualTo: timeLabel.leadingAnchor, constant: -8),
             
             commentLabel.leadingAnchor.constraint(equalTo: usernameLabel.leadingAnchor),
-            commentLabel.topAnchor.constraint(equalTo: timeLabel.bottomAnchor, constant: 4),
+            commentLabel.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 4),
             commentLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             commentLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8)
         ])
     }
     
-    func configure(with comment: PostComment) {
+    @objc private func didTapOptions() {
+        onOptionsTapped?()
+    }
+    
+    func configure(with comment: PostComment, isOwner: Bool) {
         usernameLabel.text = comment.username
         commentLabel.text = comment.content
         timeLabel.text = comment.timeAgo
+        
+        optionsButton.isHidden = !isOwner
         
         // Load profile image
         if let imageUrl = comment.profilePictureUrl, !imageUrl.isEmpty {

@@ -531,6 +531,28 @@ final class PostManager {
         print("✅ Comment saved successfully")
     }
     
+    // MARK: - Update Comment
+    func updateComment(commentId: String, text: String) async throws {
+        let _ = try await client
+            .from("post_comments")
+            .update(["content": text])
+            .eq("id", value: commentId)
+            .select()
+            .single()
+            .execute()
+    }
+    
+    // MARK: - Delete Comment
+    func deleteComment(commentId: String) async throws {
+        try await client
+            .from("post_comments")
+            .delete()
+            .eq("id", value: commentId)
+            .select()
+            .single()
+            .execute()
+    }
+    
     // MARK: - Fetch Comments
     func fetchComments(postId: String) async throws -> [PostComment] {
         // Fetch comments from post_comments table
