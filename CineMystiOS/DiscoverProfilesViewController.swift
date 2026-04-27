@@ -96,15 +96,25 @@ class DiscoverProfilesViewController: UIViewController, UICollectionViewDataSour
     // MARK: Data
     private func loadRecommendedProfiles() {
         loadTask?.cancel()
-        activityIndicator.startAnimating()
-        emptyLabel.isHidden = true
-        profiles = []
-        collectionView.reloadData()
 
         guard let currentUserId = supabase.auth.currentUser?.id else {
             showEmptyState("Complete sign-in to get suggestions.")
             return
         }
+
+        if let cachedProfiles = RecommendationsService.shared.cachedDiscoveryProfiles(for: currentUserId) {
+            profiles = cachedProfiles
+            collectionView.reloadData()
+            emptyLabel.isHidden = !cachedProfiles.isEmpty
+            emptyLabel.text = cachedProfiles.isEmpty ? "No suggested profiles available yet." : nil
+            activityIndicator.stopAnimating()
+            return
+        }
+
+        activityIndicator.startAnimating()
+        emptyLabel.isHidden = true
+        profiles = []
+        collectionView.reloadData()
 
         loadTask = Task { [weak self] in
             do {

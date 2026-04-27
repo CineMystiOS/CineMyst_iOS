@@ -482,6 +482,7 @@ final class RecommendationsService {
 
     private let session: URLSession
     private let baseURL: URL
+    private var discoveryCache: [String: [DiscoveryProfile]] = [:]
 
     private init(session: URLSession = .shared) {
         self.session = session
@@ -495,6 +496,8 @@ final class RecommendationsService {
     }
 
     func refreshRecommendations(for userId: UUID) async throws {
+        discoveryCache[userId.uuidString] = nil
+
         var request = URLRequest(url: baseURL.appendingPathComponent("/v1/process-profile/\(userId.uuidString)"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -503,7 +506,15 @@ final class RecommendationsService {
         try validate(response: response, service: "RecommendationsService")
     }
 
+    func cachedDiscoveryProfiles(for userId: UUID) -> [DiscoveryProfile]? {
+        discoveryCache[userId.uuidString]
+    }
+
     func fetchDiscoveryProfiles(for userId: UUID, refreshFirst: Bool = false) async throws -> [DiscoveryProfile] {
+        if !refreshFirst, let cached = discoveryCache[userId.uuidString] {
+            return cached
+        }
+
         if refreshFirst {
             do {
                 try await refreshRecommendations(for: userId)
@@ -524,16 +535,23 @@ final class RecommendationsService {
         let candidates = rawItems.compactMap(Self.parseCandidate(from:))
             .filter { $0.id != userId }
 
-        guard !candidates.isEmpty else { return [] }
+        guard !candidates.isEmpty else {
+            discoveryCache[userId.uuidString] = []
+            return []
+        }
 
         if candidates.allSatisfy({ $0.hasDisplayDetails }) {
-            return candidates.map(\.discoveryProfile)
+            let profiles = candidates.map(\.discoveryProfile)
+            discoveryCache[userId.uuidString] = profiles
+            return profiles
         }
 
         let hydratedProfilesById = try await hydrateProfiles(ids: candidates.map(\.id))
-        return candidates.compactMap { candidate in
+        let profiles = candidates.compactMap { candidate in
             hydratedProfilesById[candidate.id.uuidString] ?? (candidate.hasDisplayDetails ? candidate.discoveryProfile : nil)
         }
+        discoveryCache[userId.uuidString] = profiles
+        return profiles
     }
 
     private func hydrateProfiles(ids: [UUID]) async throws -> [String: DiscoveryProfile] {

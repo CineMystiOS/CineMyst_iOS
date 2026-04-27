@@ -531,12 +531,18 @@ final class ProfileDiscoveryRowView: UIView, UICollectionViewDataSource, UIColle
 
     func loadDiscoveryProfiles() {
         loadTask?.cancel()
-        showLoadingState()
 
         guard let currentUserId = supabase.auth.currentUser?.id else {
             showEmptyState(message: "Complete sign-in to get suggestions.")
             return
         }
+
+        if let cachedProfiles = RecommendationsService.shared.cachedDiscoveryProfiles(for: currentUserId) {
+            applyLoadedProfiles(cachedProfiles)
+            return
+        }
+
+        showLoadingState()
 
         loadTask = Task { [weak self] in
             do {
