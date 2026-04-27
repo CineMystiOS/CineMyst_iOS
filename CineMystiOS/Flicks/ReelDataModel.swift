@@ -23,6 +23,7 @@ struct Reel {
     let caption: String?
     let isLiked: Bool
     let allowComments: Bool   // from flick.allow_comments
+    let thumbnailUrl: String? // Added for instant preview
     
     // Helper to create from Flick model
     static func from(flick: Flick, isLiked: Bool = false) -> Reel {
@@ -40,7 +41,8 @@ struct Reel {
             audioTitle: flick.audioTitle ?? "Original Audio",
             caption: flick.caption,
             isLiked: isLiked,
-            allowComments: flick.allowComments ?? true
+            allowComments: flick.allowComments ?? true,
+            thumbnailUrl: flick.thumbnailUrl
         )
     }
     

@@ -14,16 +14,19 @@ import AVFoundation
 class GradientButton: UIButton {
     private let gradientLayer = CAGradientLayer()
     private let shineLayer = CAGradientLayer()
+    private let edgeGlowLayer = CAGradientLayer()
 
     override func layoutSubviews() {
         super.layoutSubviews()
         gradientLayer.frame = bounds
         shineLayer.frame = bounds
+        edgeGlowLayer.frame = bounds.insetBy(dx: 1, dy: 1)
     }
 
     func setupGradient(colors: [UIColor]) {
         gradientLayer.removeFromSuperlayer()
         shineLayer.removeFromSuperlayer()
+        edgeGlowLayer.removeFromSuperlayer()
         gradientLayer.colors = colors.map { $0.cgColor }
         gradientLayer.startPoint = CGPoint(x: 0, y: 0)
         gradientLayer.endPoint = CGPoint(x: 1, y: 1)
@@ -33,35 +36,54 @@ class GradientButton: UIButton {
     func setupGlassStyle(tint: UIColor) {
         gradientLayer.removeFromSuperlayer()
         shineLayer.removeFromSuperlayer()
+        edgeGlowLayer.removeFromSuperlayer()
 
         gradientLayer.colors = [
-            UIColor.white.withAlphaComponent(0.88).cgColor,
-            UIColor(hex: "#F8EAF3").withAlphaComponent(0.78).cgColor
+            UIColor.white.withAlphaComponent(0.96).cgColor,
+            UIColor(hex: "#FFF8FC").withAlphaComponent(0.92).cgColor,
+            UIColor(hex: "#F6E4EF").withAlphaComponent(0.82).cgColor
         ]
-        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
-        gradientLayer.endPoint = CGPoint(x: 1, y: 1)
+        gradientLayer.locations = [0, 0.38, 1]
+        gradientLayer.startPoint = CGPoint(x: 0.08, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 0.92, y: 1)
         gradientLayer.cornerRadius = layer.cornerRadius
         layer.insertSublayer(gradientLayer, at: 0)
 
         shineLayer.colors = [
-            UIColor.white.withAlphaComponent(0.55).cgColor,
-            UIColor.white.withAlphaComponent(0.08).cgColor,
+            UIColor.white.withAlphaComponent(0.82).cgColor,
+            UIColor.white.withAlphaComponent(0.22).cgColor,
             UIColor.clear.cgColor
         ]
-        shineLayer.locations = [0, 0.4, 1]
-        shineLayer.startPoint = CGPoint(x: 0.15, y: 0)
-        shineLayer.endPoint = CGPoint(x: 0.85, y: 1)
+        shineLayer.locations = [0, 0.28, 0.82]
+        shineLayer.startPoint = CGPoint(x: 0.12, y: 0)
+        shineLayer.endPoint = CGPoint(x: 0.88, y: 1)
         shineLayer.cornerRadius = layer.cornerRadius
         layer.insertSublayer(shineLayer, above: gradientLayer)
 
+        edgeGlowLayer.colors = [
+            UIColor.white.withAlphaComponent(0.5).cgColor,
+            UIColor.clear.cgColor,
+            tint.withAlphaComponent(0.12).cgColor
+        ]
+        edgeGlowLayer.locations = [0, 0.55, 1]
+        edgeGlowLayer.startPoint = CGPoint(x: 0, y: 0)
+        edgeGlowLayer.endPoint = CGPoint(x: 1, y: 1)
+        edgeGlowLayer.cornerRadius = max(layer.cornerRadius - 1, 0)
+        layer.insertSublayer(edgeGlowLayer, above: shineLayer)
+
         backgroundColor = .clear
         setTitleColor(tint, for: .normal)
-        layer.borderWidth = 1
-        layer.borderColor = tint.withAlphaComponent(0.14).cgColor
-        layer.shadowColor = tint.withAlphaComponent(0.14).cgColor
+        titleLabel?.layer.shadowColor = UIColor.white.withAlphaComponent(0.7).cgColor
+        titleLabel?.layer.shadowOpacity = 1
+        titleLabel?.layer.shadowRadius = 4
+        titleLabel?.layer.shadowOffset = CGSize(width: 0, height: 1)
+        layer.borderWidth = 1.1
+        layer.borderColor = UIColor.white.withAlphaComponent(0.72).cgColor
+        layer.shadowColor = tint.withAlphaComponent(0.16).cgColor
         layer.shadowOpacity = 1
-        layer.shadowRadius = 12
-        layer.shadowOffset = CGSize(width: 0, height: 6)
+        layer.shadowRadius = 16
+        layer.shadowOffset = CGSize(width: 0, height: 8)
+        layer.cornerCurve = .continuous
     }
 }
 
@@ -88,7 +110,7 @@ final class DiscoverIconButton: UIButton {
     }
 
     private func updateAppearance() {
-        let symbolName = (isHighlighted || isSelected) ? "square.grid.2x2.fill" : "square.grid.2x2"
+        let symbolName = (isHighlighted || isSelected) ? "person.fill" : "person"
         let config = (isHighlighted || isSelected) ? highlightedSymbolConfig : normalSymbolConfig
         let image = UIImage(systemName: symbolName, withConfiguration: config)?.withRenderingMode(.alwaysTemplate)
         setImage(image, for: .normal)
@@ -1534,6 +1556,9 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
                 self.contentStackView.removeArrangedSubview(existing)
                 existing.removeFromSuperview()
                 self.discoveryRowView = nil
+                if let card = self.contentStackView.arrangedSubviews.first as? ActorProfileCardView {
+                    card.discoverProfilesButton.isSelected = false
+                }
             }
 
             // Pulse icon to signal collapse
@@ -1590,6 +1615,7 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
 
         // Pulse icon to signal expand
         if let card = contentStackView.arrangedSubviews.first as? ActorProfileCardView {
+            card.discoverProfilesButton.isSelected = true
             UIView.animate(withDuration: 0.15) { card.discoverProfilesButton.alpha = 0.55 }
             UIView.animate(withDuration: 0.15, delay: 0.15) { card.discoverProfilesButton.alpha = 1 }
         }

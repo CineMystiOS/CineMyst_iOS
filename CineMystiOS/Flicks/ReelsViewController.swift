@@ -301,7 +301,8 @@ final class ReelsViewController: UIViewController {
                         audioTitle: reel.audioTitle,
                         caption: reel.caption,
                         isLiked: isLiked,
-                        allowComments: reel.allowComments
+                        allowComments: reel.allowComments,
+                        thumbnailUrl: reel.thumbnailUrl
                     )
                     self.reels[index] = updatedReel
                     

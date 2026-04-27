@@ -35,6 +35,7 @@ final class ReelCell: UICollectionViewCell {
     private var playerLayer:  AVPlayerLayer?
     private var playerLooper: AVPlayerLooper?
     private var queuePlayer:  AVQueuePlayer?
+    private var displayObserver: NSKeyValueObservation?
 
     // MARK: - Design tokens
     private enum DS {
@@ -57,6 +58,24 @@ final class ReelCell: UICollectionViewCell {
         ]
         g.locations = [0, 0.4, 0.75, 1]
         return g
+    }()
+
+    // MARK: - Thumbnail & Loading
+    private let thumbnailImageView: UIImageView = {
+        let iv = UIImageView()
+        iv.contentMode = .scaleAspectFill
+        iv.clipsToBounds = true
+        iv.translatesAutoresizingMaskIntoConstraints = false
+        iv.backgroundColor = .black // Default background while image loads
+        return iv
+    }()
+
+    private let loadingIndicator: UIActivityIndicatorView = {
+        let ai = UIActivityIndicatorView(style: .large)
+        ai.color = .white
+        ai.hidesWhenStopped = true
+        ai.translatesAutoresizingMaskIntoConstraints = false
+        return ai
     }()
 
 
@@ -185,6 +204,20 @@ final class ReelCell: UICollectionViewCell {
 
     private func setupViews() {
         contentView.backgroundColor = .black
+        
+        contentView.addSubview(thumbnailImageView)
+        contentView.addSubview(loadingIndicator)
+        
+        NSLayoutConstraint.activate([
+            thumbnailImageView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            thumbnailImageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            thumbnailImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            thumbnailImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            
+            loadingIndicator.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            loadingIndicator.centerYAnchor.constraint(equalTo: contentView.centerYAnchor)
+        ])
+        
         contentView.layer.addSublayer(gradientLayer)
 
         contentView.addSubview(heartBurst)
@@ -535,6 +568,20 @@ final class ReelCell: UICollectionViewCell {
             }.resume()
         }
 
+        // Show thumbnail and spinner instantly
+        thumbnailImageView.isHidden = false
+        thumbnailImageView.image = nil
+        loadingIndicator.startAnimating()
+        
+        if let thumbURLStr = reel.thumbnailUrl, let url = URL(string: thumbURLStr) {
+            URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+                guard let data = data, let img = UIImage(data: data) else { return }
+                DispatchQueue.main.async {
+                    self?.thumbnailImageView.image = img
+                }
+            }.resume()
+        }
+
         setupVideoPlayer(with: reel.videoURL)
     }
 
@@ -557,10 +604,18 @@ final class ReelCell: UICollectionViewCell {
         playerLayer  = AVPlayerLayer(player: queuePlayer)
         playerLayer!.videoGravity = .resizeAspectFill
         playerLayer!.frame = contentView.bounds
-        contentView.layer.insertSublayer(playerLayer!, at: 0)
-        // Re-add gradient on top of player
-        if gradientLayer.superlayer == nil {
-            contentView.layer.addSublayer(gradientLayer)
+        
+        // Insert player below UI elements but above the thumbnail
+        contentView.layer.insertSublayer(playerLayer!, below: gradientLayer)
+        
+        // Observe when video is ready to paint the first frame
+        displayObserver = playerLayer?.observe(\.isReadyForDisplay, options: [.initial, .new]) { [weak self] layer, _ in
+            if layer.isReadyForDisplay {
+                DispatchQueue.main.async {
+                    self?.thumbnailImageView.isHidden = true
+                    self?.loadingIndicator.stopAnimating()
+                }
+            }
         }
     }
 
@@ -575,6 +630,9 @@ final class ReelCell: UICollectionViewCell {
     }
 
     private func cleanupPlayer() {
+        displayObserver?.invalidate()
+        displayObserver = nil
+        
         queuePlayer?.pause()
         playerLayer?.removeFromSuperlayer()
         playerLayer  = nil
