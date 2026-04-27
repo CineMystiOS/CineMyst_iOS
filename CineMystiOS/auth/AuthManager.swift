@@ -297,6 +297,15 @@ final class AuthManager: NSObject {
             print("🎬 Saving casting profile...")
             try await saveCastingProfile(profileData, userId: userId)
         }
+
+        Task {
+            do {
+                try await RecommendationsService.shared.refreshRecommendations(for: userId)
+                print("✅ Recommendation data refreshed after profile save")
+            } catch {
+                print("⚠️ Recommendation refresh failed after profile save: \(error)")
+            }
+        }
         
         print("🎉 All profile data saved successfully!")
     }

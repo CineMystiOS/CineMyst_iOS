@@ -109,7 +109,9 @@ final class ReelsViewController: UIViewController {
         emptyStateButton?.removeFromSuperview()
         emptyStateButton = nil
         
-        refreshFlicks()
+        if reels.isEmpty {
+            loadInitialReels()
+        }
     }
 
     override func viewDidAppear(_ animated: Bool) {

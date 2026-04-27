@@ -625,6 +625,15 @@ class ProfileInfoViewController: UIViewController {
             .from("profiles")
             .upsert(profile)
             .execute()
+
+        Task {
+            do {
+                try await RecommendationsService.shared.refreshRecommendations(for: userId)
+                print("✅ Recommendation data refreshed after casting profile save")
+            } catch {
+                print("⚠️ Recommendation refresh failed after casting profile save: \(error)")
+            }
+        }
         
         print("✅ Comprehensive director profile saved successfully")
     }

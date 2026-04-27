@@ -13,17 +13,86 @@ import AVFoundation
 
 class GradientButton: UIButton {
     private let gradientLayer = CAGradientLayer()
+    private let shineLayer = CAGradientLayer()
 
     override func layoutSubviews() {
         super.layoutSubviews()
         gradientLayer.frame = bounds
+        shineLayer.frame = bounds
     }
 
     func setupGradient(colors: [UIColor]) {
+        gradientLayer.removeFromSuperlayer()
+        shineLayer.removeFromSuperlayer()
         gradientLayer.colors = colors.map { $0.cgColor }
         gradientLayer.startPoint = CGPoint(x: 0, y: 0)
         gradientLayer.endPoint = CGPoint(x: 1, y: 1)
         layer.insertSublayer(gradientLayer, at: 0)
+    }
+
+    func setupGlassStyle(tint: UIColor) {
+        gradientLayer.removeFromSuperlayer()
+        shineLayer.removeFromSuperlayer()
+
+        gradientLayer.colors = [
+            UIColor.white.withAlphaComponent(0.88).cgColor,
+            UIColor(hex: "#F8EAF3").withAlphaComponent(0.78).cgColor
+        ]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 1)
+        gradientLayer.cornerRadius = layer.cornerRadius
+        layer.insertSublayer(gradientLayer, at: 0)
+
+        shineLayer.colors = [
+            UIColor.white.withAlphaComponent(0.55).cgColor,
+            UIColor.white.withAlphaComponent(0.08).cgColor,
+            UIColor.clear.cgColor
+        ]
+        shineLayer.locations = [0, 0.4, 1]
+        shineLayer.startPoint = CGPoint(x: 0.15, y: 0)
+        shineLayer.endPoint = CGPoint(x: 0.85, y: 1)
+        shineLayer.cornerRadius = layer.cornerRadius
+        layer.insertSublayer(shineLayer, above: gradientLayer)
+
+        backgroundColor = .clear
+        setTitleColor(tint, for: .normal)
+        layer.borderWidth = 1
+        layer.borderColor = tint.withAlphaComponent(0.14).cgColor
+        layer.shadowColor = tint.withAlphaComponent(0.14).cgColor
+        layer.shadowOpacity = 1
+        layer.shadowRadius = 12
+        layer.shadowOffset = CGSize(width: 0, height: 6)
+    }
+}
+
+final class DiscoverIconButton: UIButton {
+    private let normalSymbolConfig = UIImage.SymbolConfiguration(pointSize: 19, weight: .bold)
+    private let highlightedSymbolConfig = UIImage.SymbolConfiguration(pointSize: 19, weight: .bold)
+
+    override var isHighlighted: Bool {
+        didSet { updateAppearance() }
+    }
+
+    override var isSelected: Bool {
+        didSet { updateAppearance() }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        updateAppearance()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        updateAppearance()
+    }
+
+    private func updateAppearance() {
+        let symbolName = (isHighlighted || isSelected) ? "square.grid.2x2.fill" : "square.grid.2x2"
+        let config = (isHighlighted || isSelected) ? highlightedSymbolConfig : normalSymbolConfig
+        let image = UIImage(systemName: symbolName, withConfiguration: config)?.withRenderingMode(.alwaysTemplate)
+        setImage(image, for: .normal)
+        setPreferredSymbolConfiguration(config, forImageIn: .normal)
     }
 }
 
@@ -58,10 +127,11 @@ class ActorProfileCardView: UIView {
     let roleLabel          = UILabel()
     let connectionsButton  = UIButton(type: .system)
     let connectionsLabel   = UILabel()
-    let editPortfolioButton = GradientButton(type: .system)
-    let editProfileButton   = GradientButton(type: .system)   // own profile — edit details
-    let connectButton       = GradientButton(type: .system)   // other users — connect
-    let avatarEditButton    = UIButton(type: .system)          // pencil badge on own profile
+    let editPortfolioButton      = GradientButton(type: .system)
+    let editProfileButton        = GradientButton(type: .system)   // own profile — edit details
+    let connectButton            = GradientButton(type: .system)   // other users — connect
+    let avatarEditButton         = UIButton(type: .system)          // pencil badge on own profile
+    let discoverProfilesButton   = DiscoverIconButton(type: .system)   // profile discovery CTA
 
     // Stored so layoutSubviews can resize them
     private let bannerGradientLayer = CAGradientLayer()
@@ -167,35 +237,25 @@ class ActorProfileCardView: UIView {
         connLabel.translatesAutoresizingMaskIntoConstraints = false
         addSubview(connLabel)
 
-        // Button stack (owns editPortfolioButton & connectButton)
-        let buttonStack = UIStackView()
-        buttonStack.axis         = .horizontal
-        buttonStack.spacing      = 0
-        buttonStack.distribution = .fill
-        buttonStack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(buttonStack)
-
         // ── Portfolio Button (initially "Create Portfolio") ─────────────────
         editPortfolioButton.setTitle("Create Portfolio", for: .normal)
-        editPortfolioButton.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
-        editPortfolioButton.setTitleColor(.white, for: .normal)
+        editPortfolioButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
         editPortfolioButton.layer.cornerRadius = 22
-        editPortfolioButton.layer.masksToBounds = true
+        editPortfolioButton.layer.masksToBounds = false
         editPortfolioButton.translatesAutoresizingMaskIntoConstraints = false
-        editPortfolioButton.setupGradient(colors: [ActorProfileDS.deepPlum, ActorProfileDS.midPlum])
+        editPortfolioButton.setupGlassStyle(tint: ActorProfileDS.deepPlum)
 
         // ── Edit Profile button (own profile) ─────────────────────────────────
         editProfileButton.setTitle("Edit Profile", for: .normal)
-        editProfileButton.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
-        editProfileButton.setTitleColor(.white, for: .normal)
+        editProfileButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
         editProfileButton.layer.cornerRadius = 22
-        editProfileButton.layer.masksToBounds = true
+        editProfileButton.layer.masksToBounds = false
         editProfileButton.translatesAutoresizingMaskIntoConstraints = false
-        editProfileButton.setupGradient(colors: [ActorProfileDS.deepPlum, ActorProfileDS.midPlum])
+        editProfileButton.setupGlassStyle(tint: ActorProfileDS.deepPlum)
 
         // ── Connect button (other users) ──────────────────────────────────────
         connectButton.setTitle("Connect", for: .normal)
-        connectButton.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
+        connectButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
         connectButton.setTitleColor(.white, for: .normal)
         connectButton.layer.cornerRadius = 22
         connectButton.layer.masksToBounds = true
@@ -203,12 +263,33 @@ class ActorProfileCardView: UIView {
         connectButton.setupGradient(colors: [ActorProfileDS.deepPlum, ActorProfileDS.rosePink])
         connectButton.isHidden = true
 
-        // Both own-profile buttons fill equally; connect button fills full width
-        buttonStack.spacing      = 12
-        buttonStack.distribution = .fillEqually
+        // ── Discover icon button — compact square (44×44), icon-only ──────────
+        discoverProfilesButton.imageView?.contentMode = .scaleAspectFit
+        discoverProfilesButton.contentHorizontalAlignment = .center
+        discoverProfilesButton.contentVerticalAlignment = .center
+        discoverProfilesButton.imageEdgeInsets = .zero
+        discoverProfilesButton.setTitle(nil, for: .normal)
+        discoverProfilesButton.tintColor = ActorProfileDS.deepPlum
+        discoverProfilesButton.layer.cornerRadius = 22
+        discoverProfilesButton.layer.masksToBounds = false
+        discoverProfilesButton.translatesAutoresizingMaskIntoConstraints = false
+        discoverProfilesButton.backgroundColor = .clear
+        discoverProfilesButton.isHidden = true   // shown on own profile only
+        // Accessibility label so VoiceOver users know what it does
+        discoverProfilesButton.accessibilityLabel = "Discover Profiles"
+
+        // ── Single row: [Edit Profile] [Edit Portfolio] [🔍icon] ──────────────
+        let buttonStack = UIStackView()
+        buttonStack.axis         = .horizontal
+        buttonStack.spacing      = 10
+        buttonStack.alignment    = .fill
+        buttonStack.distribution = .fill          // we'll pin the icon to 44 pt
+        buttonStack.translatesAutoresizingMaskIntoConstraints = false
         buttonStack.addArrangedSubview(editProfileButton)
         buttonStack.addArrangedSubview(editPortfolioButton)
         buttonStack.addArrangedSubview(connectButton)
+        buttonStack.addArrangedSubview(discoverProfilesButton)
+        addSubview(buttonStack)
 
         // Layout
         NSLayoutConstraint.activate([
@@ -257,11 +338,18 @@ class ActorProfileCardView: UIView {
             connLabel.leftAnchor.constraint(equalTo: leftAnchor, constant: 16),
             connLabel.rightAnchor.constraint(equalTo: rightAnchor, constant: -16),
 
+            // Single button row — pinned left/right; icon fixed 44 pt wide
             buttonStack.topAnchor.constraint(equalTo: connLabel.bottomAnchor, constant: 20),
             buttonStack.leftAnchor.constraint(equalTo: leftAnchor, constant: 16),
             buttonStack.rightAnchor.constraint(equalTo: rightAnchor, constant: -16),
             buttonStack.heightAnchor.constraint(equalToConstant: 44),
             buttonStack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
+
+            // Ensure the two text buttons split the available width equally
+            editProfileButton.widthAnchor.constraint(equalTo: editPortfolioButton.widthAnchor),
+
+            // Icon button is square
+            discoverProfilesButton.widthAnchor.constraint(equalToConstant: 44),
         ])
     }
 
@@ -1121,6 +1209,16 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
     private var galleryHeaderView: GalleryHeaderView?
     private let galleryDataSource = GalleryCollectionViewDataSource()
     private var galleryHeightConstraint: NSLayoutConstraint?
+    private let emptyStateLabel: UILabel = {
+        let l = UILabel()
+        l.font          = UIFont.systemFont(ofSize: 15, weight: .medium)
+        l.textColor     = .gray
+        l.textAlignment = .center
+        l.numberOfLines = 0
+        l.isHidden      = true
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
 
     private var profileData: UserProfileData?
     private var posts:        [Post] = []
@@ -1133,6 +1231,9 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
     private var connectionState: String = "none"
     private var isVerifiedCasting: Bool = false
     private var selectedMediaTab: MediaTab = .gallery
+
+    // Discovery row (lazy — inserted/removed on tap)
+    private var discoveryRowView: ProfileDiscoveryRowView?
 
     // Image editing (own profile only)
     private enum ImageEditTarget { case banner, avatar }
@@ -1260,8 +1361,9 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
             card.editProfileButton.isHidden   = !isOwnProfile
 
             if isOwnProfile {
-                card.editPortfolioButton.isHidden = false
-                card.connectButton.isHidden       = true
+                card.editPortfolioButton.isHidden    = false
+                card.discoverProfilesButton.isHidden = false
+                card.connectButton.isHidden          = true
                 
                 card.avatarEditButton.removeTarget(nil, action: nil, for: .allEvents)
                 card.avatarEditButton.addTarget(self, action: #selector(editProfileImageTapped), for: .touchUpInside)
@@ -1269,6 +1371,8 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
                 card.editProfileButton.addTarget(self, action: #selector(editProfileTapped), for: .touchUpInside)
                 card.editPortfolioButton.removeTarget(nil, action: nil, for: .allEvents)
                 card.editPortfolioButton.addTarget(self, action: #selector(editPortfolioTapped), for: .touchUpInside)
+                card.discoverProfilesButton.removeTarget(nil, action: nil, for: .allEvents)
+                card.discoverProfilesButton.addTarget(self, action: #selector(discoverProfilesTapped), for: .touchUpInside)
                 
                 // Casting professionals should go to the production profile info flow.
                 let btnTitle: String
@@ -1279,6 +1383,7 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
                 }
                 card.editPortfolioButton.setTitle(btnTitle, for: .normal)
             } else {
+                card.discoverProfilesButton.isHidden = true
                 card.connectButton.isHidden = false
                 card.connectButton.removeTarget(nil, action: nil, for: .allEvents)
                 card.connectButton.addTarget(self, action: #selector(connectTapped), for: .touchUpInside)
@@ -1409,6 +1514,96 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
                     self.present(a, animated: true)
                 }
             }
+        }
+    }
+
+    // MARK: - Profile Discovery
+
+    @objc private func discoverProfilesTapped() {
+        // If already showing, collapse with animation
+        if let existing = discoveryRowView {
+            UIView.animate(withDuration: 0.35,
+                           delay: 0,
+                           usingSpringWithDamping: 0.8,
+                           initialSpringVelocity: 0.5,
+                           options: [.curveEaseInOut]) {
+                existing.alpha = 0
+                existing.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
+            } completion: { [weak self] _ in
+                guard let self else { return }
+                self.contentStackView.removeArrangedSubview(existing)
+                existing.removeFromSuperview()
+                self.discoveryRowView = nil
+            }
+
+            // Pulse icon to signal collapse
+            if let card = contentStackView.arrangedSubviews.first as? ActorProfileCardView {
+                UIView.animate(withDuration: 0.15) { card.discoverProfilesButton.alpha = 0.55 }
+                UIView.animate(withDuration: 0.15, delay: 0.15) { card.discoverProfilesButton.alpha = 1 }
+            }
+            return
+        }
+
+        // Create and insert the discovery row after the profile card (index 1)
+        let rowView = ProfileDiscoveryRowView()
+        rowView.alpha     = 0
+        rowView.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
+        rowView.onProfileSelected = { [weak self] profile in
+            self?.navigateToProfile(profile)
+        }
+        rowView.onSeeAllTapped = { [weak self] in
+            let vc = DiscoverProfilesViewController()
+            vc.hidesBottomBarWhenPushed = true
+            
+            if let nav = self?.navigationController {
+                nav.pushViewController(vc, animated: true)
+            } else {
+                let nav = UINavigationController(rootViewController: vc)
+                nav.modalPresentationStyle = .fullScreen
+                self?.present(nav, animated: true)
+            }
+        }
+        discoveryRowView = rowView
+
+        // Insert right after the profile card
+        contentStackView.insertArrangedSubview(rowView, at: 1)
+
+        // Animate in with iOS spring feel
+        UIView.animate(withDuration: 0.45,
+                       delay: 0,
+                       usingSpringWithDamping: 0.75,
+                       initialSpringVelocity: 0.6,
+                       options: [.curveEaseOut]) {
+            rowView.alpha     = 1
+            rowView.transform = .identity
+        }
+
+        // Lazy load profiles
+        rowView.loadDiscoveryProfiles()
+
+        // Scroll so the row is visible
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            guard let self else { return }
+            let targetRect = rowView.frame
+            self.scrollView.scrollRectToVisible(targetRect, animated: true)
+        }
+
+        // Pulse icon to signal expand
+        if let card = contentStackView.arrangedSubviews.first as? ActorProfileCardView {
+            UIView.animate(withDuration: 0.15) { card.discoverProfilesButton.alpha = 0.55 }
+            UIView.animate(withDuration: 0.15, delay: 0.15) { card.discoverProfilesButton.alpha = 1 }
+        }
+    }
+
+    private func navigateToProfile(_ profile: DiscoveryProfile) {
+        let vc = ActorProfileViewController(userId: profile.id)
+        vc.hidesBottomBarWhenPushed = true
+        if let nav = navigationController {
+            nav.pushViewController(vc, animated: true)
+        } else {
+            let nav = UINavigationController(rootViewController: vc)
+            nav.modalPresentationStyle = .fullScreen
+            present(nav, animated: true)
         }
     }
 
@@ -1772,6 +1967,21 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
         let rows                 = mediaItems.isEmpty ? 0 : ceil(CGFloat(mediaItems.count) / itemsPerRow)
         galleryHeightConstraint?.constant = rows == 0 ? 0 : rows * itemWidth + max(0, rows - 1) * spacing
         collectionView?.isHidden = mediaItems.isEmpty
+        
+        if mediaItems.isEmpty {
+            emptyStateLabel.isHidden = false
+            switch selectedMediaTab {
+            case .gallery:
+                emptyStateLabel.text = isOwnProfile ? "No posts posted by you" : "No posts yet"
+            case .flicks:
+                emptyStateLabel.text = isOwnProfile ? "No flicks posted by you" : "No flicks yet"
+            case .tagged:
+                emptyStateLabel.text = "No tagged posts"
+            }
+        } else {
+            emptyStateLabel.isHidden = true
+        }
+        
         collectionView?.reloadData()
     }
 
@@ -1994,6 +2204,9 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
         let hc = gc.heightAnchor.constraint(equalToConstant: itemWidth)
         hc.isActive = true
         galleryHeightConstraint = hc
+        
+        contentStackView.addArrangedSubview(emptyStateLabel)
+        emptyStateLabel.heightAnchor.constraint(equalToConstant: 100).isActive = true
 
         let spacer = UIView()
         spacer.translatesAutoresizingMaskIntoConstraints = false

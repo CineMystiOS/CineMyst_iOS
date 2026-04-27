@@ -475,6 +475,214 @@ struct PortfolioItemResponse: Codable {
     let display_order: Int?
 }
 
+// MARK: - Recommendations Service
+
+final class RecommendationsService {
+    static let shared = RecommendationsService()
+
+    private let session: URLSession
+    private let baseURL: URL
+
+    private init(session: URLSession = .shared) {
+        self.session = session
+        if let configuredBaseURL = Bundle.main.object(forInfoDictionaryKey: "AI_CHATBOT_BASE_URL") as? String,
+           let configuredURL = URL(string: configuredBaseURL),
+           !configuredBaseURL.isEmpty {
+            self.baseURL = configuredURL
+        } else {
+            self.baseURL = URL(string: "https://cinemyst-chatbot-backend.onrender.com")!
+        }
+    }
+
+    func refreshRecommendations(for userId: UUID) async throws {
+        var request = URLRequest(url: baseURL.appendingPathComponent("/v1/process-profile/\(userId.uuidString)"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let (_, response) = try await session.data(for: request)
+        try validate(response: response, service: "RecommendationsService")
+    }
+
+    func fetchDiscoveryProfiles(for userId: UUID, refreshFirst: Bool = false) async throws -> [DiscoveryProfile] {
+        if refreshFirst {
+            do {
+                try await refreshRecommendations(for: userId)
+            } catch {
+                // Fall back to the last saved recommendations if refresh fails.
+                print("⚠️ Failed to refresh recommendations before fetch: \(error)")
+            }
+        }
+
+        var request = URLRequest(url: baseURL.appendingPathComponent("/v1/recommendations/\(userId.uuidString)"))
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let (data, response) = try await session.data(for: request)
+        try validate(response: response, service: "RecommendationsService")
+
+        let rawItems = try extractRecommendationItems(from: data)
+        let candidates = rawItems.compactMap(Self.parseCandidate(from:))
+            .filter { $0.id != userId }
+
+        guard !candidates.isEmpty else { return [] }
+
+        if candidates.allSatisfy({ $0.hasDisplayDetails }) {
+            return candidates.map(\.discoveryProfile)
+        }
+
+        let hydratedProfilesById = try await hydrateProfiles(ids: candidates.map(\.id))
+        return candidates.compactMap { candidate in
+            hydratedProfilesById[candidate.id.uuidString] ?? (candidate.hasDisplayDetails ? candidate.discoveryProfile : nil)
+        }
+    }
+
+    private func hydrateProfiles(ids: [UUID]) async throws -> [String: DiscoveryProfile] {
+        var seen = Set<String>()
+        let idStrings = ids.map(\.uuidString).filter { seen.insert($0).inserted }
+        guard !idStrings.isEmpty else { return [:] }
+
+        let response: [ProfileResponse] = try await supabase
+            .from("profiles")
+            .select("id, username, full_name, role, avatar_url, profile_picture_url, location_city, location_state")
+            .in("id", value: idStrings)
+            .execute()
+            .value
+
+        return Dictionary(uniqueKeysWithValues: response.compactMap { profile in
+            guard let uuid = UUID(uuidString: profile.id) else { return nil }
+            return (
+                uuid.uuidString,
+                DiscoveryProfile(
+                    id: uuid,
+                    fullName: profile.full_name,
+                    username: profile.username,
+                    role: profile.role,
+                    profilePictureUrl: profile.avatar_url ?? profile.profile_picture_url,
+                    location: Self.formatLocation(city: profile.location_city, state: profile.location_state)
+                )
+            )
+        })
+    }
+
+    private func validate(response: URLResponse, service: String) throws {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NSError(domain: service, code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid server response."])
+        }
+
+        guard 200..<300 ~= httpResponse.statusCode else {
+            throw NSError(
+                domain: service,
+                code: httpResponse.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: "Request failed with status \(httpResponse.statusCode)."]
+            )
+        }
+    }
+
+    private func extractRecommendationItems(from data: Data) throws -> [[String: Any]] {
+        let object = try JSONSerialization.jsonObject(with: data)
+        return Self.extractArray(from: object)
+    }
+
+    private static func extractArray(from object: Any) -> [[String: Any]] {
+        if let array = object as? [[String: Any]] {
+            return array
+        }
+
+        guard let dict = object as? [String: Any] else {
+            return []
+        }
+
+        for key in ["recommendations", "results", "items", "data"] {
+            if let nested = dict[key] {
+                let extracted = extractArray(from: nested)
+                if !extracted.isEmpty {
+                    return extracted
+                }
+            }
+        }
+
+        return []
+    }
+
+    private static func parseCandidate(from item: [String: Any]) -> RecommendationCandidate? {
+        let nestedProfile = ["recommended_user", "recommended_profile", "profile", "user", "candidate"]
+            .compactMap { item[$0] as? [String: Any] }
+            .first
+
+        let source = nestedProfile ?? item
+        let idString =
+            nonEmptyString(in: source, keys: ["recommended_user_id", "recommendedUserId", "id", "profile_id", "user_id"]) ??
+            nonEmptyString(in: item, keys: ["recommended_user_id", "recommendedUserId", "profile_id", "id", "user_id"])
+
+        guard let idString, let id = UUID(uuidString: idString) else {
+            return nil
+        }
+
+        let city = nonEmptyString(in: source, keys: ["location_city", "city"])
+        let state = nonEmptyString(in: source, keys: ["location_state", "state"])
+        let location = formatLocation(city: city, state: state) ?? nonEmptyString(in: source, keys: ["location"])
+
+        return RecommendationCandidate(
+            id: id,
+            fullName: nonEmptyString(in: source, keys: ["full_name", "fullName", "name"]),
+            username: nonEmptyString(in: source, keys: ["username", "handle"]),
+            role: nonEmptyString(in: source, keys: ["role", "primary_role"]),
+            profilePictureUrl: nonEmptyString(in: source, keys: ["profile_picture_url", "profilePictureUrl", "avatar_url", "avatarUrl"]),
+            location: location
+        )
+    }
+
+    private static func nonEmptyString(in dict: [String: Any], keys: [String]) -> String? {
+        for key in keys {
+            guard let value = dict[key] else { continue }
+
+            if let string = value as? String {
+                let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    return trimmed
+                }
+            }
+
+            if let number = value as? NSNumber {
+                return number.stringValue
+            }
+        }
+
+        return nil
+    }
+
+    private static func formatLocation(city: String?, state: String?) -> String? {
+        var components: [String] = []
+        if let city, !city.isEmpty { components.append(city) }
+        if let state, !state.isEmpty { components.append(state) }
+        return components.isEmpty ? nil : components.joined(separator: ", ")
+    }
+}
+
+private struct RecommendationCandidate {
+    let id: UUID
+    let fullName: String?
+    let username: String?
+    let role: String?
+    let profilePictureUrl: String?
+    let location: String?
+
+    var hasDisplayDetails: Bool {
+        fullName != nil || username != nil || role != nil || profilePictureUrl != nil || location != nil
+    }
+
+    var discoveryProfile: DiscoveryProfile {
+        DiscoveryProfile(
+            id: id,
+            fullName: fullName,
+            username: username,
+            role: role,
+            profilePictureUrl: profilePictureUrl,
+            location: location
+        )
+    }
+}
+
 struct ConnectionResponse: Codable {
     let id: String
     let requester_id: String?

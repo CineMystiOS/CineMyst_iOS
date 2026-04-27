@@ -331,6 +331,17 @@ class EditProfileViewController: UIViewController {
                 print("📦 artist_profiles upsert response: \(artistRaw)")
                 print("✅ Artist profiles table updated")
 
+                if self.didChangeRecommendationInputs() {
+                    Task {
+                        do {
+                            try await RecommendationsService.shared.refreshRecommendations(for: self.userId)
+                            print("✅ Recommendation data refreshed after bio edit")
+                        } catch {
+                            print("⚠️ Recommendation refresh failed after bio edit: \(error)")
+                        }
+                    }
+                }
+
                 await MainActor.run {
                     self.saveButton.isEnabled = true
                     self.saveButton.setTitle("Save Changes", for: .normal)
@@ -354,6 +365,14 @@ class EditProfileViewController: UIViewController {
                 }
             }
         }
+    }
+}
+
+private extension EditProfileViewController {
+    func didChangeRecommendationInputs() -> Bool {
+        let oldBio = profileData?.profile.bio?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let newBio = bioTextView.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return oldBio != newBio
     }
 }
 

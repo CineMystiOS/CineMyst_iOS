@@ -90,6 +90,7 @@ class CineMystTabBarController: UITabBarController, UITabBarControllerDelegate {
 
         // Flicks → ReelsViewController
         let reelsVC = ReelsViewController()
+        reelsVC.loadViewIfNeeded() // Pre-load to trigger Flicks fetch early
         let flicksNav = UINavigationController(rootViewController: reelsVC)
         flicksNav.tabBarItem = UITabBarItem(title: "Flicks",
                                             image: UIImage(systemName: "popcorn.fill"),
