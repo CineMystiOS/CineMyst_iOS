@@ -27,6 +27,7 @@ final class ReelCell: UICollectionViewCell, UIGestureRecognizerDelegate {
     // MARK: State
     private var isLiked        = false
     private var currentLikes   = 0
+    private var latestLikerUsername: String?
     private var currentFlickId: String?
     private var currentUserId:  String?
     private var connectionState: String = "none"  // "none" | "pending" | "connected"
@@ -482,7 +483,26 @@ final class ReelCell: UICollectionViewCell, UIGestureRecognizerDelegate {
             btn?.tintColor = color
         }
 
-        likeCountLabel.text = currentLikes == 0 ? "Be the first to like" : "❤️ \(formatCount(currentLikes)) likes"
+        if currentLikes == 0 {
+            likeCountLabel.text = ""
+        } else if isLiked {
+            if currentLikes == 1 {
+                likeCountLabel.text = "Liked by you"
+            } else {
+                likeCountLabel.text = "Liked by you and \(currentLikes - 1) \(currentLikes - 1 == 1 ? "other" : "others")"
+            }
+        } else {
+            if let liker = latestLikerUsername {
+                if currentLikes == 1 {
+                    likeCountLabel.text = "Liked by \(liker)"
+                } else {
+                    likeCountLabel.text = "Liked by \(liker) and \(currentLikes - 1) \(currentLikes - 1 == 1 ? "other" : "others")"
+                }
+            } else {
+                let suffix = currentLikes == 1 ? "like" : "likes"
+                likeCountLabel.text = "\(formatCount(currentLikes)) \(suffix)"
+            }
+        }
     }
 
     // MARK: - Heart Burst Animation
@@ -593,7 +613,8 @@ final class ReelCell: UICollectionViewCell, UIGestureRecognizerDelegate {
         currentFlickId = reel.id
         currentUserId  = reel.userId
         isLiked        = reel.isLiked
-        currentLikes   = Int(reel.likes) ?? 0
+        currentLikes   = reel.rawLikesCount
+        latestLikerUsername = reel.latestLikerUsername
 
         nameLabel.text  = reel.authorName
         captionLabel.text = reel.caption?.isEmpty == false ? reel.caption : ""
@@ -602,7 +623,6 @@ final class ReelCell: UICollectionViewCell, UIGestureRecognizerDelegate {
         actionLabel(in: commentStack)?.text = reel.comments
         actionLabel(in: shareStack)?.text   = reel.shares
 
-        likeCountLabel.text = currentLikes == 0 ? "Be the first to like" : "❤️ \(reel.likes) likes"
         refreshLikeUI(animated: false)
 
         // Check if own content and fetch connection status

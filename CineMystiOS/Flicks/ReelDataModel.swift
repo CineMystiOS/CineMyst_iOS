@@ -26,6 +26,7 @@ struct Reel {
     var isLiked: Bool
     let allowComments: Bool   // from flick.allow_comments
     let thumbnailUrl: String? // Added for instant preview
+    var latestLikerUsername: String?
     
     // Helper to create from Flick model
     static func from(flick: Flick, isLiked: Bool = false) -> Reel {
@@ -46,7 +47,8 @@ struct Reel {
             caption: flick.caption,
             isLiked: isLiked,
             allowComments: flick.allowComments ?? true,
-            thumbnailUrl: flick.thumbnailUrl
+            thumbnailUrl: flick.thumbnailUrl,
+            latestLikerUsername: flick.latestLikerUsername
         )
     }
     

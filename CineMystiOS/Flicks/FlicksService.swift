@@ -19,6 +19,7 @@ struct Flick: Codable, Identifiable {
     var likesCount: Int
     var commentsCount: Int
     var sharesCount: Int
+    var latestLikerUsername: String?
     let location: String?
     let taggedUsers: [String]?
     let hashtags: [String]?
@@ -239,14 +240,26 @@ class FlicksService {
                 }
             }
             
-            // Fetch accurate likes count
+            // Fetch accurate likes count and get one liker's username
             if let likesData = try? await supabase
                 .from("flick_likes")
-                .select("flick_id")
+                .select("user_id")
                 .eq("flick_id", value: flicks[i].id)
                 .execute() {
                 if let rows = try? JSONSerialization.jsonObject(with: likesData.data) as? [[String: Any]] {
                     flicks[i].likesCount = rows.count
+                    if let firstUserId = rows.first?["user_id"] as? String {
+                        if let profileData = try? await supabase
+                            .from("profiles")
+                            .select("username")
+                            .eq("id", value: firstUserId)
+                            .single()
+                            .execute(),
+                           let json = try? JSONSerialization.jsonObject(with: profileData.data) as? [String: Any],
+                           let username = json["username"] as? String {
+                             flicks[i].latestLikerUsername = username
+                        }
+                    }
                 }
             }
         }
