@@ -698,13 +698,48 @@ final class PostManager {
     }
     
     func fetchLikeCount(postId: String) async throws -> Int {
+        let likerIds = try await fetchUniquePostLikerIds(postId: postId)
+        return likerIds.count
+    }
+
+    private func fetchUniquePostLikerIds(postId: String) async throws -> [String] {
         let response = try await client
             .from("post_likes")
-            .select("id", head: true, count: .exact)
+            .select("user_id")
             .eq("post_id", value: postId)
             .execute()
-        
-        return response.count ?? 0
+
+        guard let rows = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] else {
+            return []
+        }
+
+        return Array(Set(rows.compactMap { ($0["user_id"] as? String)?.lowercased() }))
+    }
+
+    func fetchPostLikers(postId: String) async throws -> [ProfileRecord] {
+        let userIds = try await fetchUniquePostLikerIds(postId: postId)
+        guard !userIds.isEmpty else { return [] }
+
+        let decoder = JSONDecoder()
+        var likers: [ProfileRecord] = []
+
+        for userId in userIds {
+            do {
+                let profileResponse = try await client
+                    .from("profiles")
+                    .select("*")
+                    .eq("id", value: userId)
+                    .single()
+                    .execute()
+
+                let profile = try decoder.decode(ProfileRecord.self, from: profileResponse.data)
+                likers.append(profile)
+            } catch {
+                print("⚠️ Could not hydrate post liker profile for \(userId): \(error)")
+            }
+        }
+
+        return likers
     }
 }
 

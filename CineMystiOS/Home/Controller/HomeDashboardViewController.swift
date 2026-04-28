@@ -164,7 +164,6 @@ final class HomeDashboardViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         setupNavigationBar()
-        loadPosts()
         refreshUnreadMessageBadge()
     }
 
@@ -734,6 +733,17 @@ final class HomeDashboardViewController: UIViewController {
         }
         present(shareVC, animated: true)
     }
+    func openPostLikes(for post: Post) {
+        let likesVC = PostLikesBottomSheetViewController()
+        likesVC.postId = post.id
+        likesVC.modalPresentationStyle = .pageSheet
+        if let sheet = likesVC.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 24
+        }
+        present(likesVC, animated: true)
+    }
     private func openCameraForPost() { let vc = CameraViewController(); vc.modalPresentationStyle = .fullScreen; present(vc, animated: true) }
     private func openAIAssistant() {
         let vc = AIAssistantViewController()
@@ -1112,6 +1122,7 @@ extension HomeDashboardViewController: UITableViewDataSource, UITableViewDelegat
             cell.configure(with: post)
             cell.onComment = { [weak self] in self?.openComments(for: post) }
             cell.onShare   = { [weak self] in self?.openShareSheet(for: post) }
+            cell.onLikesTap = { [weak self] in self?.openPostLikes(for: post) }
             cell.onLikeStateChanged = { [weak self] postId, isLiked, likeCount in
                 self?.updatePostLikeState(postId: postId, isLiked: isLiked, likeCount: likeCount)
             }
@@ -1681,6 +1692,7 @@ final class PostFeedCell: UITableViewCell {
     var onComment: (() -> Void)?
     var onShare:   (() -> Void)?
     var onProfile: (() -> Void)?
+    var onLikesTap: (() -> Void)?
     var onImageTap: (([String], Int) -> Void)?
     var onLikeStateChanged: ((String, Bool, Int) -> Void)?
     var onMoreTap: ((UIButton) -> Void)?
@@ -1702,6 +1714,7 @@ final class PostFeedCell: UITableViewCell {
     private let mediaContainer = UIView()
     private let likeButton     = UIButton(type: .system)
     private let likeCount      = UILabel()
+    private let likeSummaryLabel = UILabel()
     private let commentButton  = UIButton(type: .system)
     private let commentCountLabel = UILabel()
     private let shareButton    = UIButton(type: .system)
@@ -1710,9 +1723,11 @@ final class PostFeedCell: UITableViewCell {
     private var currentLikeCount = 0
     private var currentCommentCount = 0
     private var currentMediaUrls: [String] = []
+    private var currentPreviewLikerName: String?
 
     // Dynamic height for media — set to 0 when no images
     private var mediaHeightConstraint: NSLayoutConstraint!
+    private var likeSummaryHeightConstraint: NSLayoutConstraint!
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -1800,19 +1815,16 @@ final class PostFeedCell: UITableViewCell {
         mediaHeightConstraint = mediaContainer.heightAnchor.constraint(equalToConstant: 0)
         mediaHeightConstraint.isActive = true
 
-        // Separator
-        let sep = UIView(); sep.backgroundColor = UIColor(red: 0.93, green: 0.89, blue: 0.82, alpha: 1)
-        card.addSubview(sep); sep.translatesAutoresizingMaskIntoConstraints = false
-        sep.heightAnchor.constraint(equalToConstant: 0.5).isActive = true
-
         // Reactions
         likeButton.setImage(UIImage(systemName: "heart"), for: .normal); likeButton.tintColor = .secondaryLabel
-        likeButton.isUserInteractionEnabled = false
+        likeButton.isUserInteractionEnabled = true
+        likeButton.addTarget(self, action: #selector(likeTapped(_:)), for: .touchUpInside)
         likeCount.font = .systemFont(ofSize: 12); likeCount.textColor = .secondaryLabel
+        likeCount.isUserInteractionEnabled = true
         let likeRow = UIStackView(arrangedSubviews: [likeButton, likeCount])
         likeRow.axis = .horizontal; likeRow.spacing = 4; likeRow.alignment = .center
         likeRow.isUserInteractionEnabled = true
-        likeRow.addGestureRecognizer(makeTapRecognizer(action: #selector(likeTapped(_:))))
+        likeCount.addGestureRecognizer(makeTapRecognizer(action: #selector(likesListTapped(_:))))
         
         commentButton.setImage(UIImage(systemName: "bubble.left"), for: .normal); commentButton.tintColor = .secondaryLabel
         commentButton.isUserInteractionEnabled = false
@@ -1834,6 +1846,19 @@ final class PostFeedCell: UITableViewCell {
         let reactionStack = UIStackView(arrangedSubviews: [likeRow, commentRow, spacer, shareRow])
         reactionStack.axis = .horizontal; reactionStack.spacing = 16; reactionStack.alignment = .center
         card.addSubview(reactionStack); reactionStack.translatesAutoresizingMaskIntoConstraints = false
+
+        likeSummaryLabel.font = .systemFont(ofSize: 12.5, weight: .medium)
+        likeSummaryLabel.textColor = CineMystTheme.deepPlum.withAlphaComponent(0.72)
+        likeSummaryLabel.numberOfLines = 1
+        likeSummaryLabel.lineBreakMode = .byTruncatingTail
+        likeSummaryLabel.isHidden = true
+        likeSummaryLabel.isUserInteractionEnabled = true
+        likeSummaryLabel.setContentCompressionResistancePriority(.required, for: .vertical)
+        likeSummaryLabel.setContentHuggingPriority(.required, for: .vertical)
+        likeSummaryLabel.addGestureRecognizer(makeTapRecognizer(action: #selector(likesListTapped(_:))))
+        card.addSubview(likeSummaryLabel); likeSummaryLabel.translatesAutoresizingMaskIntoConstraints = false
+        likeSummaryHeightConstraint = likeSummaryLabel.heightAnchor.constraint(equalToConstant: 0)
+        likeSummaryHeightConstraint.isActive = true
 
         NSLayoutConstraint.activate([
             card.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 7),
@@ -1858,11 +1883,11 @@ final class PostFeedCell: UITableViewCell {
             mediaContainer.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 10),
             mediaContainer.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -10),
 
-            sep.topAnchor.constraint(equalTo: mediaContainer.bottomAnchor, constant: 10),
-            sep.leadingAnchor.constraint(equalTo: card.leadingAnchor),
-            sep.trailingAnchor.constraint(equalTo: card.trailingAnchor),
+            likeSummaryLabel.topAnchor.constraint(equalTo: mediaContainer.bottomAnchor, constant: 10),
+            likeSummaryLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
+            likeSummaryLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -14),
 
-            reactionStack.topAnchor.constraint(equalTo: sep.bottomAnchor, constant: 10),
+            reactionStack.topAnchor.constraint(equalTo: likeSummaryLabel.bottomAnchor, constant: 10),
             reactionStack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
             reactionStack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -14),
             reactionStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -12),
@@ -1888,8 +1913,10 @@ final class PostFeedCell: UITableViewCell {
         likeCount.text    = "\(post.likesCount)"
         commentCountLabel.text = "\(post.commentsCount)"
         isLiked = post.isLiked
+        currentPreviewLikerName = nil
         likeButton.setImage(UIImage(systemName: isLiked ? "heart.fill" : "heart"), for: .normal)
         likeButton.tintColor = isLiked ? .systemRed : .secondaryLabel
+        updateLikeSummary()
 
         // Only show more button if it's the current user's post
         // Show more button only if management is enabled AND it belongs to current user
@@ -1915,13 +1942,18 @@ final class PostFeedCell: UITableViewCell {
         Task {
             do {
                 let actualCommentCount = try await PostManager.shared.fetchCommentCount(postId: postId)
-                let actualLikeCount = try await PostManager.shared.fetchLikeCount(postId: postId)
+                let likers = try await PostManager.shared.fetchPostLikers(postId: postId)
+                let actualLikeCount = likers.count
+                let previewName = self.previewLikerName(from: likers)
                 
                 DispatchQueue.main.async {
+                    guard self.postId == post.id else { return }
                     self.currentCommentCount = actualCommentCount
                     self.currentLikeCount = actualLikeCount
+                    self.currentPreviewLikerName = previewName
                     self.commentCountLabel.text = "\(actualCommentCount)"
                     self.likeCount.text = "\(actualLikeCount)"
+                    self.updateLikeSummary()
                 }
             } catch {
                 print("⚠️ Could not fetch actual counts: \(error)")
@@ -2091,6 +2123,49 @@ final class PostFeedCell: UITableViewCell {
         return "\(s / 86400)d"
     }
 
+    private func previewLikerName(from likers: [ProfileRecord]) -> String? {
+        let currentUserId = AuthManager.shared.currentUser?.id.uuidString.lowercased()
+        let firstOther = likers.first {
+            guard let currentUserId else { return true }
+            return $0.id.lowercased() != currentUserId
+        }
+        return firstOther?.fullName ?? firstOther?.username
+    }
+
+    private func updateLikeSummary() {
+        guard currentLikeCount > 0 else {
+            likeSummaryLabel.text = nil
+            likeSummaryLabel.isHidden = true
+            likeSummaryHeightConstraint.constant = 0
+            return
+        }
+
+        let summary: String
+        if isLiked {
+            if currentLikeCount == 1 {
+                summary = "Liked by you"
+            } else if currentLikeCount == 2 {
+                summary = "Liked by you and 1 other"
+            } else {
+                summary = "Liked by you and \(currentLikeCount - 1) others"
+            }
+        } else if let previewName = currentPreviewLikerName, !previewName.isEmpty {
+            if currentLikeCount == 1 {
+                summary = "Liked by \(previewName)"
+            } else if currentLikeCount == 2 {
+                summary = "Liked by \(previewName) and 1 other"
+            } else {
+                summary = "Liked by \(previewName) and \(currentLikeCount - 1) others"
+            }
+        } else {
+            summary = currentLikeCount == 1 ? "1 like" : "\(currentLikeCount) likes"
+        }
+
+        likeSummaryLabel.text = summary
+        likeSummaryLabel.isHidden = false
+        likeSummaryHeightConstraint.constant = 18
+    }
+
     @objc private func likeTapped(_ sender: Any?) {
         isLiked.toggle()
         likeButton.setImage(UIImage(systemName: isLiked ? "heart.fill" : "heart"), for: .normal)
@@ -2103,6 +2178,7 @@ final class PostFeedCell: UITableViewCell {
             currentLikeCount = max(0, currentLikeCount - 1)
         }
         likeCount.text = "\(currentLikeCount)"
+        updateLikeSummary()
         
         UIView.animate(withDuration: 0.15, animations: { self.likeButton.transform = CGAffineTransform(scaleX: 1.35, y: 1.35) }) { _ in
             UIView.animate(withDuration: 0.22, delay: 0, usingSpringWithDamping: 0.4, initialSpringVelocity: 8) {
@@ -2132,12 +2208,22 @@ final class PostFeedCell: UITableViewCell {
                         self.currentLikeCount = max(0, self.currentLikeCount - 1)
                     }
                     self.likeCount.text = "\(self.currentLikeCount)"
+                    self.updateLikeSummary()
                 }
                 return
             }
 
-            DispatchQueue.main.async {
-                self.onLikeStateChanged?(self.postId, self.isLiked, self.currentLikeCount)
+            Task {
+                if let likers = try? await PostManager.shared.fetchPostLikers(postId: self.postId) {
+                    let previewName = self.previewLikerName(from: likers)
+                    DispatchQueue.main.async {
+                        self.currentLikeCount = likers.count
+                        self.likeCount.text = "\(likers.count)"
+                        self.currentPreviewLikerName = previewName
+                        self.updateLikeSummary()
+                        self.onLikeStateChanged?(self.postId, self.isLiked, self.currentLikeCount)
+                    }
+                }
             }
         }
     }
@@ -2145,6 +2231,7 @@ final class PostFeedCell: UITableViewCell {
     @objc private func commentTapped(_ sender: Any?) { onComment?() }
     @objc private func shareTapped(_ sender: Any?)   { onShare?()   }
     @objc private func profileTapped(_ sender: Any?) { onProfile?() }
+    @objc private func likesListTapped(_ sender: Any?) { onLikesTap?() }
     @objc private func moreTapped()                  { onMoreTap?(moreButton) }
     
     @objc private func imageTapped(_ sender: UITapGestureRecognizer) {
