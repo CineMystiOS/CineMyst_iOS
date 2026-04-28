@@ -470,6 +470,23 @@ extension ReelsViewController: UICollectionViewDelegate, UICollectionViewDelegat
 // MARK: - ReelCell Delegate
 extension ReelsViewController: ReelCellDelegate {
 
+    func didTapLikesList(on cell: ReelCell) {
+        guard let indexPath = collectionView.indexPath(for: cell) else { return }
+        let reel = reels[indexPath.item]
+        
+        let likesVC = LikesBottomSheetViewController()
+        likesVC.flickId = reel.id
+        likesVC.modalPresentationStyle = .pageSheet
+        
+        if let sheet = likesVC.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 24
+        }
+        
+        present(likesVC, animated: true)
+    }
+
     func didTapLike(on cell: ReelCell, isLiked: Bool, currentLikes: Int) {
         guard let indexPath = collectionView.indexPath(for: cell) else { return }
         reels[indexPath.item].isLiked = isLiked

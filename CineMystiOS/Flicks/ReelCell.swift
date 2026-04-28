@@ -15,6 +15,7 @@ protocol ReelCellDelegate: AnyObject {
     func didTapMore(on cell: ReelCell, sourceView: UIView)
     func didTapProfile(on cell: ReelCell, userId: String)
     func didTapLike(on cell: ReelCell, isLiked: Bool, currentLikes: Int)
+    func didTapLikesList(on cell: ReelCell)
 }
 
 // MARK: - ReelCell
@@ -145,6 +146,7 @@ final class ReelCell: UICollectionViewCell, UIGestureRecognizerDelegate {
         let l = UILabel()
         l.font = .systemFont(ofSize: 12, weight: .regular)
         l.textColor = UIColor.white.withAlphaComponent(0.85)
+        l.isUserInteractionEnabled = true
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
@@ -346,6 +348,9 @@ final class ReelCell: UICollectionViewCell, UIGestureRecognizerDelegate {
         avatarView.addGestureRecognizer(profileTap)
         let nameTap = UITapGestureRecognizer(target: self, action: #selector(handleProfileTap))
         nameLabel.addGestureRecognizer(nameTap)
+        
+        let likesTap = UITapGestureRecognizer(target: self, action: #selector(handleLikesListTap))
+        likeCountLabel.addGestureRecognizer(likesTap)
 
         followButton.addTarget(self, action: #selector(handleFollow), for: .touchUpInside)
 
@@ -381,6 +386,10 @@ final class ReelCell: UICollectionViewCell, UIGestureRecognizerDelegate {
     @objc private func handleProfileTap() {
         guard let uid = currentUserId else { return }
         delegate?.didTapProfile(on: self, userId: uid)
+    }
+    
+    @objc private func handleLikesListTap() {
+        delegate?.didTapLikesList(on: self)
     }
 
     @objc private func handleFollow() {

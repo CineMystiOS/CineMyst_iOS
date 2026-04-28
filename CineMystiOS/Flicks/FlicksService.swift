@@ -481,6 +481,28 @@ class FlicksService {
         return !(rows?.isEmpty ?? true)
     }
     
+    // MARK: - Fetch Likers
+    func fetchLikers(flickId: String) async throws -> [ProfileRecord] {
+        let likesRes = try await supabase
+            .from("flick_likes")
+            .select("user_id")
+            .eq("flick_id", value: flickId)
+            .execute()
+        
+        guard let rows = try? JSONSerialization.jsonObject(with: likesRes.data) as? [[String: Any]] else { return [] }
+        
+        let userIds = rows.compactMap { $0["user_id"] as? String }
+        if userIds.isEmpty { return [] }
+        
+        let profileRes = try await supabase
+            .from("profiles")
+            .select("*")
+            .in("id", value: userIds)
+            .execute()
+            
+        return try JSONDecoder().decode([ProfileRecord].self, from: profileRes.data)
+    }
+    
     // MARK: - Update Comment
     func updateComment(commentId: String, comment: String) async throws {
         let _ = try await supabase
