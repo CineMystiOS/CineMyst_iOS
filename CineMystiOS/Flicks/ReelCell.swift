@@ -14,6 +14,7 @@ protocol ReelCellDelegate: AnyObject {
     func didTapShare(on cell: ReelCell)
     func didTapMore(on cell: ReelCell, sourceView: UIView)
     func didTapProfile(on cell: ReelCell, userId: String)
+    func didTapLike(on cell: ReelCell, isLiked: Bool, currentLikes: Int)
 }
 
 // MARK: - ReelCell
@@ -432,6 +433,8 @@ final class ReelCell: UICollectionViewCell, UIGestureRecognizerDelegate {
         if currentLikes < 0 { currentLikes = 0 }
 
         refreshLikeUI(animated: true)
+        
+        delegate?.didTapLike(on: self, isLiked: isLiked, currentLikes: currentLikes)
 
         Task {
             do {
@@ -442,11 +445,16 @@ final class ReelCell: UICollectionViewCell, UIGestureRecognizerDelegate {
                 }
             } catch {
                 // Revert
-                self.isLiked.toggle()
-                self.currentLikes += self.isLiked ? 1 : -1
-                self.refreshLikeUI(animated: false)
+                await MainActor.run {
+                    self.isLiked.toggle()
+                    self.currentLikes += self.isLiked ? 1 : -1
+                    self.refreshLikeUI(animated: false)
+                    self.delegate?.didTapLike(on: self, isLiked: self.isLiked, currentLikes: self.currentLikes)
+                }
             }
-            btn?.isEnabled = true
+            await MainActor.run {
+                btn?.isEnabled = true
+            }
         }
     }
 

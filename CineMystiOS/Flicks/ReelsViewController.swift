@@ -470,6 +470,13 @@ extension ReelsViewController: UICollectionViewDelegate, UICollectionViewDelegat
 // MARK: - ReelCell Delegate
 extension ReelsViewController: ReelCellDelegate {
 
+    func didTapLike(on cell: ReelCell, isLiked: Bool, currentLikes: Int) {
+        guard let indexPath = collectionView.indexPath(for: cell) else { return }
+        reels[indexPath.item].isLiked = isLiked
+        reels[indexPath.item].rawLikesCount = currentLikes
+        reels[indexPath.item].likes = Reel.formatCount(currentLikes)
+    }
+
     func didTapComment(on cell: ReelCell) {
         guard let indexPath = collectionView.indexPath(for: cell) else { return }
         let reel = reels[indexPath.item]

@@ -238,6 +238,17 @@ class FlicksService {
                     flicks[i].commentsCount = rows.count
                 }
             }
+            
+            // Fetch accurate likes count
+            if let likesData = try? await supabase
+                .from("flick_likes")
+                .select("flick_id")
+                .eq("flick_id", value: flicks[i].id)
+                .execute() {
+                if let rows = try? JSONSerialization.jsonObject(with: likesData.data) as? [[String: Any]] {
+                    flicks[i].likesCount = rows.count
+                }
+            }
         }
 
         return flicks
