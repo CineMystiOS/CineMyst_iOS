@@ -161,10 +161,34 @@ final class HomeDashboardViewController: UIViewController {
         navigationItem.backButtonTitle = ""
     }
 
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        setupNavigationBar()
-        refreshUnreadMessageBadge()
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        injectHomeTitleIfNeeded()
+        
+        // Occasional Promo Check
+        if CinematicCardPromoManager.shared.shouldShowPromo() {
+            let promoVC = CinematicCardPromoViewController()
+            promoVC.modalPresentationStyle = .overFullScreen
+            promoVC.onAction = { [weak self] in
+                self?.navigateToPortfolioAndCreate()
+            }
+            self.present(promoVC, animated: true, completion: nil)
+            CinematicCardPromoManager.shared.markShown()
+        }
+    }
+
+    private func navigateToPortfolioAndCreate() {
+        // Find the TabBarController and switch to Portfolio tab (index 4 usually)
+        if let tabBar = self.tabBarController {
+            tabBar.selectedIndex = 4 
+            // Give it a tiny moment to switch, then trigger the creation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                if let nav = tabBar.selectedViewController as? UINavigationController,
+                   let portfolioVC = nav.viewControllers.first as? PortfolioViewController {
+                    portfolioVC.shareCinematicCardTapped()
+                }
+            }
+        }
     }
 
     override func viewDidLayoutSubviews() {
@@ -232,34 +256,12 @@ final class HomeDashboardViewController: UIViewController {
         ])
     }
 
-    // MARK: - Navigation Bar
     private func setupNavigationBar() {
-
         // Clear default items
         navigationItem.leftBarButtonItem = nil
         navigationItem.titleView = nil
-
-        guard let navBar = navigationController?.navigationBar else { return }
-
-        // MARK: - Find correct content view (CRITICAL FIX)
-        guard let contentView = navBar.subviews.first(where: {
-            String(describing: type(of: $0)).contains("ContentView")
-        }) else { return }
-
-        // MARK: - Add title safely (avoid duplicates)
-        if contentView.viewWithTag(999) == nil {
-
-            let titleLabel = GradientWordmarkView(text: "CineMyst")
-            titleLabel.translatesAutoresizingMaskIntoConstraints = false
-            titleLabel.tag = 999
-
-            contentView.addSubview(titleLabel)
-
-            NSLayoutConstraint.activate([
-                titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-                titleLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -16)
-            ])
-        }
+        
+        injectHomeTitleIfNeeded()
 
         // MARK: - Right Buttons
         navigationItem.rightBarButtonItem = makeRightBarButtons()
@@ -321,6 +323,37 @@ final class HomeDashboardViewController: UIViewController {
         navigationController?.navigationBar.scrollEdgeAppearance = appearance
         navigationController?.navigationBar.compactAppearance = appearance
     }
+
+    private func injectHomeTitleIfNeeded() {
+        guard let navBar = navigationController?.navigationBar else { return }
+        
+        // MARK: - Find correct content view (CRITICAL FIX)
+        guard let contentView = navBar.subviews.first(where: {
+            String(describing: type(of: $0)).contains("ContentView")
+        }) else { 
+            // If not found yet, try again in a bit (rare case)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.injectHomeTitleIfNeeded()
+            }
+            return 
+        }
+
+        // MARK: - Add title safely (avoid duplicates)
+        if contentView.viewWithTag(999) == nil {
+            let titleLabel = GradientWordmarkView(text: "CineMyst")
+            titleLabel.translatesAutoresizingMaskIntoConstraints = false
+            titleLabel.tag = 999
+
+            contentView.addSubview(titleLabel)
+
+            NSLayoutConstraint.activate([
+                titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+                titleLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -16)
+            ])
+        }
+    }
+
+
 
     private func removeInjectedHomeTitleIfNeeded() {
         guard let navBar = navigationController?.navigationBar,

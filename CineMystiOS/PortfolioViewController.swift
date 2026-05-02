@@ -8,6 +8,8 @@
 import UIKit
 import AVKit
 import Supabase
+import AVFoundation
+import CoreMedia
 
 // MARK: - Design System
 private enum PDS {
@@ -76,6 +78,21 @@ class PortfolioViewController: UIViewController {
                                                name: NSNotification.Name("portfolioCreated"), object: nil)
     }
     
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        
+        // Occasional Promo Check
+        if CinematicCardPromoManager.shared.shouldShowPromo() {
+            let promoVC = CinematicCardPromoViewController()
+            promoVC.modalPresentationStyle = .overFullScreen
+            promoVC.onAction = { [weak self] in
+                self?.shareCinematicCardTapped()
+            }
+            self.present(promoVC, animated: true, completion: nil)
+            CinematicCardPromoManager.shared.markShown()
+        }
+    }
+
     @objc private func portfolioUpdated() {
         print("🔄 Portfolio updated notification received, refreshing...")
         fetchPortfolioData()
@@ -138,7 +155,8 @@ class PortfolioViewController: UIViewController {
             let editMenu = UIMenu(title: "Portfolio Options", children: [
                 UIAction(title: "Edit Details", image: UIImage(systemName: "pencil")) { [weak self] _ in self?.editBasicInfoTapped() },
                 UIAction(title: "Share Portfolio", image: UIImage(systemName: "link")) { [weak self] _ in self?.shareTapped() },
-                UIAction(title: "Export resume", image: UIImage(systemName: "doc.text")) { [weak self] _ in self?.exportTapped() }
+                UIAction(title: "Export Document Resume", image: UIImage(systemName: "doc.text")) { [weak self] _ in self?.exportTapped() },
+                UIAction(title: "Share Cinematic Card", image: UIImage(systemName: "sparkles")) { [weak self] _ in self?.shareCinematicCardTapped() }
             ])
             let moreBtn = UIBarButtonItem(image: UIImage(systemName: "ellipsis.circle"), menu: editMenu)
             navigationItem.rightBarButtonItems = [moreBtn, shareBtn]
@@ -881,30 +899,188 @@ class PortfolioViewController: UIViewController {
     @objc private func exportTapped() {
         guard let p = portfolio else { return }
         
-        // Generate a text-based resume/export summary
-        var exportContent = "CINEMYST PORTFOLIO: \(p.full_name?.uppercased() ?? "ARTIST")\n"
-        exportContent += "====================================\n\n"
-        if let bio = p.bio { exportContent += "BIO: \(bio)\n\n" }
-        
-        for section in sections {
-            if !section.items.isEmpty {
-                exportContent += "【 \(section.title.uppercased()) 】\n"
-                for item in section.items {
-                    exportContent += "- \(item.title) (\(item.year))"
-                    if let role = item.role { exportContent += " as \(role)" }
-                    exportContent += "\n"
-                }
-                exportContent += "\n"
-            }
+        // Create the PDF
+        guard let pdfURL = generatePDFResume(portfolio: p) else {
+            showError("Could not generate PDF resume.")
+            return
         }
         
-        exportContent += "Generated via CineMyst 🎬"
-        
-        let activityVC = UIActivityViewController(activityItems: [exportContent], applicationActivities: nil)
+        let activityVC = UIActivityViewController(activityItems: [pdfURL], applicationActivities: nil)
         if let popover = activityVC.popoverPresentationController {
             popover.barButtonItem = navigationItem.rightBarButtonItem
         }
         present(activityVC, animated: true)
+    }
+
+    private func generatePDFResume(portfolio: PortfolioResponse) -> URL? {
+        let pdfRenderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792))
+        
+        let filePath = NSTemporaryDirectory().appending("CineMyst_Professional_Resume.pdf")
+        let fileURL = URL(fileURLWithPath: filePath)
+        
+        // Colors from Design System
+        let cinemystRose = UIColor(red: 0.95, green: 0.42, blue: 0.47, alpha: 1)
+        let cinemystGold = UIColor(red: 1.00, green: 0.80, blue: 0.30, alpha: 1)
+        let cinemystDeep = UIColor(red: 0.07, green: 0.04, blue: 0.18, alpha: 1)
+        let cinemystEnd  = UIColor(red: 0.55, green: 0.15, blue: 0.25, alpha: 1)
+        
+        do {
+            try pdfRenderer.writePDF(to: fileURL) { context in
+                context.beginPage()
+                let cgContext = context.cgContext
+                
+                // 1. HEADER BACKGROUND (Gradient)
+                let headerHeight: CGFloat = 180
+                let colors = [cinemystDeep.cgColor, cinemystEnd.cgColor] as CFArray
+                let colorSpace = CGColorSpaceCreateDeviceRGB()
+                let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 1.0])!
+                cgContext.drawLinearGradient(gradient, start: CGPoint(x: 0, y: 0), end: CGPoint(x: 612, y: headerHeight), options: [])
+                
+                // 2. PROFILE IMAGE
+                var currentY: CGFloat = 40
+                let margin: CGFloat = 50
+                let contentWidth: CGFloat = 612 - (2 * margin)
+                
+                if let profileImage = profileImageView.image {
+                    let imageSize: CGFloat = 100
+                    let imageRect = CGRect(x: margin, y: currentY, width: imageSize, height: imageSize)
+                    
+                    cgContext.saveGState()
+                    cgContext.addEllipse(in: imageRect)
+                    cgContext.clip()
+                    profileImage.draw(in: imageRect)
+                    cgContext.restoreGState()
+                    
+                    // Ring around image
+                    cgContext.setStrokeColor(cinemystRose.cgColor)
+                    cgContext.setLineWidth(2)
+                    cgContext.strokeEllipse(in: imageRect)
+                    
+                    currentY += 0 // Don't advance Y yet, we want name next to it
+                }
+                
+                // 3. NAME & TAGLINE
+                let nameX = margin + 120
+                var nameY = currentY + 15
+                
+                let name = (portfolio.full_name ?? portfolio.stage_name ?? "Artist Portfolio").uppercased()
+                let nameAttr: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.boldSystemFont(ofSize: 28),
+                    .foregroundColor: cinemystGold
+                ]
+                name.draw(at: CGPoint(x: nameX, y: nameY), withAttributes: nameAttr)
+                nameY += 35
+                
+                let tagline = "CINEMYST CERTIFIED PROFESSIONAL"
+                let tagAttr: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: 10, weight: .bold),
+                    .foregroundColor: cinemystRose,
+                    .kern: 1.5
+                ]
+                tagline.draw(at: CGPoint(x: nameX, y: nameY), withAttributes: tagAttr)
+                
+                currentY = headerHeight + 30
+                
+                // --- SECTION STYLING ---
+                let sectionTitleAttr: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.boldSystemFont(ofSize: 16),
+                    .foregroundColor: cinemystEnd
+                ]
+                let bodyAttr: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: 12),
+                    .foregroundColor: UIColor.black
+                ]
+                let subAttr: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.italicSystemFont(ofSize: 11),
+                    .foregroundColor: UIColor.gray
+                ]
+                
+                // 4. VITAL STATISTICS (GRID)
+                "VITAL STATISTICS".draw(at: CGPoint(x: margin, y: currentY), withAttributes: sectionTitleAttr)
+                currentY += 25
+                
+                let stats = [
+                    ("Age", portfolio.age), ("Sex", portfolio.sex),
+                    ("Height", portfolio.height_cm), ("Weight", portfolio.weight_kg),
+                    ("Eyes", portfolio.eye_color), ("Hair", portfolio.hair_color)
+                ]
+                
+                var statX = margin
+                var count = 0
+                for (label, val) in stats {
+                    if let v = val, !v.isEmpty {
+                        let statText = "\(label): \(v)"
+                        statText.draw(at: CGPoint(x: statX, y: currentY), withAttributes: bodyAttr)
+                        statX += contentWidth / 3
+                        count += 1
+                        if count % 3 == 0 {
+                            statX = margin
+                            currentY += 20
+                        }
+                    }
+                }
+                if count % 3 != 0 { currentY += 20 }
+                currentY += 20
+                
+                // 5. BIO
+                if let bio = portfolio.bio, !bio.isEmpty {
+                    "BIOGRAPHY".draw(at: CGPoint(x: margin, y: currentY), withAttributes: sectionTitleAttr)
+                    currentY += 25
+                    let bioRect = bio.boundingRect(with: CGSize(width: contentWidth, height: .greatestFiniteMagnitude), options: .usesLineFragmentOrigin, attributes: bodyAttr, context: nil)
+                    bio.draw(in: CGRect(x: margin, y: currentY, width: contentWidth, height: bioRect.height), withAttributes: bodyAttr)
+                    currentY += bioRect.height + 30
+                }
+                
+                // 6. PROJECTS
+                let actorSections: [(String, AnyCodable?)] = [
+                    ("FILMS & TV", portfolio.movies),
+                    ("THEATRE", portfolio.theatre),
+                    ("ADS & COMMERCIALS", portfolio.advertisement),
+                    ("WEB SERIES", portfolio.web_series)
+                ]
+                
+                for (title, content) in actorSections {
+                    let projects = normalizedProjects(from: content)
+                    if !projects.isEmpty {
+                        if currentY > 650 { context.beginPage(); currentY = 50 }
+                        title.draw(at: CGPoint(x: margin, y: currentY), withAttributes: sectionTitleAttr)
+                        currentY += 25
+                        
+                        for dict in projects {
+                            let pTitle = dict["title"] as? String ?? "Untitled"
+                            let pYear  = (dict["year"] as? String) ?? (dict["year"] as? Int).map { "\($0)" } ?? "—"
+                            let pRole  = dict["role"] as? String
+                            
+                            let itemText = "• \(pTitle) (\(pYear))"
+                            let itemRect = itemText.boundingRect(with: CGSize(width: contentWidth, height: .greatestFiniteMagnitude), options: .usesLineFragmentOrigin, attributes: bodyAttr, context: nil)
+                            
+                            if currentY + itemRect.height > 740 { context.beginPage(); currentY = 50 }
+                            itemText.draw(in: CGRect(x: margin, y: currentY, width: contentWidth, height: itemRect.height), withAttributes: bodyAttr)
+                            currentY += itemRect.height + 2
+                            
+                            if let r = pRole, !r.isEmpty {
+                                "  Role: \(r)".draw(at: CGPoint(x: margin, y: currentY), withAttributes: subAttr)
+                                currentY += 14
+                            }
+                            currentY += 4
+                        }
+                        currentY += 20
+                    }
+                }
+                
+                // FOOTER
+                let footer = "Generated via CineMyst 🎬 | The Global Casting Network".uppercased()
+                let footAttr: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: 8, weight: .bold),
+                    .foregroundColor: UIColor.lightGray,
+                    .kern: 1.0
+                ]
+                footer.draw(at: CGPoint(x: margin, y: 760), withAttributes: footAttr)
+            }
+            return fileURL
+        } catch {
+            return nil
+        }
     }
 
     @objc private func addItemTapped(_ sender: UIButton) {
@@ -1238,7 +1414,6 @@ class PortfolioViewController: UIViewController {
                 })
             }
         }
-
         return urls
             .compactMap { resolvePortfolioMediaURL($0) }
             .filter { !$0.isEmpty }
@@ -2037,7 +2212,6 @@ class ImageLoader {
         } catch {}
         return nil
     }
-    
     private func generateThumbnail(url: URL) async -> UIImage? {
         let asset = AVAsset(url: url)
         let generator = AVAssetImageGenerator(asset: asset)
@@ -2055,3 +2229,597 @@ class ImageLoader {
         }
     }
 }
+
+// MARK: - Cinematic Card Generation
+extension PortfolioViewController {
+    
+    @objc func shareCinematicCardTapped() {
+        guard let p = portfolio else { return }
+        
+        let loadingIndicator = UIActivityIndicatorView(style: .large)
+        loadingIndicator.center = view.center
+        loadingIndicator.color = .white
+        loadingIndicator.startAnimating()
+        view.addSubview(loadingIndicator)
+        
+        Task {
+            let cardImage = await createGenZCinematicCard(portfolio: p)
+            await MainActor.run {
+                loadingIndicator.removeFromSuperview()
+                let celebrationVC = CinematicCardCelebrationViewController(cardImage: cardImage)
+                celebrationVC.modalPresentationStyle = .fullScreen
+                self.present(celebrationVC, animated: true)
+            }
+        }
+    }
+    
+    private func createGenZCinematicCard(portfolio p: PortfolioResponse) async -> UIImage {
+        let cardSize = CGSize(width: 1200, height: 1800)
+        let renderer = UIGraphicsImageRenderer(size: cardSize)
+        
+        // Use the already-loaded profile image from the screen, or fetch it if needed
+        var profileImg = self.profileImageView.image ?? UIImage(systemName: "person.crop.circle.fill")!
+        
+        if let resolvedUrl = resolvePortfolioMediaURL(p.profile_picture_url),
+           let img = await ImageLoader.shared.image(from: resolvedUrl) {
+            profileImg = img
+        }
+        
+        var galleryImages: [UIImage] = []
+        if let mediaList = p.media_urls?.value as? [[String: Any]] {
+            for media in mediaList.prefix(3) {
+                if let url = media["url"] as? String, let img = await ImageLoader.shared.image(from: url) {
+                    galleryImages.append(img)
+                }
+            }
+        }
+        
+        // Background Doodle
+        let bgImage = UIImage(contentsOfFile: "/Users/user55/.gemini/antigravity/brain/51857e07-7311-4e96-95bc-bf9dc4ee4199/genz_portfolio_bg_1777729823074.png") ?? UIImage()
+        
+        return renderer.image { ctx in
+            let cg = ctx.cgContext
+            
+            // 1. Draw Background Pattern
+            bgImage.draw(in: CGRect(origin: .zero, size: cardSize))
+            
+            // 2. Main Card with Gradient & Shadow
+            let margin: CGFloat = 50
+            let glassRect = CGRect(x: margin, y: margin, width: cardSize.width - (margin * 2), height: cardSize.height - (margin * 2))
+            let glassPath = UIBezierPath(roundedRect: glassRect, cornerRadius: 50)
+            
+            // Shadow
+            cg.saveGState()
+            cg.setShadow(offset: CGSize(width: 0, height: 20), blur: 40, color: UIColor.black.withAlphaComponent(0.2).cgColor)
+            
+            // Gradient Fill for Panel
+            let colors = [UIColor(red: 0.98, green: 0.96, blue: 1.0, alpha: 0.95).cgColor, UIColor.white.withAlphaComponent(0.95).cgColor] as CFArray
+            let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0.0, 1.0])!
+            glassPath.addClip()
+            cg.drawLinearGradient(gradient, start: glassRect.origin, end: CGPoint(x: glassRect.maxX, y: glassRect.maxY), options: [])
+            cg.restoreGState()
+            
+            // Border
+            UIColor.white.withAlphaComponent(0.6).setStroke()
+            glassPath.lineWidth = 3
+            glassPath.stroke()
+            
+            // 3. Decorative "Cool" Elements (Bubbles/Blobs)
+            let bubbleColors = [
+                UIColor(red: 1.0, green: 0.8, blue: 0.9, alpha: 0.3).cgColor,
+                UIColor(red: 0.8, green: 0.9, blue: 1.0, alpha: 0.3).cgColor,
+                UIColor(red: 1.0, green: 1.0, blue: 0.8, alpha: 0.3).cgColor
+            ]
+            for _ in 0...8 {
+                let r = CGFloat.random(in: 40...120)
+                let x = CGFloat.random(in: glassRect.minX...glassRect.maxX)
+                let y = CGFloat.random(in: glassRect.minY...glassRect.maxY)
+                cg.setFillColor(bubbleColors.randomElement()!)
+                cg.fillEllipse(in: CGRect(x: x, y: y, width: r, height: r))
+            }
+            
+            // 4. Profile Picture (Modern Layout)
+            let pfpSize: CGFloat = 300
+            let pfpRect = CGRect(x: glassRect.minX + 40, y: glassRect.minY + 40, width: pfpSize, height: pfpSize)
+            
+            // Glow behind PFP
+            cg.saveGState()
+            cg.setShadow(offset: .zero, blur: 30, color: UIColor(red: 0.85, green: 0.65, blue: 1.00, alpha: 0.6).cgColor)
+            let pfpPath = UIBezierPath(ovalIn: pfpRect)
+            pfpPath.addClip()
+            profileImg.draw(in: pfpRect)
+            cg.restoreGState()
+            
+            // PFP Border
+            UIColor.white.setStroke()
+            pfpPath.lineWidth = 10
+            pfpPath.stroke()
+            
+            // 5. Name and Bio Section
+            let name = p.stage_name ?? p.full_name ?? "CineMyst Artist"
+            let nameAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 82, weight: .black),
+                .foregroundColor: UIColor.black,
+                .kern: -1.0
+            ]
+            name.draw(at: CGPoint(x: pfpRect.maxX + 40, y: pfpRect.minY + 40), withAttributes: nameAttrs)
+            
+            let id = p.id.prefix(8)
+            let idAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.monospacedSystemFont(ofSize: 30, weight: .bold),
+                .foregroundColor: UIColor.systemPurple.withAlphaComponent(0.6)
+            ]
+            "ID: #\(id)".draw(at: CGPoint(x: pfpRect.maxX + 40, y: pfpRect.minY + 140), withAttributes: idAttrs)
+            
+            // 6. Bio (Filled more space)
+            let bioRect = CGRect(x: glassRect.minX + 40, y: pfpRect.maxY + 40, width: glassRect.width - 80, height: 280)
+            let bio = p.bio ?? "Professional Artist • Actor • Creator\nTurning dreams into cinematic reality."
+            let bioPara = NSMutableParagraphStyle()
+            bioPara.lineSpacing = 10
+            let bioAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 42, weight: .medium),
+                .foregroundColor: UIColor.darkGray,
+                .paragraphStyle: bioPara
+            ]
+            bio.draw(in: bioRect, withAttributes: bioAttrs)
+            
+            // 7. Gallery Section (Bigger)
+            let galleryY = bioRect.maxY + 20
+            let itemW = (glassRect.width - 120) / 3
+            let itemH = itemW * 1.4
+            for (idx, img) in galleryImages.enumerated() {
+                let rect = CGRect(x: glassRect.minX + 40 + (CGFloat(idx) * (itemW + 20)), y: galleryY, width: itemW, height: itemH)
+                let path = UIBezierPath(roundedRect: rect, cornerRadius: 35)
+                cg.saveGState()
+                path.addClip()
+                img.draw(in: rect)
+                cg.restoreGState()
+                
+                // Card Border
+                UIColor.white.withAlphaComponent(0.8).setStroke()
+                path.lineWidth = 4
+                path.stroke()
+            }
+            
+            // 8. Stats Bar
+            let statsY = galleryY + itemH + 60
+            let stats = [
+                ("AGE", p.age ?? "24"),
+                ("SEX", p.sex ?? "N/A"),
+                ("HT", p.height_cm ?? "N/A"),
+                ("TYPE", p.body_type ?? "Artist")
+            ]
+            
+            for (idx, stat) in stats.enumerated() {
+                let x = glassRect.minX + 40 + (CGFloat(idx) * (glassRect.width - 80) / 4)
+                let labelAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 24, weight: .bold), .foregroundColor: UIColor.systemGray2]
+                let valAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 40, weight: .heavy), .foregroundColor: UIColor.black]
+                
+                stat.0.draw(at: CGPoint(x: x, y: statsY), withAttributes: labelAttrs)
+                stat.1.draw(at: CGPoint(x: x, y: statsY + 35), withAttributes: valAttrs)
+            }
+            
+            // 8.5 PROFESSIONAL CREDITS & LINKS
+            let creditsY = statsY + 120
+            let creditsTitleAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 32, weight: .black), .foregroundColor: UIColor.black]
+            "TOP CREDITS".draw(at: CGPoint(x: glassRect.minX + 40, y: creditsY), withAttributes: creditsTitleAttrs)
+            
+            var currentCreditY = creditsY + 50
+            let creditEntryAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 28, weight: .bold), .foregroundColor: UIColor.darkGray]
+            let creditSubAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 24, weight: .medium), .foregroundColor: UIColor.systemGray]
+            
+            // Helper to draw credit lists
+            let allCategories = [("FILMS", p.movies), ("THEATRE", p.theatre), ("ADS", p.advertisement)]
+            var creditCount = 0
+            for cat in allCategories {
+                let projects = normalizedProjects(from: cat.1)
+                if let first = projects.first, creditCount < 3 {
+                    let title = first["title"] as? String ?? "Untitled"
+                    let role = first["role"] as? String ?? "Artist"
+                    "• \(cat.0): \(title)".draw(at: CGPoint(x: glassRect.minX + 40, y: currentCreditY), withAttributes: creditEntryAttrs)
+                    "  as \(role)".draw(at: CGPoint(x: glassRect.minX + 40, y: currentCreditY + 32), withAttributes: creditSubAttrs)
+                    currentCreditY += 80
+                    creditCount += 1
+                }
+            }
+            
+            // Social Presence Links
+            let linkTitleAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 28, weight: .bold), .foregroundColor: UIColor.systemPurple]
+            let linkTextAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 24, weight: .medium), .foregroundColor: UIColor.darkGray]
+            
+            let linksY = glassRect.maxY - 400
+            "DIGITAL PRESENCE".draw(at: CGPoint(x: glassRect.minX + 40, y: linksY), withAttributes: linkTitleAttrs)
+            
+            let linkList = [
+                ("Instagram", p.instagram_url),
+                ("IMDb", p.imdb_url),
+                ("Website", p.website_url)
+            ].filter { $0.1 != nil && !$0.1!.isEmpty }
+            
+            for (idx, link) in linkList.prefix(3).enumerated() {
+                let text = "\(link.0): \(link.1!)"
+                text.draw(at: CGPoint(x: glassRect.minX + 40, y: linksY + 45 + (CGFloat(idx) * 35)), withAttributes: linkTextAttrs)
+            }
+            
+            // 9. QR Section (Positioned lower)
+            let qrSize: CGFloat = 280
+            let qrRect = CGRect(x: glassRect.maxX - qrSize - 40, y: glassRect.maxY - qrSize - 80, width: qrSize, height: qrSize)
+            
+            // White background for QR visibility
+            let qrBg = UIBezierPath(roundedRect: qrRect.insetBy(dx: -10, dy: -10), cornerRadius: 20)
+            UIColor.white.setFill()
+            qrBg.fill()
+            
+            let qrCode = generateQRCode(from: "https://cinemyst.com/p/\(p.user_id)") ?? UIImage()
+            qrCode.draw(in: qrRect)
+            
+            let ctaAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 34, weight: .black),
+                .foregroundColor: UIColor.black
+            ]
+            "CHECK MY PROFILE".draw(at: CGPoint(x: qrRect.minX - 20, y: qrRect.maxY + 15), withAttributes: ctaAttrs)
+            
+            // 10. CineMyst Branding
+            let brandAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 52, weight: .heavy),
+                .foregroundColor: UIColor(red: 0.95, green: 0.42, blue: 0.47, alpha: 1)
+            ]
+            "CineMyst".draw(at: CGPoint(x: glassRect.minX + 40, y: glassRect.maxY - 110), withAttributes: brandAttrs)
+        }
+    }
+    
+    private func generateQRCode(from string: String) -> UIImage? {
+        let data = string.data(using: String.Encoding.ascii)
+        if let filter = CIFilter(name: "CIQRCodeGenerator") {
+            filter.setValue(data, forKey: "inputMessage")
+            let transform = CGAffineTransform(scaleX: 10, y: 10)
+            if let output = filter.outputImage?.transformed(by: transform) {
+                return UIImage(ciImage: output)
+            }
+        }
+        return nil
+    }
+}
+
+// MARK: - Celebration Screen
+class CinematicCardCelebrationViewController: UIViewController {
+    private let cardImage: UIImage
+    private let cardImageView = UIImageView()
+    private let bgImageView = UIImageView()
+    private let confettiLayer = CAEmitterLayer()
+    private let gradientLayer = CAGradientLayer()
+    private var isDarkMode = false
+    private var actionsStack = UIStackView()
+    
+    init(cardImage: UIImage) {
+        self.cardImage = cardImage
+        super.init(nibName: nil, bundle: nil)
+    }
+    
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        setupUI()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        startAnimations()
+    }
+    
+    private func setupUI() {
+        // 1. Background Image (Revealed in Dark Mode)
+        bgImageView.image = UIImage(named: "cinematic_card")
+        bgImageView.contentMode = .scaleAspectFill
+        bgImageView.clipsToBounds = true
+        bgImageView.alpha = 0 // Hidden in Light Mode
+        bgImageView.translatesAutoresizingMaskIntoConstraints = false
+        view.insertSubview(bgImageView, at: 0)
+        
+        NSLayoutConstraint.activate([
+            bgImageView.topAnchor.constraint(equalTo: view.topAnchor),
+            bgImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bgImageView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bgImageView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        
+        let overlay = UIView()
+        overlay.tag = 501 // Tag for identification
+        overlay.backgroundColor = UIColor.black.withAlphaComponent(0.3)
+        overlay.translatesAutoresizingMaskIntoConstraints = false
+        view.insertSubview(overlay, aboveSubview: bgImageView)
+        
+        NSLayoutConstraint.activate([
+            overlay.topAnchor.constraint(equalTo: view.topAnchor),
+            overlay.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            overlay.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            overlay.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        
+        // 3. Gradient Background
+        gradientLayer.frame = view.bounds
+        applyLightModeGradient() // Start with Light Mode
+        view.layer.insertSublayer(gradientLayer, above: overlay.layer)
+        
+        // 4. Confetti / Sprinkler Layer
+        confettiLayer.emitterPosition = CGPoint(x: view.center.x, y: -50)
+        confettiLayer.emitterShape = .line
+        confettiLayer.emitterSize = CGSize(width: view.bounds.width, height: 1)
+        
+        let colors: [UIColor] = [.systemPink, .systemPurple, .systemYellow, .systemBlue, .systemCyan]
+        let cells: [CAEmitterCell] = colors.map { color in
+            let cell = CAEmitterCell()
+            cell.birthRate = 12
+            cell.lifetime = 10
+            cell.velocity = 150
+            cell.velocityRange = 50
+            cell.emissionLongitude = .pi
+            cell.emissionRange = .pi / 4
+            cell.spin = 2
+            cell.spinRange = 3
+            cell.scale = 0.1
+            cell.scaleRange = 0.05
+            cell.contents = createConfettiImage(color: color)?.cgImage
+            return cell
+        }
+        confettiLayer.emitterCells = cells
+        view.layer.addSublayer(confettiLayer)
+        
+        // 5. Floating Card Preview
+        cardImageView.image = cardImage
+        cardImageView.contentMode = .scaleAspectFit
+        cardImageView.layer.cornerRadius = 20
+        cardImageView.clipsToBounds = true
+        cardImageView.layer.shadowColor = UIColor.black.cgColor
+        cardImageView.layer.shadowOpacity = 0.5
+        cardImageView.layer.shadowRadius = 15
+        cardImageView.layer.shadowOffset = CGSize(width: 0, height: 10)
+        cardImageView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(cardImageView)
+        
+        // 6. Celebration Text
+        let titleLbl = UILabel()
+        titleLbl.text = "YOU'RE CINEMATIC!"
+        titleLbl.font = UIFont.systemFont(ofSize: 32, weight: .black)
+        titleLbl.textColor = .white
+        titleLbl.textAlignment = .center
+        titleLbl.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(titleLbl)
+        
+        let subLbl = UILabel()
+        subLbl.text = "Your custom cinematic card is ready."
+        subLbl.font = UIFont.systemFont(ofSize: 18, weight: .medium)
+        subLbl.textColor = UIColor.white.withAlphaComponent(0.8)
+        subLbl.textAlignment = .center
+        subLbl.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(subLbl)
+        
+        // 7. Circular Glass Buttons Stack
+        actionsStack.axis = .horizontal
+        actionsStack.spacing = 20
+        actionsStack.alignment = .center
+        actionsStack.distribution = .equalSpacing
+        actionsStack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(actionsStack)
+        
+        let shareBtn = createCircularGlassButton(icon: "paperplane.fill", size: 60)
+        shareBtn.addTarget(self, action: #selector(shareTapped), for: .touchUpInside)
+        shareBtn.tag = 1
+        
+        let downloadBtn = createCircularGlassButton(icon: "arrow.down", size: 56)
+        downloadBtn.addTarget(self, action: #selector(downloadTapped), for: .touchUpInside)
+        downloadBtn.tag = 2
+        
+        let copyBtn = createCircularGlassButton(icon: "doc.on.doc", size: 56)
+        copyBtn.addTarget(self, action: #selector(copyTapped), for: .touchUpInside)
+        copyBtn.tag = 3
+        
+        let darkModeBtn = createCircularGlassButton(icon: "moon.fill", size: 56)
+        darkModeBtn.tag = 502 // Tag for identification
+        darkModeBtn.addTarget(self, action: #selector(toggleDarkMode), for: .touchUpInside)
+        
+        actionsStack.addArrangedSubview(downloadBtn)
+        actionsStack.addArrangedSubview(copyBtn)
+        actionsStack.addArrangedSubview(shareBtn)
+        actionsStack.addArrangedSubview(darkModeBtn)
+        
+        // Back Button (Top Left)
+        let backBtn = createCircularGlassButton(icon: "chevron.left", size: 44)
+        backBtn.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
+        backBtn.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(backBtn)
+        
+        NSLayoutConstraint.activate([
+            backBtn.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
+            backBtn.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            backBtn.widthAnchor.constraint(equalToConstant: 44),
+            backBtn.heightAnchor.constraint(equalToConstant: 44),
+            
+            cardImageView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            cardImageView.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: 40),
+            cardImageView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.75),
+            cardImageView.heightAnchor.constraint(equalTo: cardImageView.widthAnchor, multiplier: 1.5),
+            
+            titleLbl.bottomAnchor.constraint(equalTo: cardImageView.topAnchor, constant: -50),
+            titleLbl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            titleLbl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            
+            subLbl.topAnchor.constraint(equalTo: titleLbl.bottomAnchor, constant: 4),
+            subLbl.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            
+            actionsStack.topAnchor.constraint(equalTo: cardImageView.bottomAnchor, constant: 40),
+            actionsStack.centerXAnchor.constraint(equalTo: view.centerXAnchor)
+        ])
+    }
+    
+    private func createCircularGlassButton(icon: String, size: CGFloat) -> UIButton {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: icon), for: .normal)
+        button.tintColor = UIColor.white.withAlphaComponent(0.9)
+        button.backgroundColor = UIColor.white.withAlphaComponent(0.1)
+        button.layer.borderColor = UIColor.white.withAlphaComponent(0.2).cgColor
+        button.layer.borderWidth = 1
+        button.layer.cornerRadius = size / 2
+        button.clipsToBounds = true
+        
+        // Glass morphism effect
+        button.layer.shadowColor = UIColor.black.cgColor
+        button.layer.shadowOpacity = 0.3
+        button.layer.shadowRadius = 8
+        button.layer.shadowOffset = CGSize(width: 0, height: 4)
+        
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.widthAnchor.constraint(equalToConstant: size).isActive = true
+        button.heightAnchor.constraint(equalToConstant: size).isActive = true
+        
+        return button
+    }
+    
+    private func applyLightModeGradient() {
+        gradientLayer.colors = [
+            UIColor(red: 0.05, green: 0.05, blue: 0.15, alpha: 1).cgColor,
+            UIColor(red: 0.20, green: 0.10, blue: 0.30, alpha: 1).cgColor,
+            UIColor(red: 0.40, green: 0.15, blue: 0.25, alpha: 1).cgColor
+        ]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 1)
+    }
+    
+    private func applyDarkModeGradient() {
+        gradientLayer.colors = [
+            UIColor.black.cgColor,
+            UIColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0).cgColor // #272727 is approx 0.15
+        ]
+        gradientLayer.locations = [0.29, 0.89] as [NSNumber]
+        gradientLayer.startPoint = CGPoint(x: 0.5, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 0.5, y: 1)
+    }
+    
+    private func applyDarkGreyGradient() {
+        gradientLayer.colors = [
+            UIColor(red: 0.08, green: 0.08, blue: 0.1, alpha: 1).cgColor,
+            UIColor(red: 0.12, green: 0.12, blue: 0.15, alpha: 1).cgColor,
+            UIColor(red: 0.16, green: 0.16, blue: 0.20, alpha: 1).cgColor
+        ]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 1)
+    }
+    
+    @objc private func toggleDarkMode() {
+        isDarkMode.toggle()
+        
+        // Find views by tag to be 100% sure
+        let overlay = self.view.viewWithTag(501)
+        let btn = self.view.viewWithTag(502) as? UIButton
+        
+        UIView.animate(withDuration: 0.5, delay: 0, options: [.curveEaseInOut], animations: {
+            // 1. Keep gradient visible but update colors
+            self.gradientLayer.opacity = 1.0
+            self.bgImageView.alpha = 0.0 
+            
+            // 2. Overlay Tint
+            overlay?.backgroundColor = self.isDarkMode ? 
+                UIColor.black.withAlphaComponent(0.4) : 
+                UIColor.black.withAlphaComponent(0.3)
+            
+            // 3. Button Feedback
+            btn?.setImage(UIImage(systemName: self.isDarkMode ? "sun.max.fill" : "moon.fill"), for: .normal)
+            
+            // 4. Update Gradient
+            if self.isDarkMode {
+                self.applyDarkModeGradient()
+            } else {
+                self.applyLightModeGradient()
+                self.gradientLayer.locations = nil 
+            }
+        }, completion: nil)
+    }
+    
+    private func startAnimations() {
+        // Card is now static as requested.
+    }
+    
+    @objc private func shareTapped() {
+        let activityVC = UIActivityViewController(activityItems: [cardImage], applicationActivities: nil)
+        present(activityVC, animated: true)
+    }
+    
+    @objc private func downloadTapped() {
+        UIImageWriteToSavedPhotosAlbum(cardImage, self, #selector(image(_:didFinishSavingWithError:contextInfo:)), nil)
+    }
+    
+    @objc private func copyTapped() {
+        UIPasteboard.general.image = cardImage
+        showNotification(message: "Card copied to clipboard!")
+    }
+    
+    @objc private func moreTapped() {
+        let alert = UIAlertController(title: "More Options", message: "Choose an action", preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: "Save to Photos", style: .default) { _ in self.downloadTapped() })
+        alert.addAction(UIAlertAction(title: "Share", style: .default) { _ in self.shareTapped() })
+        alert.addAction(UIAlertAction(title: "Copy to Clipboard", style: .default) { _ in self.copyTapped() })
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        present(alert, animated: true)
+    }
+    
+    @objc private func closeTapped() {
+        dismiss(animated: true)
+    }
+    
+    @objc private func image(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer?) {
+        if error == nil {
+            showNotification(message: "Card saved to photos!")
+        } else {
+            showNotification(message: "Failed to save card")
+        }
+    }
+    
+    private func showNotification(message: String) {
+        let container = UIView()
+        container.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        container.layer.cornerRadius = 8
+        container.clipsToBounds = true
+        container.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(container)
+        
+        let label = UILabel()
+        label.text = message
+        label.textColor = .white
+        label.textAlignment = .center
+        label.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(label)
+        
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
+            label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -16),
+            label.topAnchor.constraint(equalTo: container.topAnchor, constant: 8),
+            label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -8),
+            
+            container.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            container.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+            container.heightAnchor.constraint(equalToConstant: 44)
+        ])
+        
+        UIView.animate(withDuration: 2.5, delay: 0, options: .curveEaseInOut, animations: {
+            container.alpha = 0
+        }) { _ in
+            container.removeFromSuperview()
+        }
+    }
+    
+    private func createConfettiImage(color: UIColor) -> UIImage? {
+        let rect = CGRect(x: 0, y: 0, width: 20, height: 20)
+        UIGraphicsBeginImageContext(rect.size)
+        let ctx = UIGraphicsGetCurrentContext()
+        ctx?.setFillColor(color.cgColor)
+        ctx?.fill(rect)
+        let img = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        return img
+    }
+}
+
+
+
