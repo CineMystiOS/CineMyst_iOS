@@ -1334,6 +1334,7 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         removeHomeInjectedTitleIfNeeded()
+        loadProfileData(silent: true)
     }
 
     deinit { NotificationCenter.default.removeObserver(self) }
@@ -1352,11 +1353,13 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
 
     // MARK: - Data
 
-    private func loadProfileData() {
+    private func loadProfileData(silent: Bool = false) {
         Task {
             do {
-                await MainActor.run {
-                    self.loadingView.startAnimating()
+                if !silent {
+                    await MainActor.run {
+                        self.loadingView.startAnimating()
+                    }
                 }
 
                 async let currentUserIdTask = try AuthManager.shared.currentSession()?.user.id
@@ -1473,7 +1476,7 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
                 // Casting professionals should go to the production profile info flow.
                 let btnTitle: String
                 if shouldUseCastingPortfolioFlow(data) {
-                    btnTitle = hasCastingPortfolio ? "Edit Portfolio" : "Create Portfolio"
+                    btnTitle = hasCastingPortfolio ? "Edit Information" : "Add Information"
                 } else {
                     btnTitle = hasPortfolio ? "Edit Portfolio" : "Create Portfolio"
                 }

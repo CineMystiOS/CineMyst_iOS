@@ -399,7 +399,7 @@ class ProfileInfoViewController: UIViewController {
         view.backgroundColor = .white
         
         // Setup navigation bar
-        title = openedFromProfile ? "Create Portfolio" : "Profile Information"
+        title = openedFromProfile ? "Edit Information" : "Profile Information"
         navigationController?.navigationBar.titleTextAttributes = [
             .foregroundColor: UIColor(red: 67/255, green: 0/255, blue: 34/255, alpha: 1),
             .font: UIFont.boldSystemFont(ofSize: 18)
@@ -412,7 +412,7 @@ class ProfileInfoViewController: UIViewController {
         trackButton.addTarget(self, action: #selector(trackTapped), for: .touchUpInside)
         
         if openedFromProfile {
-            submitButton.setTitle("Update Profile", for: .normal)
+            submitButton.setTitle("Update Information", for: .normal)
         }
     }
     override func viewWillAppear(_ animated: Bool) {
@@ -451,7 +451,7 @@ class ProfileInfoViewController: UIViewController {
             await MainActor.run {
                 hasExistingCastingProfile = true
                 if openedFromProfile {
-                    title = "Edit Portfolio"
+                    title = "Edit Information"
                 }
                 
                 // Map values to local state
@@ -468,7 +468,7 @@ class ProfileInfoViewController: UIViewController {
                 print("✅ Loaded existing profile data")
                 
                 // Rebuild the UI to reflect loaded data (if needed)
-                // In some cases we might want to just apply values if buildLayout was already called
+                self.dangerZoneStack.isHidden = false
                 applyLoadedValuesToForm(profile: profile, casting: castingProfile)
             }
         } catch {
@@ -767,9 +767,76 @@ class ProfileInfoViewController: UIViewController {
         stack.addArrangedSubview(submitButton)
         stack.addArrangedSubview(trackButton)
         
-        if hasExistingCastingProfile {
-            trackButton.isHidden = false
-            submitButton.setTitle("Update & Re-submit", for: .normal)
+        // Add Danger Zone (initially hidden)
+        dangerZoneStack.axis = .vertical
+        dangerZoneStack.spacing = 16
+        dangerZoneStack.isHidden = true
+        
+        let dangerHeader = sectionHeader("Danger Zone")
+        dangerHeader.textColor = .systemRed
+        dangerZoneStack.addArrangedSubview(dangerHeader)
+        
+        let revertBtn = UIButton(type: .system)
+        revertBtn.setTitle("Revert to Artist Profile", for: .normal)
+        revertBtn.setTitleColor(.systemRed, for: .normal)
+        revertBtn.titleLabel?.font = UIFont.boldSystemFont(ofSize: 15)
+        revertBtn.backgroundColor = UIColor.systemRed.withAlphaComponent(0.08)
+        revertBtn.layer.cornerRadius = 12
+        revertBtn.heightAnchor.constraint(equalToConstant: 48).isActive = true
+        revertBtn.addTarget(self, action: #selector(deleteCastingProfileTapped), for: .touchUpInside)
+        dangerZoneStack.addArrangedSubview(revertBtn)
+        
+        stack.addArrangedSubview(dangerZoneStack)
+    }
+
+    private let dangerZoneStack = UIStackView()
+
+    @objc private func deleteCastingProfileTapped() {
+        let alert = UIAlertController(
+            title: "Revert to Artist Profile?",
+            message: "This will remove your casting professional status and change your account type back to Artist. You will need to re-verify if you wish to post roles again. Proceed?",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Revert", style: .destructive) { [weak self] _ in
+            self?.performDeleteCastingProfile()
+        })
+        present(alert, animated: true)
+    }
+
+    private func performDeleteCastingProfile() {
+        Task {
+            do {
+                guard let userId = supabase.auth.currentUser?.id else { return }
+                
+                // 1. Delete casting profile
+                try await supabase
+                    .from("casting_profiles")
+                    .delete()
+                    .eq("id", value: userId.uuidString)
+                    .execute()
+                
+                // 2. Update profiles role back to artist
+                try await supabase
+                    .from("profiles")
+                    .update(["role": "artist"])
+                    .eq("id", value: userId.uuidString)
+                    .execute()
+                
+                await MainActor.run {
+                    let alert = UIAlertController(title: "Success", message: "Your profile has been reverted to Artist.", preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+                        self.navigationController?.popViewController(animated: true)
+                    })
+                    self.present(alert, animated: true)
+                }
+            } catch {
+                await MainActor.run {
+                    let alert = UIAlertController(title: "Error", message: "Failed to revert: \(error.localizedDescription)", preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: "OK", style: .default))
+                    self.present(alert, animated: true)
+                }
+            }
         }
     }
     
