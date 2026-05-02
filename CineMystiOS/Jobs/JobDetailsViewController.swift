@@ -5,6 +5,7 @@ class JobDetailsViewController: UIViewController {
     
     // MARK: - Properties
     var job: Job?
+    var isApplied: Bool = false
     private var associatedTask: JobTask?
     
     // UI
@@ -121,6 +122,15 @@ class JobDetailsViewController: UIViewController {
     }
 
     private func updateCTAButton() {
+        if isApplied {
+            applyButton.setTitle("Applied ✓", for: .normal)
+            applyButton.backgroundColor = UIColor.systemGray4
+            applyButton.setTitleColor(.darkGray, for: .normal)
+            applyButton.isEnabled = false
+            applyButton.layer.shadowOpacity = 0
+            return
+        }
+        
         if associatedTask != nil {
             applyButton.setTitle("Go to Task", for: .normal)
             applyButton.backgroundColor = CineMystTheme.brandPlum

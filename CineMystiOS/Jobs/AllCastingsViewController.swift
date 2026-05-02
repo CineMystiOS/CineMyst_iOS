@@ -32,6 +32,7 @@ final class AllCastingsViewController: UIViewController, UIScrollViewDelegate {
     private var selectedEarn: Float?
     private var selectedLoc: String?
     private var allJobs: [Job] = []
+    private var appliedJobIds: Set<UUID> = []
 
     // MARK: - Lifecycle
     override func viewDidLoad() {
@@ -158,7 +159,8 @@ final class AllCastingsViewController: UIViewController, UIScrollViewDelegate {
                         position: job.positionType,
                         genre: job.jobType,
                         appliedCount: "\(appCount) applied",
-                        hasTask: assocTask != nil
+                        hasTask: assocTask != nil,
+                        isApplied: self.appliedJobIds.contains(job.id)
                     )
                     
                     card.updateBookmark(isBookmarked: BookmarkManager.shared.isBookmarked(job.id))
@@ -178,6 +180,7 @@ final class AllCastingsViewController: UIViewController, UIScrollViewDelegate {
             card.onTap = { [weak self] in
                 let vc = JobDetailsViewController()
                 vc.job = job
+                vc.isApplied = self?.appliedJobIds.contains(job.id) ?? false
                 self?.navigationController?.pushViewController(vc, animated: true)
             }
             
@@ -201,6 +204,19 @@ final class AllCastingsViewController: UIViewController, UIScrollViewDelegate {
         do {
             let fetched = try await JobsService.shared.fetchActiveJobs()
             allJobs = fetched
+            
+            if let user = supabase.auth.currentUser {
+                let actorId = user.id.uuidString
+                if let apps: [Application] = try? await supabase
+                    .from("applications")
+                    .select()
+                    .eq("actor_id", value: actorId)
+                    .execute()
+                    .value {
+                    self.appliedJobIds = Set(apps.map { $0.jobId })
+                }
+            }
+            
             await MainActor.run {
                 applyFilters()
             }

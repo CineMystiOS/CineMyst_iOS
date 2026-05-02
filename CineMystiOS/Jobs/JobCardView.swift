@@ -45,7 +45,8 @@ class JobCardView: UIView {
         position: String? = nil,
         genre: String? = nil,
         appliedCount: String = "0 applied",
-        hasTask: Bool = false
+        hasTask: Bool = false,
+        isApplied: Bool = false
     ) {
         profileImageView.image = image
         titleLabel.text = title
@@ -59,7 +60,7 @@ class JobCardView: UIView {
         
         // At the bottom, we show Position and Genre. 
         // We do NOT show project type here as it is at the top now.
-        configureTags(project: nil, position: position, genre: genre)
+        configureTags(project: nil, position: position, genre: genre, isApplied: isApplied)
         appliedLabel.text = appliedCount
         
         if hasTask {
@@ -83,6 +84,16 @@ class JobCardView: UIView {
             applyButton.layer.shadowOpacity = 0.3
             applyButton.layer.shadowRadius = 10
             applyButton.layer.shadowOffset = CGSize(width: 0, height: 6)
+        }
+        
+        if isApplied {
+            applyButton.setTitle("Applied ✓", for: .normal)
+            applyButton.backgroundColor = UIColor.systemGray4
+            applyButton.setTitleColor(.darkGray, for: .normal)
+            applyButton.layer.shadowOpacity = 0
+            applyButton.isUserInteractionEnabled = false
+        } else {
+            applyButton.isUserInteractionEnabled = true
         }
     }
 
@@ -277,9 +288,25 @@ class JobCardView: UIView {
         stack.spacing = 4
         return stack
     }
-    private func configureTags(project: String?, position: String?, genre: String?) {
+    private func configureTags(project: String?, position: String?, genre: String?, isApplied: Bool = false) {
         // Clear old tags
         tagsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        if isApplied {
+            let appliedView = createTag(text: "Applied", icon: "checkmark.seal.fill")
+            appliedView.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.15)
+            if let stack = appliedView.subviews.first(where: { $0 is UIStackView }) as? UIStackView {
+                if let icon = stack.arrangedSubviews.first as? UIImageView {
+                    icon.tintColor = .systemGreen
+                }
+                if let lbl = stack.arrangedSubviews.last as? UILabel {
+                    lbl.textColor = UIColor.systemGreen.withAlphaComponent(0.9)
+                }
+            }
+            appliedView.layer.borderColor = UIColor.systemGreen.withAlphaComponent(0.3).cgColor
+            appliedView.layer.borderWidth = 1
+            tagsStack.addArrangedSubview(appliedView)
+        }
         
         // Add Project Type
         if let p = project, !p.isEmpty, p.lowercased() != "project" {
