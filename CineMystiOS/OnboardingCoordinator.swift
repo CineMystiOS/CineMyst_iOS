@@ -59,6 +59,7 @@ struct ProfileData {
     var skills: [String] = []
     var experienceYears: String?
     var travelWilling: Bool = false
+    var secondaryRoles: Set<String> = []
     
     // Casting Professional-specific fields
     var specificRole: String?

@@ -317,7 +317,9 @@ final class AuthManager: NSObject {
             primaryRoles: Array(data.primaryRoles),
             careerStage: data.careerStage,
             skills: data.skills,
-            travelWilling: data.travelWilling
+            yearsOfExperience: Int(data.experienceYears ?? "0"),
+            travelWilling: data.travelWilling,
+            secondaryRoles: Array(data.secondaryRoles)
         )
         
         do {
@@ -521,14 +523,18 @@ struct ArtistProfileRecordForSave: Encodable {
     let primaryRoles: [String]
     let careerStage: String?
     let skills: [String]
+    let yearsOfExperience: Int?
     let travelWilling: Bool
+    let secondaryRoles: [String]?
     
     enum CodingKeys: String, CodingKey {
         case id
         case primaryRoles = "primary_roles"
         case careerStage = "career_stage"
         case skills
+        case yearsOfExperience = "years_of_experience"
         case travelWilling = "travel_willing"
+        case secondaryRoles = "secondary_roles"
     }
 }
 

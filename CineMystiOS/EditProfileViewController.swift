@@ -20,6 +20,9 @@ class EditProfileViewController: UIViewController {
     private let locationField = UITextField()
     private let stateField = UITextField()
     private let skillsField = UITextField()
+    private let primaryRolesField = UITextField()
+    private let careerStageField = UITextField()
+    private let travelWillingSwitch = UISwitch()
     private let experienceField = UITextField()
     
     private let saveButton = UIButton(type: .system)
@@ -148,6 +151,20 @@ class EditProfileViewController: UIViewController {
         skillsField.translatesAutoresizingMaskIntoConstraints = false
         skillsField.heightAnchor.constraint(equalToConstant: 44).isActive = true
         contentStack.addArrangedSubview(skillsField)
+
+        primaryRolesField.placeholder = "Primary Roles (e.g. Actor, Model)"
+        primaryRolesField.borderStyle = .roundedRect
+        primaryRolesField.font = UIFont.systemFont(ofSize: 14)
+        primaryRolesField.translatesAutoresizingMaskIntoConstraints = false
+        primaryRolesField.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        contentStack.addArrangedSubview(primaryRolesField)
+
+        careerStageField.placeholder = "Career Stage (e.g. Professional)"
+        careerStageField.borderStyle = .roundedRect
+        careerStageField.font = UIFont.systemFont(ofSize: 14)
+        careerStageField.translatesAutoresizingMaskIntoConstraints = false
+        careerStageField.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        contentStack.addArrangedSubview(careerStageField)
         
         experienceField.placeholder = "Years of Experience"
         experienceField.borderStyle = .roundedRect
@@ -156,6 +173,21 @@ class EditProfileViewController: UIViewController {
         experienceField.translatesAutoresizingMaskIntoConstraints = false
         experienceField.heightAnchor.constraint(equalToConstant: 44).isActive = true
         contentStack.addArrangedSubview(experienceField)
+
+        let travelStack = UIStackView()
+        travelStack.axis = .horizontal
+        travelStack.spacing = 10
+        travelStack.alignment = .center
+        
+        let travelLabel = UILabel()
+        travelLabel.text = "Willing to Travel"
+        travelLabel.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        travelLabel.textColor = .darkGray
+        
+        travelStack.addArrangedSubview(travelLabel)
+        travelStack.addArrangedSubview(travelWillingSwitch)
+        travelWillingSwitch.onTintColor = ActorProfileDS.rosePink
+        contentStack.addArrangedSubview(travelStack)
         
         // MARK: - Save Button
         saveButton.setTitle("Save Changes", for: .normal)
@@ -216,6 +248,13 @@ class EditProfileViewController: UIViewController {
         if let skills = data.artistProfile?.skills {
             skillsField.text = skills.joined(separator: ", ")
         }
+
+        if let primaryRoles = data.artistProfile?.primaryRoles {
+            primaryRolesField.text = primaryRoles.joined(separator: ", ")
+        }
+
+        careerStageField.text = data.artistProfile?.careerStage
+        travelWillingSwitch.isOn = data.artistProfile?.travelWilling ?? false
 
         if let experience = data.artistProfile?.yearsOfExperience {
             experienceField.text = "\(experience)"
@@ -315,10 +354,20 @@ class EditProfileViewController: UIViewController {
 
                 let yearsExp = Int(experienceField.text ?? "")
 
+                let rawRoles = primaryRolesField.text ?? ""
+                let primaryRoles = rawRoles
+                    .split(separator: ",")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
+
                 let artistUpdate = ArtistProfileUpdate(
                     id: userId.uuidString,
                     skills: skills,
-                    years_of_experience: yearsExp
+                    years_of_experience: yearsExp,
+                    primary_roles: primaryRoles,
+                    career_stage: careerStageField.text,
+                    travel_willing: travelWillingSwitch.isOn,
+                    secondary_roles: self.profileData?.artistProfile?.secondaryRoles // Keep existing
                 )
 
                 let artistResult = try await supabase

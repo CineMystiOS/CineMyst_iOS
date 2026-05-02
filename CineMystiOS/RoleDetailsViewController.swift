@@ -130,7 +130,7 @@ class RoleDetailsViewController: UIViewController {
         // Primary Roles (Multi-select chips)
         stackView.addArrangedSubview(createLabel(text: "Primary Roles *", fontSize: 16, weight: .semibold))
         stackView.addArrangedSubview(createLabel(text: "Select all that apply", fontSize: 13, weight: .regular, color: .secondaryLabel))
-        let rolesChipView = createChipSelectionView(options: ["Actor", "Dancer", "Singer", "Model", "Voice Artist"], isMultiSelect: true, tag: 1)
+        let rolesChipView = createChipSelectionView(options: ["Actor", "Theatre Artist", "Influencer", "Model", "Content Creator"], isMultiSelect: true, tag: 1)
         stackView.addArrangedSubview(rolesChipView)
         
         stackView.addArrangedSubview(createSpacer(height: 8))

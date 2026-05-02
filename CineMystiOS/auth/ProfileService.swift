@@ -23,6 +23,8 @@ struct SupabaseArtistProfileData {
     let skills: [String]?
     let yearsOfExperience: Int?
     let careerStage: String?
+    let travelWilling: Bool?
+    let secondaryRoles: [String]?
 }
 
 struct UserProfileData {
@@ -83,7 +85,9 @@ class ProfileService {
                 primaryRoles: artistResp.primary_roles,
                 skills: artistResp.skills,
                 yearsOfExperience: artistResp.years_of_experience,
-                careerStage: artistResp.career_stage
+                careerStage: artistResp.career_stage,
+                travelWilling: artistResp.travel_willing,
+                secondaryRoles: artistResp.secondary_roles
             )
         } else {
             artistProfile = nil
@@ -153,7 +157,9 @@ class ProfileService {
                     primaryRoles: artistResp.primary_roles,
                     skills: artistResp.skills,
                     yearsOfExperience: artistResp.years_of_experience,
-                    careerStage: artistResp.career_stage
+                    careerStage: artistResp.career_stage,
+                    travelWilling: artistResp.travel_willing,
+                    secondaryRoles: artistResp.secondary_roles
                 )
             } else {
                 artistProfile = nil
@@ -434,6 +440,8 @@ struct ArtistProfileResponse: Codable {
     let skills: [String]?
     let years_of_experience: Int?
     let career_stage: String?
+    let travel_willing: Bool?
+    let secondary_roles: [String]?
 }
 
 struct PortfolioResponse: Codable {
@@ -829,4 +837,8 @@ struct ArtistProfileUpdate: Encodable {
     let id: String
     let skills: [String]
     let years_of_experience: Int?
+    let primary_roles: [String]?
+    let career_stage: String?
+    let travel_willing: Bool?
+    let secondary_roles: [String]?
 }

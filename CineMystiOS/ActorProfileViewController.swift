@@ -527,6 +527,24 @@ class AboutSectionView: UIView {
         return l
     }()
 
+    let careerStageValueLabel: UILabel = {
+        let l = UILabel()
+        l.text      = "—"
+        l.font      = UIFont.systemFont(ofSize: 14, weight: .semibold)
+        l.textColor = ActorProfileDS.deepPlum
+        l.numberOfLines = 1
+        return l
+    }()
+
+    let travelWillingValueLabel: UILabel = {
+        let l = UILabel()
+        l.text      = "—"
+        l.font      = UIFont.systemFont(ofSize: 14, weight: .semibold)
+        l.textColor = ActorProfileDS.deepPlum
+        l.numberOfLines = 1
+        return l
+    }()
+
     private let infoStack = UIStackView()
 
     override init(frame: CGRect) {
@@ -576,12 +594,27 @@ class AboutSectionView: UIView {
             return hStack
         }
 
-        infoStack.axis         = .horizontal
-        infoStack.spacing      = 16
-        infoStack.distribution = .fillEqually
+        infoStack.axis         = .vertical
+        infoStack.spacing      = 12
+        infoStack.distribution = .fill
         infoStack.translatesAutoresizingMaskIntoConstraints = false
-        infoStack.addArrangedSubview(makeInfoRow(icon: "mappin.circle.fill",   title: "Location",   valueLabel: locationValueLabel))
-        infoStack.addArrangedSubview(makeInfoRow(icon: "briefcase.circle.fill", title: "Experience", valueLabel: experienceValueLabel))
+        
+        let topRow = UIStackView()
+        topRow.axis = .horizontal
+        topRow.spacing = 16
+        topRow.distribution = .fillEqually
+        topRow.addArrangedSubview(makeInfoRow(icon: "mappin.circle.fill",   title: "Location",   valueLabel: locationValueLabel))
+        topRow.addArrangedSubview(makeInfoRow(icon: "briefcase.circle.fill", title: "Experience", valueLabel: experienceValueLabel))
+        
+        let bottomRow = UIStackView()
+        bottomRow.axis = .horizontal
+        bottomRow.spacing = 16
+        bottomRow.distribution = .fillEqually
+        bottomRow.addArrangedSubview(makeInfoRow(icon: "star.circle.fill", title: "Career Stage", valueLabel: careerStageValueLabel))
+        bottomRow.addArrangedSubview(makeInfoRow(icon: "airplane.circle.fill", title: "Travel Ready", valueLabel: travelWillingValueLabel))
+        
+        infoStack.addArrangedSubview(topRow)
+        infoStack.addArrangedSubview(bottomRow)
         addSubview(infoStack)
 
         NSLayoutConstraint.activate([
@@ -607,16 +640,24 @@ class AboutSectionView: UIView {
         ])
     }
 
-    func setSkills(_ skills: [String]) {
+    func setDetails(primaryRoles: [String], skills: [String]) {
         skillsChipsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        let text = skills.isEmpty ? "No specialties listed" : skills.joined(separator: ", ")
-        let label = UILabel()
-        label.text = text
-        label.font = UIFont.systemFont(ofSize: 14, weight: .regular)
-        label.textColor = .gray
-        label.numberOfLines = 0
-        label.translatesAutoresizingMaskIntoConstraints = false
-        skillsChipsStack.addArrangedSubview(label)
+        
+        if !primaryRoles.isEmpty {
+            let prLabel = UILabel()
+            prLabel.text = "Roles: " + primaryRoles.joined(separator: ", ")
+            prLabel.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+            prLabel.textColor = ActorProfileDS.rosePink
+            prLabel.numberOfLines = 0
+            skillsChipsStack.addArrangedSubview(prLabel)
+        }
+        
+        let sLabel = UILabel()
+        sLabel.text = skills.isEmpty ? "No specific skills listed" : "Skills: " + skills.joined(separator: ", ")
+        sLabel.font = UIFont.systemFont(ofSize: 14, weight: .regular)
+        sLabel.textColor = .gray
+        sLabel.numberOfLines = 0
+        skillsChipsStack.addArrangedSubview(sLabel)
     }
 }
 
@@ -1464,7 +1505,8 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
         // --- About ---
         if let aboutView = contentStackView.arrangedSubviews.compactMap({ $0 as? AboutSectionView }).first {
             aboutView.bioLabel.text = data.profile.bio.flatMap { $0.isEmpty ? nil : $0 } ?? "No bio available."
-            aboutView.setSkills(data.artistProfile?.skills ?? [])
+            aboutView.setDetails(primaryRoles: data.artistProfile?.primaryRoles ?? [], 
+                               skills: data.artistProfile?.skills ?? [])
             let locText = data.profile.location.flatMap { $0.isEmpty ? nil : $0 } ?? "Not specified"
             aboutView.locationValueLabel.text = locText.components(separatedBy: ",").last?.trimmingCharacters(in: .whitespaces) ?? locText
             if let yrs = data.artistProfile?.yearsOfExperience {
@@ -1472,6 +1514,8 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
             } else {
                 aboutView.experienceValueLabel.text = "Not specified"
             }
+            aboutView.careerStageValueLabel.text = data.artistProfile?.careerStage ?? "Not specified"
+            aboutView.travelWillingValueLabel.text = (data.artistProfile?.travelWilling ?? false) ? "Yes" : "No"
         }
 
         updateMediaContent()
@@ -1871,22 +1915,14 @@ final class ActorProfileViewController: UIViewController, EditProfileDelegate, U
     }
 
     private func formatRoleLabel(_ data: UserProfileData) -> String {
-        var parts: [String] = []
-        if let username = data.profile.username { 
-            parts.append("@\(username)") 
+        if let role = data.profile.role?.lowercased() {
+            if role.contains("casting") {
+                return "Casting Professional"
+            } else {
+                return "Artist"
+            }
         }
-        
-        if hasCastingPortfolio {
-            parts.append("I cast")
-        } else if let roles = data.artistProfile?.primaryRoles, !roles.isEmpty {
-            parts.append(roles.joined(separator: ", "))
-        } else if let role = data.profile.role, !role.isEmpty {
-            parts.append(role)
-        } else {
-            parts.append("Actor") // Default fallback
-        }
-        
-        return parts.joined(separator: " • ")
+        return "Artist" // Default fallback
     }
 
     private func shouldUseCastingPortfolioFlow(_ data: UserProfileData) -> Bool {
